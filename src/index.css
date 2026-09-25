@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  /* Tokens Oficiales de Fluo */
+  --color-fluo-dark: #0B0F19;
+  --color-fluo-income: #10B981;
+  --color-fluo-expense: #EF4444;
+  --color-fluo-invest: #6366F1;
+
+  /* Superficies de Cristal */
+  --color-fluo-card: rgba(255, 255, 255, 0.07);
+  --color-fluo-card-hover: rgba(255, 255, 255, 0.12);
+  --color-fluo-border: rgba(255, 255, 255, 0.15);
+  --color-fluo-border-highlight: rgba(255, 255, 255, 0.25);
+}
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.2),
+      0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  }
+
+  .glass-button {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-button:active {
+    transform: scale(0.98);
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-fluo-dark);
+  color: #F3F4F6;
+  min-height: 100vh;
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "swiftui-liquid-glass": {
+      "source": "FloWritesCode/fwc-swiftui-skills",
+      "sourceType": "github",
+      "skillPath": "skills/swiftui-liquid-glass/SKILL.md",
+      "computedHash": "3dbf9d23d64ff671ed305c2101a8d720392c109c665682d0ea14ff307505f5c6"
+    }
+  }
+}
