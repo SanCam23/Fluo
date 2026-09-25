@@ -32,7 +32,7 @@ interface FinanceState {
   // Actions
   addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
   deleteTransaction: (id: string) => void;
-  addAsset: (asset: Omit<InvestmentAsset, 'id'>) => void;
+  addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
   updateAssetPrice: (id: string, newPrice: number) => void;
   refreshAllAssetPrices: () => Promise<void>;
   addRecurrence: (rule: Omit<RecurrenceRule, 'id'>) => void;
@@ -151,6 +151,8 @@ export const useFinanceStore = create<FinanceState>()(
       resetToInitialData: () => {
         try {
           localStorage.removeItem('fluo_finance_storage_v1');
+          localStorage.removeItem('fluo_finance_storage_v2');
+          localStorage.removeItem('fluo_finance_storage_v3');
         } catch (e) {
           console.warn('Error clearing localStorage:', e);
         }
@@ -208,7 +210,7 @@ export const useFinanceStore = create<FinanceState>()(
       },
     }),
     {
-      name: 'fluo_finance_storage_v1',
+      name: 'fluo_finance_storage_v3',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         transactions: state.transactions,
@@ -231,10 +233,16 @@ export const useFinanceStore = create<FinanceState>()(
             Array.isArray(p.categories) && p.categories.length > 0
               ? p.categories
               : currentState.categories,
-          brands:
-            Array.isArray(p.brands) && p.brands.length > 0
-              ? p.brands
-              : currentState.brands,
+          brands: INITIAL_BRANDS.map((initBrand) => {
+            const stored = Array.isArray(p.brands)
+              ? p.brands.find((b) => b.id === initBrand.id)
+              : null;
+            return {
+              ...initBrand,
+              ...(stored || {}),
+              domain: initBrand.domain, // Always guarantee official domain is active
+            };
+          }),
           assets:
             Array.isArray(p.assets) && p.assets.length > 0
               ? p.assets

@@ -1,11 +1,13 @@
-import React from 'react';
 import { CalendarClock } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { formatCurrency } from '../../utils/currency';
 import { getDaysUntil } from '../../utils/dates';
+import { BrandAvatar } from '../common/BrandAvatar';
 
 export const RecurrenceSummaryWidget: React.FC = () => {
   const recurrences = useFinanceStore((state) => state.recurrences);
+  const getBrandById = useFinanceStore((state) => state.getBrandById);
+  const getCategoryById = useFinanceStore((state) => state.getCategoryById);
 
   // Filter only active recurrences sorted by nextDueDate
   const activeRecurrences = recurrences
@@ -28,20 +30,31 @@ export const RecurrenceSummaryWidget: React.FC = () => {
       <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
         {activeRecurrences.map((rule) => {
           const daysLeft = getDaysUntil(rule.nextDueDate);
+          const brand = getBrandById(rule.brandId);
+          const category = getCategoryById(rule.categoryId);
           const isIncome = rule.pillar === 'income';
           const isInvest = rule.pillar === 'invest';
 
           return (
             <div
               key={rule.id}
-              className="flex-shrink-0 w-44 rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 p-3 flex flex-col justify-between transition-all duration-200"
+              className="flex-shrink-0 w-48 rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 p-3 flex flex-col justify-between transition-all duration-200"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white truncate max-w-[100px]">
-                  {rule.title}
-                </span>
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <BrandAvatar
+                    brand={brand}
+                    fallbackText={rule.title}
+                    categoryIcon={category?.icon}
+                    categoryColor={category?.color}
+                    size="sm"
+                  />
+                  <span className="text-xs font-semibold text-white truncate max-w-[90px]">
+                    {rule.title}
+                  </span>
+                </div>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
                     daysLeft <= 3
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                       : 'bg-white/10 text-slate-300'

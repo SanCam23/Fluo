@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { X, Check } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { PillarType } from '../../types/finance';
+import { BrandPicker } from './BrandPicker';
 
 interface QuickAddTransactionModalProps {
   isOpen: boolean;
@@ -13,7 +15,6 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   onClose,
 }) => {
   const categories = useFinanceStore((state) => state.categories);
-  const brands = useFinanceStore((state) => state.brands);
   const addTransaction = useFinanceStore((state) => state.addTransaction);
 
   const [pillar, setPillar] = useState<PillarType>('expense');
@@ -29,7 +30,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const availableCategories = categories.filter((c) => c.pillar === pillar);
   const selectedCatId = categoryId || (availableCategories[0]?.id ?? '');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) return;
@@ -170,22 +171,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
             </select>
           </div>
 
-          {/* Brand Selector */}
-          <div>
-            <label className="text-xs font-medium text-slate-400">Marca Comercial (Opcional)</label>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
-            >
-              <option value="">Sin marca específica</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Brand Picker with Search */}
+          <BrandPicker
+            selectedBrandId={brandId}
+            onSelectBrand={setBrandId}
+            categoryId={selectedCatId}
+          />
 
           {/* Recurrence Checkbox */}
           <label className="flex items-center gap-2 cursor-pointer mt-1">

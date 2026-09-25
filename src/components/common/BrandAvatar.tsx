@@ -1,37 +1,100 @@
-import React from 'react';
+import { useState } from 'react';
 import type { Brand } from '../../types/finance';
+import { getBrandLogoSources } from '../../utils/brandLogo';
+import { CategoryIcon } from './CategoryIcon';
 
 interface BrandAvatarProps {
   brand?: Brand;
   fallbackText?: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
 export const BrandAvatar: React.FC<BrandAvatarProps> = ({
   brand,
   fallbackText = 'FL',
+  categoryIcon,
+  categoryColor,
   size = 'md',
 }) => {
   const sizeClasses = {
-    sm: 'h-8 w-8 text-xs',
-    md: 'h-10 w-10 text-sm',
-    lg: 'h-12 w-12 text-base',
+    sm: 'h-8 w-8 rounded-xl p-1.5',
+    md: 'h-10 w-10 rounded-2xl p-2',
+    lg: 'h-12 w-12 rounded-2xl p-2.5',
   }[size];
 
-  const brandColor = brand?.brandColor || '#6366F1';
-  const initial = brand?.name?.charAt(0) || fallbackText.charAt(0);
+  const iconSizes = {
+    sm: 'h-4 w-4',
+    md: 'h-5 w-5',
+    lg: 'h-6 w-6',
+  }[size];
 
+  const brandColor = brand?.brandColor || categoryColor || '#6366F1';
+  const initial = (brand?.name || fallbackText || 'F').charAt(0).toUpperCase();
+
+  const logoSources = getBrandLogoSources(brand);
+  const [failedSources, setFailedSources] = useState<Record<string, boolean>>({});
+
+  // Active source is the first one that hasn't failed
+  const currentSource = logoSources.find((src) => !failedSources[src]);
+
+  const handleImageError = () => {
+    if (currentSource) {
+      setFailedSources((prev) => ({ ...prev, [currentSource]: true }));
+    }
+  };
+
+  // Case 1: Real Brand Logo (High-definition vector / raster)
+  // Clean dark surface, NO white hairline / shadow cutting across the top
+  if (currentSource) {
+    return (
+      <div
+        className={`relative flex-shrink-0 flex items-center justify-center bg-[#111726] border border-white/10 shadow-lg shadow-black/40 overflow-hidden backdrop-blur-md transition-transform duration-200 ${sizeClasses}`}
+        style={{
+          boxShadow: `0 4px 16px ${brandColor}20`,
+        }}
+      >
+        <img
+          src={currentSource}
+          alt={brand?.name || fallbackText}
+          onError={handleImageError}
+          className="w-full h-full object-contain filter drop-shadow-sm select-none"
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  // Case 2: Transaction without brand, but with category icon
+  if (categoryIcon) {
+    return (
+      <div
+        className={`relative flex-shrink-0 flex items-center justify-center border border-white/10 shadow-lg overflow-hidden backdrop-blur-md transition-transform duration-200 ${sizeClasses}`}
+        style={{
+          background: `linear-gradient(135deg, ${brandColor}30, ${brandColor}10)`,
+          borderColor: `${brandColor}40`,
+          color: brandColor,
+        }}
+      >
+        <CategoryIcon iconName={categoryIcon} className={iconSizes} />
+      </div>
+    );
+  }
+
+  // Case 3: Letter Avatar fallback
   return (
     <div
-      className={`relative flex items-center justify-center rounded-2xl border border-white/20 shadow-md font-bold text-white overflow-hidden backdrop-blur-md ${sizeClasses}`}
+      className={`relative flex-shrink-0 flex items-center justify-center border border-white/10 shadow-lg font-bold text-white overflow-hidden backdrop-blur-md transition-transform duration-200 ${sizeClasses}`}
       style={{
         background: `linear-gradient(135deg, ${brandColor}40, ${brandColor}15)`,
-        borderColor: `${brandColor}60`,
+        borderColor: `${brandColor}50`,
       }}
     >
-      {/* Specular edge */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
-      <span style={{ color: '#FFFFFF', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+      <span
+        className="font-extrabold select-none"
+        style={{ color: '#FFFFFF', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}
+      >
         {initial}
       </span>
     </div>

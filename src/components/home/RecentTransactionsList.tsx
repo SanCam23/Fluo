@@ -1,4 +1,3 @@
-import React from 'react';
 import { Repeat, Trash2 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { PillarType } from '../../types/finance';
@@ -87,7 +86,13 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
               >
                 {/* Left side: Avatar + Concept + Category */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <BrandAvatar brand={brand} fallbackText={category?.name || 'TX'} size="md" />
+                  <BrandAvatar
+                    brand={brand}
+                    fallbackText={category?.name || 'TX'}
+                    categoryIcon={category?.icon}
+                    categoryColor={category?.color}
+                    size="md"
+                  />
 
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-semibold text-white truncate">

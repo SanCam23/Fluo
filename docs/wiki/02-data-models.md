@@ -33,18 +33,28 @@ export interface Category {
 ```
 
 ### Marca Comercial (`Brand`)
-Soporta marcas reales (Mercadona, Netflix, DAZN, Carrefour, Repsol, Apple, etc.) para identificar de un vistazo el origen del gasto/ingreso:
+Soporta marcas reales (Mercadona, Netflix, DAZN, Carrefour, Repsol, Apple, Spotify, Amazon, etc.) para identificar de un vistazo el origen del gasto/ingreso:
 ```typescript
 export interface Brand {
   id: string;
   name: string;
   slug: string;
   categoryId: string;
+  domain?: string;      // Dominio web raíz para resolución automática de logo (ej. 'mercadona.es')
   logoUrl?: string;     // URL opcional o favicon oficial
   brandColor?: string;  // Color representativo de la marca (ej. #E50914 para Netflix)
   isPopular?: boolean;
 }
 ```
+
+### Esquema de Resolución de Logos Reales (`brandLogo.ts`)
+Para garantizar que cada transacción muestre un logotipo nítido sin dependencias rotas, se emplea una estrategia en cascada multi-CDN en `src/utils/brandLogo.ts`:
+
+1. **URL Personalizada (`customLogoUrl`)**: Si la marca posee un asset estático explícito.
+2. **Primario CDN (`unavatar.io`)**: `https://unavatar.io/${domain}?fallback=false` para logotipos e iconos vectoriales.
+3. **Secundario CDN (Google Favicons HD)**: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`.
+4. **Terciario CDN (`Clearbit`)**: `https://logo.clearbit.com/${domain}`.
+5. **Fallback Óptico Liquid Glass**: Si los CDNs no responden o el dispositivo está offline, el componente `BrandAvatar` conmuta automáticamente a un avatar de cristal con la inicial tipográfica en blanco puro sobre un degradado con el color oficial de la marca (`brandColor`).
 
 ---
 
@@ -99,6 +109,23 @@ export interface InvestmentAsset {
     price: number;
   }[];
 }
+```
+
+### Servicio de Cotizaciones en Vivo (`priceFeedService.ts`)
+Simula una API de mercado financiero en tiempo real con latencia de red estocástica (250-450ms) y oscilaciones brownianas:
+
+```typescript
+export interface QuoteResult {
+  identifier: string;
+  name?: string;
+  price: number;
+  change24h: number;
+  currency: 'EUR' | 'USD';
+  lastUpdated: string;
+}
+
+export function fetchLiveQuote(identifier: string): Promise<QuoteResult>;
+export function batchUpdateQuotes(identifiers: string[]): Promise<Record<string, QuoteResult>>;
 ```
 
 ### Métricas Calculadas para un Activo

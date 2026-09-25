@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Eye, EyeOff, RefreshCw, Sparkles } from 'lucide-react';
 import { useFinanceStore, useFinancialSummary } from '../../store/useFinanceStore';
 import { formatCurrency, formatPercentage } from '../../utils/currency';

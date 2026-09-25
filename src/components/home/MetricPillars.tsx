@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
 import { useFinancialSummary } from '../../store/useFinanceStore';
 import { formatCompactCurrency } from '../../utils/currency';

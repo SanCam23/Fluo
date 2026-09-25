@@ -1,7 +1,7 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 
 interface MobileContainerProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const MobileContainer: React.FC<MobileContainerProps> = ({ children }) => {

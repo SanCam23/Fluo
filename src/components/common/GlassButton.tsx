@@ -1,7 +1,7 @@
-import React from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-interface GlassButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
+interface GlassButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  children: ReactNode;
   variant?: 'neutral' | 'prominent' | 'ghost';
   pill?: boolean;
 }

@@ -14,6 +14,7 @@ export interface Brand {
   name: string;
   slug: string;
   categoryId: string;
+  domain?: string;
   logoUrl?: string;
   brandColor?: string;
   isPopular?: boolean;

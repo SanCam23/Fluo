@@ -1,7 +1,7 @@
-import React from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 
-interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
   variant?: 'default' | 'tinted' | 'subtle';
   tintColor?: 'emerald' | 'rose' | 'indigo';
   isInteractive?: boolean;

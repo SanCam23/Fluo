@@ -1,4 +1,3 @@
-import React from 'react';
 import type { PillarType } from '../../types/finance';
 
 interface PillarBadgeProps {
