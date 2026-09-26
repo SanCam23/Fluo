@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import {
-  Wallet,
   Mail,
   Lock,
   Eye,
   EyeOff,
-  ArrowRight,
-  Sparkles,
   Loader2,
   AlertCircle,
   CheckCircle2,
@@ -95,27 +92,16 @@ export const AuthScreen: React.FC = () => {
       </div>
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        {/* App Logo & Header Header */}
+        {/* App Logo & Header */}
         <div className="flex flex-col items-center mb-6 text-center">
-          <div className="relative mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-emerald-400 p-0.5 shadow-[0_0_30px_rgba(99,102,241,0.4)]">
-            {/* Specular Glint */}
-            <div className="pointer-events-none absolute inset-x-3 top-0 h-[2px] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-            <div className="flex h-full w-full items-center justify-center rounded-[22px] bg-[#0B0F19]/90 backdrop-blur-md">
-              <Wallet className="h-8 w-8 text-emerald-400 stroke-[2.2]" />
-            </div>
-          </div>
-
           <img
             src="/fluo-wordmark.png"
             alt="Fluo"
-            className="h-10 w-auto object-contain filter drop-shadow-[0_4px_16px_rgba(99,102,241,0.35)] select-none my-1"
+            className="h-12 w-auto object-contain filter drop-shadow-[0_4px_20px_rgba(99,102,241,0.4)] select-none mb-1"
           />
-          <p className="text-xs text-slate-400 font-medium mt-1">
-            Smart Financial OS &bull; Liquid Glass
-          </p>
 
           {!isSupabaseConfigured && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
               <AlertCircle className="h-3 w-3" />
               <span>Configuración local de Supabase</span>
             </div>
@@ -258,15 +244,9 @@ export const AuthScreen: React.FC = () => {
                   <span>Procesando...</span>
                 </>
               ) : mode === 'login' ? (
-                <>
-                  <span>Entrar a Fluo</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
+                <span>Entrar a Fluo</span>
               ) : (
-                <>
-                  <span>Crear Mi Cuenta</span>
-                  <Sparkles className="h-4 w-4" />
-                </>
+                <span>Crear Mi Cuenta</span>
               )}
             </button>
           </form>

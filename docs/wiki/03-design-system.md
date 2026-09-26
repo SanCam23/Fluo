@@ -92,7 +92,13 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 - **Contenedor**: `bg-white/5 border border-white/10 rounded-xl flex items-center justify-center`
 - **Glifo**: Iconos de Lucide React renderizados en tamaño proporcional con color semántico según la categoría financiera asociada.
 
-### 9. Gráficos y Métricas Visuales (`Recharts` adaptado a Liquid Glass)
+### 9. Selector Desplegable de Cristal (`GlassSelect`)
+- **Disparador Liquid Glass**: `bg-white/[0.06] hover:bg-white/[0.1] border border-white/15 backdrop-blur-xl rounded-2xl px-3.5 py-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] active:scale-[0.99]` con chevron rotatorio `transition-transform duration-200`.
+- **Menú Flotante Revestido**: `bg-[#0D1527]/95 backdrop-blur-2xl border border-white/20 rounded-2xl p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)]` con destello especular superior.
+- **Filas de Selección**: Resplandor activo `bg-indigo-600/25 border border-indigo-500/40 text-white shadow-[0_0_12px_rgba(99,102,241,0.25)]` con checkmark `Check` y soporte para iconos semánticos (`CategoryIcon`, clases de activo, divisas).
+- **Control de Foco y Cierre**: Cierre automático al hacer clic fuera o pulsar la tecla `Escape`.
+
+### 10. Gráficos y Métricas Visuales (`Recharts` adaptado a Liquid Glass)
 - **Contenedores de Gráfico**: `rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl` con línea especular superior `h-px bg-gradient-to-r from-transparent via-white/50 to-transparent`.
 - **Tooltips Flotantes (`GlassTooltip`)**: `rounded-2xl bg-[#0F1626]/95 border border-white/20 p-3 shadow-2xl backdrop-blur-2xl text-xs z-50` con viñetas coloreadas y tipografía de alto contraste.
 - **Gráfico de Dona (Distribución de Gastos)**:

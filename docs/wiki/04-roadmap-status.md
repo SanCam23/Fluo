@@ -261,6 +261,36 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Incorporados tests unitarios de hashing criptográfico SHA-256 en [`useSecurityLock.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSecurityLock.test.ts).
   - 23 tests automatizados pasando al 100% (`npm test`).
 
+### v0.5.9 (Depuración Minimalista de la Pantalla de Acceso)
+- **Limpieza de Cabecera ([`AuthScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/AuthScreen.tsx))**:
+  - Eliminado el recuadro con el icono de la cartera (`Wallet`).
+  - Eliminados los textos redundantes *"Smart Financial OS"* y *"Liquid Glass"*.
+  - El wordmark oficial `fluo-wordmark.png` se presenta en tamaño ampliado (`h-12`) con resplandor ambiental índigo como protagonista único y limpio.
+- **Depuración de Botones de Acción**:
+  - Eliminada la flecha (`ArrowRight`) en el botón de "Entrar a Fluo".
+  - Eliminado el icono de estrellas (`Sparkles`) en el botón de "Crear Mi Cuenta".
+- **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (23/23 tests pasando).
+
+### v0.5.10 (Selectores Desplegables Oficiales Liquid Glass - `GlassSelect`)
+- **Componente Reutilizable ([`GlassSelect.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/GlassSelect.tsx))**:
+  - Sustitución de los `<select>` nativos del sistema operativo por componentes Liquid Glass personalizados con sustrato translúcido, biselado refractivo y chevron interactivo.
+  - Menú desplegable flotante `bg-[#0D1527]/95 backdrop-blur-2xl` con línea especular superior, soporte para iconos semánticos, checkmarks y control de cierre al hacer clic fuera o pulsar `Escape`.
+- **Integración en Modal de Añadir Movimiento ([`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx))**:
+  - **Selector de Categoría**: Desplegable enriquecido con los iconos vectoriales oficiales de `CategoryIcon` e insignias coloreadas por categoría.
+  - **Selector de Tipo de Activo**: Desplegable con iconografía dedicada para acciones, ETFs, fondos indexados, criptoactivos, renta fija y depósitos.
+  - **Selector de Divisa**: Desplegable vítreo para EUR (€) y USD ($).
+- **Consistencia en Cartera ([`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx))**:
+  - Implementación homóloga de `GlassSelect` en el modal de alta de activos.
+- **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (23/23 tests pasando).
+
+### v0.5.11 (Calibración Ergonómica de Bloqueo por Inactividad y Búsqueda Bajo Demanda)
+- **Calibración de Inactividad Real ([`useSecurityLock.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSecurityLock.ts))**:
+  - Eliminado el bloqueo prematuro en el milisegundo de cambio de ventana/pestaña (`visibilitychange`).
+  - Ahora se calcula con precisión el tiempo real transcurrido (`Date.now() - lastActivityTimestamp`): si el usuario conmuta entre aplicaciones durante unos segundos o minutos, la aplicación permanece desbloqueada, activando el bloqueo únicamente si han transcurrido los 3 minutos completos de inactividad.
+- **Búsqueda de Activos Estrictamente Bajo Demanda ([`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) y [`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx))**:
+  - Corregido el auto-despliegue del menú de fondos al abrir la pestaña de inversiones: el menú flotante ahora permanece cerrado de forma predeterminada y solo se activa cuando el usuario escribe activamente una consulta en el campo de búsqueda (`query.trim().length > 0`).
+- **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (23/23 tests pasando).
+
 ---
 
 ## Próximos Hitos (v0.6.0)

@@ -346,9 +346,9 @@ Fluo está optimizada como una PWA de alto rendimiento instalable como aplicaci�
 Fluo implementa un modelo de defensa en profundidad (*Defense in Depth*) adaptado a finanzas personales en movilidad:
 
 ### 1. Bloqueo por Inactividad & Segundo Plano (`useSecurityLock.ts`)
-- **Detección de Inactividad (3 Minutos)**: Temporizador continuo reseteado por interacciones del usuario (`touchstart`, `click`, `mousemove`, `keydown`, `scroll`). Si transcurren 180 segundos sin actividad con PIN activo, la aplicación se bloquea de forma preventiva.
-- **Detección de Segundo Plano (`visibilitychange`)**: En cuanto el usuario cambia de pestaña, minimiza el navegador o bloquea el teléfono móvil (`document.visibilityState === 'hidden'`), se activa de inmediato el bloqueo de seguridad.
-- **Ofuscación de Privacidad**: El contenido del dashboard se desenfoca de forma automática (`filter blur-2xl opacity-40 pointer-events-none`) evitando capturas de pantalla accidentales en el selector de aplicaciones de iOS/Android.
+- **Detección de Inactividad (3 Minutos)**: Temporizador continuo reseteado por interacciones del usuario (`touchstart`, `click`, `mousemove`, `keydown`, `scroll`). Si transcurren 180 segundos continuos sin actividad con PIN activo, la aplicación se bloquea de forma preventiva.
+- **Segundo Plano Inteligente (`visibilitychange`)**: Al conmutar de pestaña o ventana, se registra la marca temporal. Al regresar, el sistema calcula si transcurrieron los 3 minutos de inactividad (`Date.now() - lastActivity >= 180s`). Si el usuario vuelve tras unos segundos o un lapso inferior, la app continúa abierta de forma fluida sin requerir desbloqueo forzado.
+- **Ofuscación de Privacidad**: El contenido del dashboard se desenfoca de forma automática (`filter blur-2xl opacity-40 pointer-events-none`) evitando capturas de pantalla accidentales en el selector de aplicaciones de iOS/Android cuando la pantalla está bloqueada.
 
 ### 2. Criptografía Local y Bóveda de PIN (`SecurityLockScreen.tsx`)
 - **Hashing SHA-256**: Los PINs de 4 dígitos nunca se persisten en texto plano. Se procesan mediante la Web Cryptography API nativa (`crypto.subtle.digest('SHA-256')`) con sal interna de aplicación (`fluo_salt_v1_...`), neutralizando ataques de diccionario o tablas arcoíris en almacenamiento local.

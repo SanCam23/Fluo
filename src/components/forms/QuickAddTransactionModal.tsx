@@ -13,6 +13,10 @@ import {
   Layers,
   Calendar,
   RefreshCw,
+  LineChart,
+  Coins,
+  ShieldCheck,
+  Landmark,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -22,9 +26,26 @@ import type {
   MarketAssetItem,
 } from '../../types/finance';
 import { BrandPicker } from './BrandPicker';
+import { GlassSelect } from '../common/GlassSelect';
+import type { GlassSelectOption } from '../common/GlassSelect';
+import { CategoryIcon } from '../common/CategoryIcon';
 import { calculateFirstNextDueDate } from '../../services/recurringEngine';
 import { searchAssets, fetchCurrentPrice } from '../../services/marketDataService';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
+
+const ASSET_TYPE_OPTIONS: GlassSelectOption<AssetType>[] = [
+  { value: 'stock', label: 'Acciones Bursátiles', icon: <LineChart className="h-3.5 w-3.5 text-indigo-400" /> },
+  { value: 'etf', label: 'ETFs Cotizados', icon: <TrendingUp className="h-3.5 w-3.5 text-indigo-400" /> },
+  { value: 'index_fund', label: 'Fondos Indexados', icon: <Layers className="h-3.5 w-3.5 text-indigo-400" /> },
+  { value: 'crypto', label: 'Criptomonedas', icon: <Coins className="h-3.5 w-3.5 text-amber-400" /> },
+  { value: 'fixed_income', label: 'Renta Fija / Bonos', icon: <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> },
+  { value: 'deposit', label: 'Depósitos Remunerados', icon: <Landmark className="h-3.5 w-3.5 text-indigo-400" /> },
+];
+
+const CURRENCY_OPTIONS: GlassSelectOption<'EUR' | 'USD'>[] = [
+  { value: 'EUR', label: 'EUR (€)', icon: <span className="font-bold text-xs text-indigo-400">€</span> },
+  { value: 'USD', label: 'USD ($)', icon: <span className="font-bold text-xs text-emerald-400">$</span> },
+];
 
 interface QuickAddTransactionModalProps {
   isOpen: boolean;
@@ -54,6 +75,9 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   // Whenever modal opens or activeTab changes, auto-align pillar
   useEffect(() => {
     if (isOpen) {
+      setAssetSearchQuery('');
+      setAssetSearchResults([]);
+      setIsAssetDropdownOpen(false);
       if (initialPillar) {
         setPillar(initialPillar);
       } else if (activeTab === 'invest') {
@@ -101,18 +125,28 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const [endDate, setEndDate] = useState<string>('');
   const [autoCharge, setAutoCharge] = useState<boolean>(true);
 
-  // Debounced search for financial assets
+  // Debounced search for financial assets (only searches when user types a query)
   useEffect(() => {
-    if (!isOpen || pillar !== 'invest') return;
+    if (!isOpen || pillar !== 'invest') {
+      setIsAssetDropdownOpen(false);
+      return;
+    }
+
+    const query = assetSearchQuery.trim();
+    if (!query) {
+      setAssetSearchResults([]);
+      setIsAssetDropdownOpen(false);
+      return;
+    }
 
     let isMounted = true;
     const timeout = setTimeout(async () => {
       setIsSearchingAssets(true);
       try {
-        const results = await searchAssets(assetSearchQuery);
+        const results = await searchAssets(query);
         if (isMounted) {
           setAssetSearchResults(results);
-          setIsAssetDropdownOpen(true);
+          setIsAssetDropdownOpen(results.length > 0);
         }
       } catch (err) {
         console.error('Error searching assets:', err);
@@ -143,6 +177,20 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   // Filter categories matching the selected pillar
   const availableCategories = categories.filter((c) => c.pillar === pillar);
   const selectedCatId = categoryId || (availableCategories[0]?.id ?? (pillar === 'invest' ? 'cat-etf' : ''));
+
+  const categoryOptions: GlassSelectOption[] = availableCategories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    color: c.color,
+    icon: (
+      <div
+        className="w-5 h-5 rounded-lg flex items-center justify-center p-0.5"
+        style={{ backgroundColor: `${c.color}20`, color: c.color }}
+      >
+        <CategoryIcon iconName={c.icon} className="h-3.5 w-3.5" />
+      </div>
+    ),
+  }));
 
   // Asset selection from search
   const handleSelectAsset = async (item: MarketAssetItem) => {
@@ -478,10 +526,17 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                     type="text"
                     placeholder="Busca por nombre, índice, Ticker o código ISIN..."
                     value={assetSearchQuery}
-                    onFocus={() => setIsAssetDropdownOpen(true)}
+                    onFocus={() => {
+                      if (assetSearchQuery.trim().length > 0 && assetSearchResults.length > 0) {
+                        setIsAssetDropdownOpen(true);
+                      }
+                    }}
                     onChange={(e) => {
-                      setAssetSearchQuery(e.target.value);
-                      setIsAssetDropdownOpen(true);
+                      const val = e.target.value;
+                      setAssetSearchQuery(val);
+                      if (!val.trim()) {
+                        setIsAssetDropdownOpen(false);
+                      }
                     }}
                     className="w-full rounded-2xl bg-white/[0.08] border border-white/15 pl-10 pr-9 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 backdrop-blur-md shadow-inner"
                   />
@@ -630,34 +685,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
               {/* Asset Class & Currency */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                    <Layers className="h-3 w-3 text-indigo-400" />
-                    Tipo de Activo
-                  </label>
-                  <select
+                  <GlassSelect<AssetType>
+                    label="Tipo de Activo"
                     value={assetType}
-                    onChange={(e) => setAssetType(e.target.value as AssetType)}
-                    className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
-                  >
-                    <option value="stock">Acciones Bursátiles</option>
-                    <option value="etf">ETFs Cotizados</option>
-                    <option value="index_fund">Fondos Indexados</option>
-                    <option value="crypto">Criptomonedas</option>
-                    <option value="fixed_income">Renta Fija / Bonos</option>
-                    <option value="deposit">Depósitos Remunerados</option>
-                  </select>
+                    onChange={(val) => setAssetType(val)}
+                    options={ASSET_TYPE_OPTIONS}
+                    size="sm"
+                  />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-400">Divisa</label>
-                  <select
+                  <GlassSelect<'EUR' | 'USD'>
+                    label="Divisa"
                     value={currency}
-                    onChange={(e) => setCurrency(e.target.value as 'EUR' | 'USD')}
-                    className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
-                  >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                  </select>
+                    onChange={(val) => setCurrency(val)}
+                    options={CURRENCY_OPTIONS}
+                    size="sm"
+                  />
                 </div>
               </div>
 
@@ -798,18 +842,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
               {/* Category Selector */}
               <div>
-                <label className="text-xs font-medium text-slate-400">Categoría</label>
-                <select
+                <GlassSelect
+                  label="Categoría"
                   value={selectedCatId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
-                >
-                  {availableCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setCategoryId(val)}
+                  options={categoryOptions}
+                />
               </div>
 
               {/* Brand Picker with Search */}

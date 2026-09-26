@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 const PIN_STORAGE_KEY = 'fluo_security_pin_hash';
 const LOCK_STORAGE_KEY = 'fluo_security_lock_state';
+const LAST_ACTIVITY_KEY = 'fluo_last_activity_time';
 const BIOMETRICS_KEY = 'fluo_biometrics_credential_id';
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos de inactividad
 
@@ -28,10 +29,11 @@ export async function hashPin(pin: string): Promise<string> {
 export function useSecurityLock() {
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     try {
-      // Si ya hay un PIN configurado y el estado estaba bloqueado, arrancar bloqueado
       const hasPin = Boolean(localStorage.getItem(PIN_STORAGE_KEY));
       const wasLocked = localStorage.getItem(LOCK_STORAGE_KEY) === 'true';
-      return hasPin && wasLocked;
+      const lastActive = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0);
+      const isExpired = lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS;
+      return hasPin && (wasLocked || isExpired);
     } catch {
       return false;
     }
@@ -47,6 +49,14 @@ export function useSecurityLock() {
 
   const [isBiometricsAvailable, setIsBiometricsAvailable] = useState<boolean>(false);
   const idleTimerRef = useRef<number | null>(null);
+
+  const recordActivity = useCallback(() => {
+    try {
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    } catch {
+      // Ignorar errores en LocalStorage
+    }
+  }, []);
 
   // 1. Detectar disponibilidad de autenticación biométrica en el dispositivo (WebAuthn)
   useEffect(() => {
@@ -85,12 +95,13 @@ export function useSecurityLock() {
   // 3. Función para desbloquear la app
   const unlockNow = useCallback(() => {
     setIsLocked(false);
+    recordActivity();
     try {
       localStorage.setItem(LOCK_STORAGE_KEY, 'false');
     } catch (e) {
       console.warn('[Security] Could not persist unlock state:', e);
     }
-  }, []);
+  }, [recordActivity]);
 
   // 4. Configurar un nuevo PIN de 4 dígitos
   const setupPin = useCallback(async (newPin: string): Promise<boolean> => {
@@ -99,6 +110,7 @@ export function useSecurityLock() {
       const hash = await hashPin(newPin);
       localStorage.setItem(PIN_STORAGE_KEY, hash);
       localStorage.setItem(LOCK_STORAGE_KEY, 'false');
+      recordActivity();
       setHasPin(true);
       setIsLocked(false);
       return true;
@@ -106,7 +118,7 @@ export function useSecurityLock() {
       console.error('[Security] Failed to setup PIN:', e);
       return false;
     }
-  }, []);
+  }, [recordActivity]);
 
   // 5. Validar PIN para desbloquear
   const unlockWithPin = useCallback(async (candidatePin: string): Promise<boolean> => {
@@ -208,6 +220,7 @@ export function useSecurityLock() {
     if (idleTimerRef.current) {
       window.clearTimeout(idleTimerRef.current);
     }
+    recordActivity();
     // Solo iniciar cuenta regresiva si el usuario tiene PIN configurado y no está ya bloqueado
     const pinExists = Boolean(localStorage.getItem(PIN_STORAGE_KEY));
     if (pinExists && !isLocked) {
@@ -215,7 +228,7 @@ export function useSecurityLock() {
         lockNow();
       }, IDLE_TIMEOUT_MS);
     }
-  }, [isLocked, lockNow]);
+  }, [isLocked, lockNow, recordActivity]);
 
   // 8. Escuchar eventos de interacción del usuario para inactividad
   useEffect(() => {
@@ -238,13 +251,30 @@ export function useSecurityLock() {
     };
   }, [hasPin, isLocked, resetIdleTimer]);
 
-  // 9. Bloqueo inmediato al pasar a segundo plano (backgrounding / tab switch)
+  // 9. Comprobación inteligente ante cambio de visibilidad / segundo plano
   useEffect(() => {
     const handleVisibilityChange = () => {
+      const pinExists = Boolean(localStorage.getItem(PIN_STORAGE_KEY));
+      if (!pinExists || isLocked) return;
+
       if (document.visibilityState === 'hidden') {
-        const pinExists = Boolean(localStorage.getItem(PIN_STORAGE_KEY));
-        if (pinExists) {
+        // Registrar timestamp de último uso antes de ir a segundo plano
+        recordActivity();
+      } else if (document.visibilityState === 'visible') {
+        // Al regresar, comprobar si realmente transcurrió el tiempo de inactividad (3 minutos)
+        const now = Date.now();
+        const lastActive = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || now);
+        const elapsed = now - lastActive;
+
+        if (elapsed >= IDLE_TIMEOUT_MS) {
           lockNow();
+        } else {
+          // Mantener desbloqueado y programar el bloqueo para el tiempo remanente
+          const remaining = IDLE_TIMEOUT_MS - elapsed;
+          if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+          idleTimerRef.current = window.setTimeout(() => {
+            lockNow();
+          }, remaining);
         }
       }
     };
@@ -253,7 +283,7 @@ export function useSecurityLock() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [lockNow]);
+  }, [hasPin, isLocked, lockNow, recordActivity]);
 
   // 10. Función para purgar seguridad (en logout)
   const resetSecurity = useCallback(() => {
@@ -262,6 +292,7 @@ export function useSecurityLock() {
     try {
       localStorage.removeItem(PIN_STORAGE_KEY);
       localStorage.removeItem(LOCK_STORAGE_KEY);
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
       localStorage.removeItem(BIOMETRICS_KEY);
     } catch {
       // Ignorar errores en LocalStorage
