@@ -125,19 +125,26 @@ export function getBrandLogoSources(brand?: Brand): string[] {
   const slug = (brand.slug || '').toLowerCase().replace(/^brand-/, '');
   const id = (brand.id || '').toLowerCase().replace(/^brand-/, '');
 
-  // 1. Direct high-definition vector logo
+  // 1. Direct high-definition vector logo from explicit catalog
   const highResList = HIGH_RES_BRAND_LOGOS[slug] || HIGH_RES_BRAND_LOGOS[id];
   if (highResList) {
     sources.push(...highResList);
   }
 
-  // 2. Generic fallback by domain
+  // 2. Generic SimpleIcons SVG resolution for any slug
+  if (slug && slug.length >= 2) {
+    sources.push(`https://cdn.simpleicons.org/${slug}`);
+  }
+
+  // 3. Generic fallback by domain across multiple HD CDNs
   const domain = brand.domain || BRAND_DOMAIN_MAP[id] || BRAND_DOMAIN_MAP[slug];
   if (domain) {
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     sources.push(`https://unavatar.io/${cleanDomain}?fallback=false`);
     sources.push(`https://www.google.com/s2/favicons?domain=${cleanDomain}&sz=128`);
+    sources.push(`https://logo.clearbit.com/${cleanDomain}`);
   }
 
-  return [...new Set(sources)];
+  return [...new Set(sources.filter(Boolean))];
 }
+

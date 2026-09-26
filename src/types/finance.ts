@@ -29,6 +29,7 @@ export interface Transaction {
   concept: string;
   date: string; // ISO 8601 string
   isRecurring?: boolean;
+  isRecurringGenerated?: boolean; // Generada automáticamente por el motor de recurrencias
   recurrenceId?: string;
   createdAt: number;
 }
@@ -70,8 +71,12 @@ export interface RecurrenceRule {
   categoryId: string;
   brandId?: string;
   frequency: RecurrenceFrequency;
+  dayOfWeek?: number; // 1 = Lunes, ..., 7 = Domingo (para semanal)
+  dayOfMonth?: number; // 1 al 31 (para mensual)
   startDate: string;
+  endDate?: string; // Fecha de finalización opcional
   nextDueDate: string;
+  lastProcessedDate?: string; // Última fecha en que se generó un cobro automático
   isActive: boolean;
   autoCharge?: boolean;
 }
@@ -87,4 +92,4 @@ export interface FinancialSummary {
   unrealizedPnLPercentage: number;
 }
 
-export type TimeRangeFilter = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all';
+export type TimeRangeFilter = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all';

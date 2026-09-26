@@ -102,10 +102,16 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
                       <span>{category?.name || 'General'}</span>
                       <span>•</span>
                       <span>{formatRelativeDate(tx.date)}</span>
-                      {tx.isRecurring && (
-                        <span className="inline-flex items-center gap-0.5 text-indigo-400 font-medium">
+                      {(tx.isRecurring || tx.isRecurringGenerated) && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            tx.isRecurringGenerated
+                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                              : 'bg-white/10 text-slate-300 border-white/15'
+                          }`}
+                        >
                           <Repeat className="h-2.5 w-2.5" />
-                          Auto
+                          {tx.isRecurringGenerated ? 'Recurrente Auto' : 'Recurrente'}
                         </span>
                       )}
                     </div>

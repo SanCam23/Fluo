@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wallet, Sparkles, RotateCcw } from 'lucide-react';
+import { Wallet, Sparkles, RotateCcw, FastForward } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
@@ -10,13 +10,16 @@ import { RecentTransactionsList } from './components/home/RecentTransactionsList
 import { InvestmentsView } from './components/investments/InvestmentsView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { QuickAddTransactionModal } from './components/forms/QuickAddTransactionModal';
+import { TimeSimulatorModal } from './components/common/TimeSimulatorModal';
 import type { PillarType } from './types/finance';
 
 export default function App() {
   const activeTab = useFinanceStore((state) => state.activeTab);
   const resetToInitialData = useFinanceStore((state) => state.resetToInitialData);
+  const simulatedTimeOffsetDays = useFinanceStore((state) => state.simulatedTimeOffsetDays);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
 
   return (
@@ -38,18 +41,37 @@ export default function App() {
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsSimulatorOpen(true)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md ${
+              simulatedTimeOffsetDays > 0
+                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
+            }`}
+            title="Simulador de Tiempo y Recurrencias"
+          >
+            <FastForward className="h-3 w-3" />
+            <span>Simular</span>
+            {simulatedTimeOffsetDays > 0 && (
+              <span className="text-[10px] font-bold text-amber-200">
+                +{simulatedTimeOffsetDays}d
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={resetToInitialData}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 text-xs font-medium border border-white/10 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 text-xs font-medium border border-white/10 transition-colors cursor-pointer"
             title="Restablecer datos de prueba"
           >
             <RotateCcw className="h-3 w-3" />
             <span className="hidden sm:inline">Demo</span>
           </button>
 
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 text-[11px] font-semibold text-indigo-300 backdrop-blur-md">
+          <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 text-[11px] font-semibold text-indigo-300 backdrop-blur-md">
             <Sparkles className="h-3 w-3 text-indigo-400" />
             <span>Liquid Glass</span>
           </div>
@@ -92,6 +114,12 @@ export default function App() {
       <QuickAddTransactionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+      />
+
+      {/* Time & Recurrences Simulator Modal (Debug Tool) */}
+      <TimeSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
       />
     </MobileContainer>
   );
