@@ -41,6 +41,47 @@
   .glass-button:active {
     transform: scale(0.98);
   }
+
+  /* GPU-Accelerated Layer for Fixed Floating Elements */
+  .gpu-layer {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Content Visibility Optimization for off-screen lists */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 72px;
+  }
+}
+
+/* Fallback for Devices Without Native Backdrop Filter Support */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-card,
+  .glass-button,
+  [class*="backdrop-blur"] {
+    background-color: rgba(11, 15, 25, 0.94) !important;
+  }
+}
+
+/* Accessibility & Low-Power / Reduced-Motion Degradation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .glass-card,
+  [class*="backdrop-blur"] {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
 }
 
 :root {

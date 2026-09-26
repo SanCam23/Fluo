@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, memo } from 'react';
 import { Trash2, Repeat } from 'lucide-react';
 import type { Transaction, Category, Brand } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
@@ -12,7 +12,7 @@ interface SwipeableTransactionItemProps {
   onDelete: (id: string) => void;
 }
 
-export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> = ({
+export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> = memo(({
   tx,
   category,
   brand,
@@ -129,7 +129,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl select-none transition-all duration-300 ease-out ${
+      className={`relative overflow-hidden rounded-2xl select-none transition-all duration-300 ease-out cv-auto ${
         isDeleting
           ? 'max-h-0 opacity-0 my-0 py-0 scale-95 pointer-events-none'
           : 'max-h-28 opacity-100'
@@ -245,4 +245,6 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
       </div>
     </div>
   );
-};
+});
+
+SwipeableTransactionItem.displayName = 'SwipeableTransactionItem';

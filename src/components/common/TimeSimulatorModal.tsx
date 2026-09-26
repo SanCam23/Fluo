@@ -63,9 +63,9 @@ export const TimeSimulatorModal: React.FC<TimeSimulatorModalProps> = ({ isOpen, 
   const activeRecurrences = recurrences.filter((r) => r.isActive);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all duration-300 gpu-layer transform-gpu">
       <div
-        className="w-full max-w-lg bg-[#0E1526]/95 border border-white/20 rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-[#0E1526]/95 border border-white/20 rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col max-h-[90vh] gpu-layer transform-gpu"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular top highlight */}

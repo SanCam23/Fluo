@@ -29,6 +29,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Persistencia en la Nube & RLS** | ✅ Completado | Base de datos PostgreSQL en Supabase con Row Level Security, Optimistic UI y sincronización en segundo plano |
 | **Progressive Web App (PWA & iOS WebKit)** | ✅ Completado | `vite-plugin-pwa`, Workbox offline caching, soporte WebKit standalone, `safe-area-inset` y banner inteligente |
 | **Ciberseguridad Nivel 1 & Bloqueo Biométrico** | ✅ Completado | Detección de inactividad (3m), backgrounding, bóveda PIN SHA-256, WebAuthn, CSP y purga de sesión (`purgeUserData`) |
+| **Optimización de Rendimiento & Aceleración GPU** | ✅ Completado | Aceleración GPU en Liquid Glass, bundle splitting (65% reducción), compresión Gzip/Brotli, viewport virtualization y SWR |
 
 ---
 
@@ -290,6 +291,24 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **Búsqueda de Activos Estrictamente Bajo Demanda ([`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) y [`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx))**:
   - Corregido el auto-despliegue del menú de fondos al abrir la pestaña de inversiones: el menú flotante ahora permanece cerrado de forma predeterminada y solo se activa cuando el usuario escribe activamente una consulta en el campo de búsqueda (`query.trim().length > 0`).
 - **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (23/23 tests pasando).
+
+### v0.5.12 (Auditoría Integral de Rendimiento: Aceleración GPU, Code Splitting, Virtualización & Caché SWR)
+- **Aceleración por GPU en Liquid Glass ([`index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css))**:
+  - Implementación de `.gpu-layer` (`transform: translateZ(0)` y `will-change: transform`) en contenedores fijos y modales (`FloatingNavbar`, `SecurityLockScreen`, `QuickAddTransactionModal`, `TimeSimulatorModal`, `SignOutConfirmModal`), forzando composición por GPU sin saturar la VRAM en móviles.
+  - Reglas de degradación elegante y accesibilidad para hardware modesto: `@media (prefers-reduced-motion: reduce)` y `@supports not (backdrop-filter: blur(1px))`.
+- **Code Splitting & Bundle Partitioning ([`vite.config.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/vite.config.ts) & [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx))**:
+  - Carga diferida (`React.lazy` + `Suspense`) de `AnalyticsView` (aísla ~400 kB de Recharts), `InvestmentsView` y todos los modales de creación y configuración.
+  - Particionamiento manual de chunks (`vendor-react`, `vendor-charts`, `vendor-supabase`, `vendor-icons`, `vendor-state`).
+  - Reducción del JS inicial de 1,031 kB a solo 115 kB (~65% reducción con dependencias core, sub-second FCP/LCP).
+  - Pre-compresión de assets estáticos en `.gz` (Gzip) y `.br` (Brotli) mediante `vite-plugin-compression`.
+- **Virtualización y Renderizado Eficiente**:
+  - Selectores optimizados con `useShallow` de Zustand en [`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx) e [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx).
+  - Memorización con `React.memo` en componentes de fila: [`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx) y `AssetCard`.
+  - Viewport virtualization nativa con `.cv-auto` (`content-visibility: auto`) y ventana progresiva (25 registros iniciales + "Mostrar más").
+- **Caché en Memoria y Red SWR**:
+  - In-memory cache de marcas en [`BrandAvatar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/BrandAvatar.tsx) con `loading="lazy"` y `decoding="async"` para eliminar parpadeos de fallback.
+  - Deduplicación de peticiones concurrentes y Stale-While-Revalidate (SWR) de 25s en [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts) para cotizaciones bursátiles y cripto.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
 
 ---
 

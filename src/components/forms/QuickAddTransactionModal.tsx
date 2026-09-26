@@ -427,10 +427,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     deposit: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md transition-all duration-300">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md transition-all duration-300 gpu-layer transform-gpu">
       <div
-        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 border border-white/20 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 border border-white/20 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden gpu-layer transform-gpu"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular Top Edge */}

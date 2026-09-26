@@ -406,11 +406,18 @@ export function getQuoteFromCache(identifier: string): MarketQuoteResult | null 
   return cache[identifier.trim().toUpperCase()] || null;
 }
 
+// Deduplication & Stale-While-Revalidate memory registries
+const inFlightQuotePromises = new Map<string, Promise<MarketQuoteResult>>();
+const swrQuoteTimestamps = new Map<string, number>();
+const SWR_FRESH_WINDOW_MS = 25_000; // 25s fresh window
+
 /**
  * Clears market quotes cache
  */
 export function clearMarketQuotesCache(): void {
   memoryCache = {};
+  inFlightQuotePromises.clear();
+  swrQuoteTimestamps.clear();
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(CACHE_STORAGE_KEY);
@@ -504,13 +511,7 @@ export async function searchAssets(query: string): Promise<MarketAssetItem[]> {
   return matches;
 }
 
-/**
- * Attempts real-time fetch from public API endpoints (with timeout)
- * and falls back seamlessly to cached/simulated quotes on failure.
- */
-export async function fetchCurrentPrice(identifier: string): Promise<MarketQuoteResult> {
-  const upperId = identifier.trim().toUpperCase();
-
+async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> {
   // Find asset configuration in curated catalog
   const found = CURATED_MARKET_ASSETS.find(
     (a) =>
@@ -603,6 +604,51 @@ export async function fetchCurrentPrice(identifier: string): Promise<MarketQuote
 
   saveQuoteToCache(quoteResult);
   return quoteResult;
+}
+
+/**
+ * Attempts real-time fetch with in-flight deduplication and Stale-While-Revalidate (SWR).
+ * Sub-second response from memory with background revalidation.
+ */
+export async function fetchCurrentPrice(identifier: string): Promise<MarketQuoteResult> {
+  const upperId = identifier.trim().toUpperCase();
+
+  // 1. SWR Freshness Check: If cached quote was refreshed recently, return immediately
+  const cached = getQuoteFromCache(upperId);
+  const lastFetched = swrQuoteTimestamps.get(upperId) || 0;
+  const isFresh = cached && Date.now() - lastFetched < SWR_FRESH_WINDOW_MS;
+
+  if (isFresh && cached) {
+    return cached;
+  }
+
+  // 2. In-flight Deduplication: If already fetching for this asset, reuse existing promise
+  if (inFlightQuotePromises.has(upperId)) {
+    if (cached) {
+      return cached; // Return stale immediately while revalidation is in-flight
+    }
+    return inFlightQuotePromises.get(upperId)!;
+  }
+
+  // 3. Initiate request with in-flight tracking
+  const fetchPromise = (async () => {
+    try {
+      const result = await doFetchCurrentPrice(upperId);
+      swrQuoteTimestamps.set(upperId, Date.now());
+      return result;
+    } finally {
+      inFlightQuotePromises.delete(upperId);
+    }
+  })();
+
+  inFlightQuotePromises.set(upperId, fetchPromise);
+
+  // If stale cached quote exists, return stale immediately while background refresh occurs (SWR)
+  if (cached) {
+    return cached;
+  }
+
+  return fetchPromise;
 }
 
 /**

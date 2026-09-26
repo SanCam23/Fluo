@@ -136,7 +136,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-3xl animate-fadeIn select-none">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-3xl animate-fadeIn select-none gpu-layer transform-gpu">
       {/* Background Ambient Spheres */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-indigo-600/20 rounded-full blur-[130px]" />

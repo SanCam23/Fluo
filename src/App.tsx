@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { FastForward, LogOut, LogIn, Loader2, Cloud, Lock, ShieldCheck } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
@@ -9,15 +9,39 @@ import { HeroBalance } from './components/home/HeroBalance';
 import { MetricPillars } from './components/home/MetricPillars';
 import { RecurrenceSummaryWidget } from './components/home/RecurrenceSummaryWidget';
 import { RecentTransactionsList } from './components/home/RecentTransactionsList';
-import { InvestmentsView } from './components/investments/InvestmentsView';
-import { AnalyticsView } from './components/analytics/AnalyticsView';
-import { QuickAddTransactionModal } from './components/forms/QuickAddTransactionModal';
-import { TimeSimulatorModal } from './components/common/TimeSimulatorModal';
 import { AuthScreen } from './components/auth/AuthScreen';
-import { SignOutConfirmModal } from './components/auth/SignOutConfirmModal';
-import { SecurityLockScreen } from './components/security/SecurityLockScreen';
 import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
 import type { PillarType } from './types/finance';
+
+// Code Splitting: Lazy load heavy analytical charts, secondary views & modals
+const AnalyticsView = lazy(() =>
+  import('./components/analytics/AnalyticsView').then((m) => ({ default: m.AnalyticsView }))
+);
+const InvestmentsView = lazy(() =>
+  import('./components/investments/InvestmentsView').then((m) => ({ default: m.InvestmentsView }))
+);
+const QuickAddTransactionModal = lazy(() =>
+  import('./components/forms/QuickAddTransactionModal').then((m) => ({
+    default: m.QuickAddTransactionModal,
+  }))
+);
+const TimeSimulatorModal = lazy(() =>
+  import('./components/common/TimeSimulatorModal').then((m) => ({ default: m.TimeSimulatorModal }))
+);
+const SignOutConfirmModal = lazy(() =>
+  import('./components/auth/SignOutConfirmModal').then((m) => ({ default: m.SignOutConfirmModal }))
+);
+const SecurityLockScreen = lazy(() =>
+  import('./components/security/SecurityLockScreen').then((m) => ({ default: m.SecurityLockScreen }))
+);
+
+const ViewSkeletonFallback = () => (
+  <div className="flex flex-col gap-4 animate-pulse p-1">
+    <div className="h-32 rounded-3xl bg-white/[0.04] border border-white/10" />
+    <div className="h-44 rounded-3xl bg-white/[0.04] border border-white/10" />
+    <div className="h-32 rounded-3xl bg-white/[0.04] border border-white/10" />
+  </div>
+);
 
 export default function App() {
   const { user, loading: isAuthLoading, isDemoMode, signOut, exitDemoMode } = useAuth();
@@ -227,50 +251,74 @@ export default function App() {
           </>
         )}
 
-        {activeTab === 'stats' && <AnalyticsView />}
+        {activeTab === 'stats' && (
+          <Suspense fallback={<ViewSkeletonFallback />}>
+            <AnalyticsView />
+          </Suspense>
+        )}
 
-        {activeTab === 'invest' && <InvestmentsView />}
+        {activeTab === 'invest' && (
+          <Suspense fallback={<ViewSkeletonFallback />}>
+            <InvestmentsView />
+          </Suspense>
+        )}
       </main>
 
       {/* Floating Bottom Glass Navigation Bar */}
       <FloatingNavbar onOpenAddModal={() => setIsAddModalOpen(true)} />
 
       {/* Quick Add Transaction Modal */}
-      <QuickAddTransactionModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
+      {isAddModalOpen && (
+        <Suspense fallback={null}>
+          <QuickAddTransactionModal
+            isOpen={isAddModalOpen}
+            onClose={() => setIsAddModalOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Time & Recurrences Simulator Modal (Debug Tool) */}
-      <TimeSimulatorModal
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-      />
+      {isSimulatorOpen && (
+        <Suspense fallback={null}>
+          <TimeSimulatorModal
+            isOpen={isSimulatorOpen}
+            onClose={() => setIsSimulatorOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Sign Out Confirmation Modal */}
-      <SignOutConfirmModal
-        isOpen={isSignOutModalOpen}
-        onClose={() => setIsSignOutModalOpen(false)}
-        onConfirm={handleConfirmSignOut}
-        userEmail={user?.email}
-        isLoggingOut={isLoggingOut}
-      />
+      {isSignOutModalOpen && (
+        <Suspense fallback={null}>
+          <SignOutConfirmModal
+            isOpen={isSignOutModalOpen}
+            onClose={() => setIsSignOutModalOpen(false)}
+            onConfirm={handleConfirmSignOut}
+            userEmail={user?.email}
+            isLoggingOut={isLoggingOut}
+          />
+        </Suspense>
+      )}
 
       {/* Security Lock Screen & Biometric PIN Vault */}
-      <SecurityLockScreen
-        isLocked={isLocked || isConfiguringPin}
-        hasPin={hasPin && !isConfiguringPin}
-        isBiometricsAvailable={isBiometricsAvailable}
-        onUnlockWithPin={unlockWithPin}
-        onUnlockWithBiometrics={unlockWithBiometrics}
-        onSetupPin={async (pin) => {
-          const success = await setupPin(pin);
-          if (success) {
-            setIsConfiguringPin(false);
-          }
-          return success;
-        }}
-      />
+      {(isLocked || isConfiguringPin) && (
+        <Suspense fallback={null}>
+          <SecurityLockScreen
+            isLocked={isLocked || isConfiguringPin}
+            hasPin={hasPin && !isConfiguringPin}
+            isBiometricsAvailable={isBiometricsAvailable}
+            onUnlockWithPin={unlockWithPin}
+            onUnlockWithBiometrics={unlockWithBiometrics}
+            onSetupPin={async (pin) => {
+              const success = await setupPin(pin);
+              if (success) {
+                setIsConfiguringPin(false);
+              }
+              return success;
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* PWA Smart Install Prompt (Android & iOS Safari Guide) */}
       <PWAInstallPrompt />

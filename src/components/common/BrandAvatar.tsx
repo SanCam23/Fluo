@@ -11,6 +11,10 @@ interface BrandAvatarProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Module-level in-memory cache to eliminate redundant network probing and fallback flickering across views
+const resolvedLogoCache = new Map<string, string>();
+const failedLogoSources = new Set<string>();
+
 export const BrandAvatar: React.FC<BrandAvatarProps> = ({
   brand,
   fallbackText = 'FL',
@@ -33,15 +37,27 @@ export const BrandAvatar: React.FC<BrandAvatarProps> = ({
   const brandColor = brand?.brandColor || categoryColor || '#6366F1';
   const initial = (brand?.name || fallbackText || 'F').charAt(0).toUpperCase();
 
+  const brandKey = brand ? (brand.id || brand.slug || brand.domain || brand.name) : undefined;
   const logoSources = getBrandLogoSources(brand);
   const [failedSources, setFailedSources] = useState<Record<string, boolean>>({});
 
-  // Active source is the first one that hasn't failed
-  const currentSource = logoSources.find((src) => !failedSources[src]);
+  // Active source: Check resolved cache first, otherwise take first non-failed candidate
+  const cachedUrl = brandKey ? resolvedLogoCache.get(brandKey) : undefined;
+  const currentSource = cachedUrl || logoSources.find((src) => !failedLogoSources.has(src) && !failedSources[src]);
 
   const handleImageError = () => {
     if (currentSource) {
+      failedLogoSources.add(currentSource);
+      if (brandKey && resolvedLogoCache.get(brandKey) === currentSource) {
+        resolvedLogoCache.delete(brandKey);
+      }
       setFailedSources((prev) => ({ ...prev, [currentSource]: true }));
+    }
+  };
+
+  const handleImageLoad = () => {
+    if (brandKey && currentSource) {
+      resolvedLogoCache.set(brandKey, currentSource);
     }
   };
 
@@ -59,8 +75,10 @@ export const BrandAvatar: React.FC<BrandAvatarProps> = ({
           src={currentSource}
           alt={brand?.name || fallbackText}
           onError={handleImageError}
+          onLoad={handleImageLoad}
           className="w-full h-full object-contain filter drop-shadow-sm select-none"
           loading="lazy"
+          decoding="async"
         />
       </div>
     );

@@ -2,12 +2,26 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import type { PluginOption } from 'vite'
+import compression from 'vite-plugin-compression'
+
+const viteCompression = compression as unknown as (options?: Record<string, unknown>) => PluginOption
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    viteCompression({
+      algorithm: 'gzip',
+      ext: '.gz',
+      threshold: 1024,
+    }),
+    viteCompression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+      threshold: 1024,
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-180.jpg', 'icon-192.jpg', 'icon-512.jpg'],
@@ -42,6 +56,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 3000000,
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,woff2}'],
         runtimeCaching: [
           {
@@ -87,4 +102,30 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    target: 'es2020',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/recharts/')) {
+            return 'vendor-charts';
+          }
+          if (id.includes('node_modules/@supabase/')) {
+            return 'vendor-supabase';
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/zustand/')) {
+            return 'vendor-state';
+          }
+        },
+      },
+    },
+  },
 })
