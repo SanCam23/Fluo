@@ -91,6 +91,8 @@ export interface BrandPickerProps {
   selectedBrandId: string;
   onSelectBrand: (brandId: string, suggestedCategoryId?: string) => void;
   categoryId?: string;
+  label?: string;            // Etiqueta superior personalizada (ej. 'Comercio / Marca' o 'Broker / Plataforma')
+  placeholder?: string;      // Placeholder del input de búsqueda rápida
 }
 ```
 - **Búsqueda Dual (Local + Global en Vivo)**: Filtra en tiempo real el catálogo local y ejecuta en paralelo una búsqueda contra la API global de empresas.
@@ -133,6 +135,23 @@ export interface Transaction {
 }
 ```
 
+### Correspondencia con la Tabla SQL `public.transactions` en Supabase
+
+| Campo TypeScript (`Transaction`) | Columna SQL (`public.transactions`) | Tipo PostgreSQL | Restricciones / Índices |
+| :--- | :--- | :--- | :--- |
+| `id` | `id` | `TEXT` | `PRIMARY KEY` |
+| *(Auth Context)* | `user_id` | `UUID` | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` |
+| `amount` | `amount` | `NUMERIC(12, 2)` | `NOT NULL` |
+| `pillar` | `pillar` | `TEXT` | `CHECK (pillar IN ('income', 'expense', 'invest'))` |
+| `categoryId` | `category_id` | `TEXT` | `NOT NULL` |
+| `brandId` | `brand_id` | `TEXT` | `NULL` |
+| `concept` | `concept` | `TEXT` | `NOT NULL` |
+| `date` | `date` | `TIMESTAMPTZ` | `NOT NULL`, Índice `idx_transactions_user_date` |
+| `isRecurring` | `is_recurring` | `BOOLEAN` | `DEFAULT FALSE` |
+| `isRecurringGenerated` | `is_recurring_generated` | `BOOLEAN` | `DEFAULT FALSE` |
+| `recurrenceId` | `recurrence_id` | `TEXT` | `NULL` |
+| `createdAt` | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
+
 ---
 
 ## 4. Módulo de Inversiones y Activos (`InvestmentAsset`)
@@ -152,42 +171,95 @@ export interface InvestmentAsset {
   id: string;
   name: string;                       // Nombre común (ej. 'Vanguard FTSE All-World')
   identifier: string;                 // Ticker (ej. 'VWCE.DE') o ISIN (ej. 'IE00BK5BQT80')
+  ticker?: string;                    // Ticker bursátil explícito (ej. 'AAPL', 'VUSA')
+  isin?: string;                      // Código ISIN normalizado (ej. 'IE00B4L5Y983')
   assetType: AssetType;
-  shares: number;                     // Cantidad de títulos / unidades / tokens
+  shares: number;                     // Cantidad de títulos / unidades / tokens (admite decimales)
   averageBuyPrice: number;            // Precio medio de compra ponderado (PMCP) en divisa base
-  currentPrice: number;               // Cotización actual del activo
+  averagePrice?: number;              // Alias de compatibilidad
+  currentPrice: number;               // Cotización actual oficial de mercado
   currency: 'EUR' | 'USD';
   platform?: string;                  // Broker o entidad (ej. 'Trade Republic', 'MyInvestor', 'Degiro')
-  lastUpdated: string;                // Fecha de última cotización
+  brandId?: string;                   // ID de la marca/broker en el catálogo para resolución de logo oficial
+  lastUpdated: string;                // Fecha y hora de última cotización
   historicalPrices?: {                // Historial de cotización para mini-sparklines
     date: string;
     price: number;
   }[];
+  change24h?: number;                 // Variación porcentual en las últimas 24 horas
+  isOfflineCached?: boolean;          // Indica si el dato proviene de la caché offline local
+  initialFee?: number;                // Comisiones iniciales de intermediación o compra
+  acquisitionDate?: string;           // Fecha de adquisición inicial (YYYY-MM-DD)
 }
 ```
 
-### Servicio de Cotizaciones en Vivo (`priceFeedService.ts`)
-Simula una API de mercado financiero en tiempo real con latencia de red estocástica (250-450ms) y oscilaciones brownianas:
+### Correspondencia con la Tabla SQL `public.investments` en Supabase
+
+| Campo TypeScript (`InvestmentAsset`) | Columna SQL (`public.investments`) | Tipo PostgreSQL | Restricciones / Índices |
+| :--- | :--- | :--- | :--- |
+| `id` | `id` | `TEXT` | `PRIMARY KEY` |
+| *(Auth Context)* | `user_id` | `UUID` | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` |
+| `name` | `name` | `TEXT` | `NOT NULL`, Índice `idx_investments_user_name` |
+| `identifier` | `identifier` | `TEXT` | `NOT NULL`, Índice `idx_investments_identifier` |
+| `ticker` | `ticker` | `TEXT` | `NULL` |
+| `isin` | `isin` | `TEXT` | `NULL` |
+| `assetType` | `asset_type` | `TEXT` | `NOT NULL CHECK (asset_type IN (...))` |
+| `shares` | `shares` | `NUMERIC(16, 8)` | `NOT NULL` |
+| `averageBuyPrice` | `average_buy_price` | `NUMERIC(12, 4)` | `NOT NULL` |
+| `currentPrice` | `current_price` | `NUMERIC(12, 4)` | `NOT NULL` |
+| `currency` | `currency` | `TEXT` | `DEFAULT 'EUR' CHECK (currency IN ('EUR', 'USD'))` |
+| `platform` | `platform` | `TEXT` | `NULL` |
+| `brandId` | `brand_id` | `TEXT` | `NULL` |
+| `lastUpdated` | `last_updated` | `TEXT` | `DEFAULT 'Ahora mismo'` |
+| `change24h` | `change_24h` | `NUMERIC(8, 4)` | `NULL` |
+| `initialFee` | `initial_fee` | `NUMERIC(10, 2)` | `NULL` |
+| `acquisitionDate` | `acquisition_date` | `TEXT` | `NULL` |
+| *(Metadata)* | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
+
+### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
+Gestiona el catálogo de activos financieros, resolución de símbolos y fallback resiliente:
 
 ```typescript
-export interface QuoteResult {
+export interface MarketAssetItem {
+  name: string;
   identifier: string;
-  name?: string;
+  ticker?: string;
+  isin?: string;
+  assetType: AssetType;
+  currency: 'EUR' | 'USD';
+  basePrice: number;
+  change24h: number;
+  benchmarkOrIndex?: string;
+  keywords?: string[];
+  isCustom?: boolean;
+}
+
+export interface MarketQuoteResult {
+  identifier: string;
+  name: string;
+  ticker?: string;
+  isin?: string;
   price: number;
   change24h: number;
   currency: 'EUR' | 'USD';
   lastUpdated: string;
+  isOfflineCached: boolean;
 }
 
-export function fetchLiveQuote(identifier: string): Promise<QuoteResult>;
-export function batchUpdateQuotes(identifiers: string[]): Promise<Record<string, QuoteResult>>;
+export function searchAssets(query: string): Promise<MarketAssetItem[]>;
+export function fetchCurrentPrice(identifier: string): Promise<MarketQuoteResult>;
+export function batchUpdateMarketQuotes(identifiers: string[]): Promise<Record<string, MarketQuoteResult>>;
+export function getQuoteFromCache(identifier: string): MarketQuoteResult | null;
+export function clearMarketQuotesCache(): void;
 ```
 
-### Métricas Calculadas para un Activo
-- **Capital Invertido**: `shares * averageBuyPrice`
-- **Valoración de Mercado**: `shares * currentPrice`
+### Métricas Calculadas para un Activo y Cartera Global (P&L Dinámico)
+- **Capital Invertido**: `(shares * averageBuyPrice) + (initialFee || 0)`
+- **Valoración Actual de Mercado**: `shares * currentPrice`
 - **Ganancia/Pérdida Neta (P&L)**: `Valoración - Capital Invertido`
-- **Rentabilidad Porcentual**: `((currentPrice - averageBuyPrice) / averageBuyPrice) * 100`
+- **Rentabilidad Porcentual**: `((currentPrice - averageBuyPrice) / averageBuyPrice) * 100` (o `((Valoración - Invertido) / Invertido) * 100` con comisiones)
+- **Patrimonio Total Invertido**: Sumatorio de Capital Invertido de todos los activos en cartera
+- **Plusvalía/Minusvalía Total No Realizada**: Sumatorio de P&L de todos los activos en cartera
 
 ---
 

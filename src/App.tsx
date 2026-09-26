@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Wallet, Sparkles, RotateCcw, FastForward } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wallet, FastForward, LogOut, LogIn, Loader2, Cloud } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
+import { useAuth } from './context/AuthContext';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
 import { HeroBalance } from './components/home/HeroBalance';
@@ -11,19 +12,70 @@ import { InvestmentsView } from './components/investments/InvestmentsView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { QuickAddTransactionModal } from './components/forms/QuickAddTransactionModal';
 import { TimeSimulatorModal } from './components/common/TimeSimulatorModal';
+import { AuthScreen } from './components/auth/AuthScreen';
+import { SignOutConfirmModal } from './components/auth/SignOutConfirmModal';
+import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
 import type { PillarType } from './types/finance';
 
 export default function App() {
+  const { user, loading: isAuthLoading, isDemoMode, signOut, exitDemoMode } = useAuth();
+
   const activeTab = useFinanceStore((state) => state.activeTab);
-  const resetToInitialData = useFinanceStore((state) => state.resetToInitialData);
   const simulatedTimeOffsetDays = useFinanceStore((state) => state.simulatedTimeOffsetDays);
+  const setUserId = useFinanceStore((state) => state.setUserId);
+  const loadCloudData = useFinanceStore((state) => state.loadCloudData);
+  const isCloudLoading = useFinanceStore((state) => state.isCloudLoading);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
 
+  // Synchronize authenticated user with store and fetch cloud data
+  useEffect(() => {
+    if (user?.id) {
+      setUserId(user.id);
+      loadCloudData(user.id);
+    } else {
+      setUserId(null);
+    }
+  }, [user?.id, setUserId, loadCloudData]);
+
+  const handleConfirmSignOut = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+      setIsSignOutModalOpen(false);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // 1. Initial Auth Loading State
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0B0F19] text-white">
+        <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-indigo-500 to-emerald-400 p-0.5 shadow-2xl shadow-indigo-500/30 animate-pulse">
+          <div className="flex h-full w-full items-center justify-center rounded-[22px] bg-[#0B0F19]/90 backdrop-blur-md">
+            <Wallet className="h-8 w-8 text-emerald-400" />
+          </div>
+        </div>
+        <p className="text-xs font-semibold tracking-wide text-slate-300">
+          Iniciando Fluo OS...
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated Screen (Login / Register with Liquid Glass)
+  if (!user && !isDemoMode) {
+    return <AuthScreen />;
+  }
+
+  // 3. Main Dashboard (Authenticated or Demo Mode)
   return (
-    <MobileContainer>
+    <MobileContainer activePillar={activeTab === 'home' ? selectedPillar : 'all'}>
       {/* Top Mobile Bar */}
       <header className="flex items-center justify-between mb-5 px-1">
         <div className="flex items-center gap-2.5">
@@ -33,15 +85,37 @@ export default function App() {
             </div>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              Fluo
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                Fluo
+              </h1>
+              {user && (
+                <div
+                  className="flex items-center text-indigo-400/80"
+                  title="Sincronizado con Supabase Cloud"
+                >
+                  <Cloud className="h-3 w-3" />
+                </div>
+              )}
+            </div>
             <p className="text-[11px] text-slate-400 font-medium">Smart Financial OS</p>
           </div>
         </div>
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-1.5">
+          {/* Cloud Sync indicator */}
+          {isCloudLoading && (
+            <div
+              className="flex items-center gap-1 text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 animate-pulse"
+              title="Sincronizando con Supabase..."
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="hidden sm:inline">Sync</span>
+            </div>
+          )}
+
+          {/* Time & Recurrences Simulator */}
           <button
             type="button"
             onClick={() => setIsSimulatorOpen(true)}
@@ -61,20 +135,31 @@ export default function App() {
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={resetToInitialData}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 text-xs font-medium border border-white/10 transition-colors cursor-pointer"
-            title="Restablecer datos de prueba"
-          >
-            <RotateCcw className="h-3 w-3" />
-            <span className="hidden sm:inline">Demo</span>
-          </button>
-
-          <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 text-[11px] font-semibold text-indigo-300 backdrop-blur-md">
-            <Sparkles className="h-3 w-3 text-indigo-400" />
-            <span>Liquid Glass</span>
-          </div>
+          {/* User Session / Sign Out or Login Button */}
+          {user ? (
+            <button
+              type="button"
+              onClick={() => setIsSignOutModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white text-xs font-medium border border-white/12 transition-all cursor-pointer"
+              title={`Conectado como ${user.email}. Pulsa para salir.`}
+            >
+              <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+              <span className="max-w-[70px] truncate sm:max-w-[100px]">
+                {user.email?.split('@')[0]}
+              </span>
+              <LogOut className="h-3 w-3 text-slate-400 ml-0.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={exitDemoMode}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition-all cursor-pointer"
+              title="Iniciar sesión con tu cuenta"
+            >
+              <LogIn className="h-3 w-3 text-indigo-400" />
+              <span>Acceder</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -83,7 +168,7 @@ export default function App() {
         {activeTab === 'home' && (
           <>
             {/* 1. Hero Net Balance */}
-            <HeroBalance />
+            <HeroBalance selectedPillar={selectedPillar} />
 
             {/* 2. Three Metric Pillars (Ingresos, Gastos, Cartera) */}
             <MetricPillars
@@ -121,6 +206,18 @@ export default function App() {
         isOpen={isSimulatorOpen}
         onClose={() => setIsSimulatorOpen(false)}
       />
+
+      {/* Sign Out Confirmation Modal */}
+      <SignOutConfirmModal
+        isOpen={isSignOutModalOpen}
+        onClose={() => setIsSignOutModalOpen(false)}
+        onConfirm={handleConfirmSignOut}
+        userEmail={user?.email}
+        isLoggingOut={isLoggingOut}
+      />
+
+      {/* PWA Smart Install Prompt (Android & iOS Safari Guide) */}
+      <PWAInstallPrompt />
     </MobileContainer>
   );
 }

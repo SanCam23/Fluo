@@ -13,12 +13,16 @@ interface BrandPickerProps {
   selectedBrandId: string;
   onSelectBrand: (brandId: string, suggestedCategoryId?: string) => void;
   categoryId?: string;
+  label?: string;
+  placeholder?: string;
 }
 
 export const BrandPicker: React.FC<BrandPickerProps> = ({
   selectedBrandId,
   onSelectBrand,
   categoryId,
+  label,
+  placeholder,
 }) => {
   const brands = useFinanceStore((state) => state.brands);
   const getBrandById = useFinanceStore((state) => state.getBrandById);
@@ -146,7 +150,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
     <div className="relative flex flex-col gap-1.5" ref={containerRef}>
       <label className="text-xs font-semibold text-slate-400 flex items-center justify-between">
         <span className="flex items-center gap-1.5">
-          <span>Marca o Comercio</span>
+          <span>{label || 'Marca o Comercio'}</span>
           <span className="text-[10px] text-indigo-400 font-normal bg-indigo-500/10 px-1.5 py-0.5 rounded-full border border-indigo-500/20">
             Global
           </span>
@@ -157,7 +161,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
             onClick={() => onSelectBrand('')}
             className="text-[11px] text-slate-400 hover:text-rose-400 cursor-pointer transition-colors"
           >
-            Quitar marca
+            Quitar
           </button>
         )}
       </label>
@@ -172,7 +176,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
                 {selectedBrand.name}
               </span>
               <span className="text-[10px] text-slate-400">
-                {selectedBrand.domain || 'Marca vinculada'}
+                {selectedBrand.domain || 'Entidad vinculada'}
               </span>
             </div>
           </div>
@@ -181,7 +185,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
             type="button"
             onClick={() => onSelectBrand('')}
             className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
-            title="Cambiar marca"
+            title="Cambiar"
           >
             <X className="h-4 w-4" />
           </button>
@@ -193,7 +197,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
             <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Escribe cualquier marca (Mercadona, Zara, Airbnb, Steam...)"
+              placeholder={placeholder || 'Escribe cualquier marca (Mercadona, Zara, Airbnb, Steam...)'}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);

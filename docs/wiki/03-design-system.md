@@ -110,6 +110,62 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - Podio con insignias de medallas (#1 Oro, #2 Plata, #3 Bronce).
   - Barras de progreso horizontales con degradado tricolor `from-rose-500 via-pink-500 to-indigo-500`.
 
+### 10. Sub-Métricas de Balance (`HeroBalance`)
+- **Cuadrícula Aislada de 2 Columnas**: `grid grid-cols-2 gap-2 text-xs` sobre `border-t border-white/10`.
+- **Celdas Vítreas Independientes**: `flex flex-col justify-center rounded-2xl bg-white/[0.04] border border-white/10 px-3 py-2`.
+- **Ventaja Ergonómica**: Erradica el quiebre de palabras ("Tasa de ahorro") y asegura márgenes amplios y lectura limpia de la Tasa de Ahorro y el Rendimiento latente sin solapamientos.
+
+### 11. Tarjeta de Transacción Reciente (`RecentTransactionsList`)
+- **Estructura en Doble Eje Paralelo**:
+  - **Eje Izquierdo**: Avatar de marca (`BrandAvatar`) con separación clara `mr-3.5 flex-shrink-0`.
+  - **Eje Central (`flex-1 min-w-0 pr-2`)**:
+    - Fila 1: Concepto de la transacción (`text-sm font-semibold text-white tracking-tight truncate block`).
+    - Fila 2: Categoría (`text-xs text-slate-400 truncate`) + Badge vítreo de recurrencia si aplica (`Auto` / `Recurrente`).
+  - **Eje Derecho (`flex-shrink-0 text-right`)**:
+    - Fila 1: Importe en `text-[15px] font-bold tracking-tight` con coloración semántica exclusiva (sin etiqueta textual `EXPENSE`/`INCOME`/`INVEST` redundante).
+    - Fila 2: Fecha relativa (`formatRelativeDate`) en `text-xs text-slate-400 font-medium mt-0.5`.
+  - **Gesto de Deslizar para Eliminar (`Swipe-to-Delete`)**:
+    - Reconocimiento táctil con `touch-action: pan-y` para permitir scroll vertical nativo y captura horizontal precisa.
+    - Fondo de acción reactivo: capa roja (`bg-rose-600/90 backdrop-blur-xl`) oculta al reposo (`visibility: hidden, opacity: 0`) para erradicar cualquier fuga o sombreado rojo a través del cristal translúcido de la tarjeta (`bg-white/[0.05]`). Solo se hace visible y proporcional al arrastre cuando `offsetX < 0`.
+    - Umbral de activación: al superar los -80px y soltar, dispara una animación cinematográfica de expulsión (`translateX(-100%)`) y colapso de fila (`max-h-0 opacity-0 my-0 py-0 scale-95 duration-300`).
+    - Si se libera antes del umbral, regresa con resorte suave (`cubic-bezier(0.16, 1, 0.3, 1)`).
+    - Botón de papelera accesible en hover de escritorio como método alternativo sin alterar el espaciado.
+
+### 12. Tarjetas Duales de Métricas de Inversión (`InvestmentsView`)
+- **Jerarquía Vertical Estricta**:
+  - Evita saturar el eje horizontal en anchos reducidos dividiendo la información en 3 niveles:
+    1. Etiqueta superior en mayúsculas (`text-[10px] tracking-wider text-slate-400`).
+    2. Importe monetario principal en `text-base font-bold tracking-tight` (blanco en coste base, esmeralda/carmesí en P&L).
+    3. Metadato contextual inferior (`Coste base total` o porcentaje ROI con icono vectorial `TrendingUp`/`TrendingDown` en `text-[11px]`).
+- **Simetría Volumétrica**: Ambas tarjetas (`Patrimonio Invertido` y `P&L No Realizado`) comparten altura y padding idénticos (`p-3 rounded-2xl flex flex-col justify-between`).
+
+### 13. Iluminación Atmosférica Reactiva Ultra-Suave (`MobileContainer`)
+- **Preservación del Lienzo Obsidiana**: El fondo base `#0B0F19` se mantiene puro, evitando tintes completos o filtros invasivos que afecten a la legibilidad.
+- **Focos Difusos de Máxima Atenuación**: Orbes ambientales con desenfoque extremo (`blur-[150px]-blur-[160px]`) y opacidades mínimas (`10%-14%`), generando una presencia de luz etérea que no satura:
+  - *Ingresos*: Orbe superior en verde esmeralda ultraligero (`bg-emerald-500/12`).
+  - *Gastos*: Orbe superior en rojo coral ultraligero (`bg-rose-500/10`).
+  - *Inversión*: Orbe superior en índigo ultraligero (`bg-indigo-500/14`).
+- **Spotlight Superior Sutil (`h-64`)**: Degradado cenital acotado a la cabecera (`from-.../[0.04] to-transparent`) que aporta una delicada caricia lumínica exclusivamente detrás del balance principal.
+
+### 14. Dock Flotante Liquid Glass Suave & Refinado (`FloatingNavbar`)
+- **Sustrato y Difusión Cromática (`Backdrop Refraction`)**:
+  - `bg-slate-900/40 backdrop-blur-2xl backdrop-saturate-150`: Material ahumado de alta gama con mayor translucidez (`40%`), absorbiendo suavemente el fondo sin lechosidad y permitiendo que los elementos y focos refracten a través del dock con fluidez orgánica.
+- **Biselado Especular Orgánico (Luz Inset Atenuada)**:
+  - `shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_16px_36px_-8px_rgba(0,0,0,0.45)]`:
+    - Borde superior interior: bisel suave de cristal pulido que atrapa la luz cenital (`rgba(255,255,255,0.18)`).
+    - Sombra ambiental: desenfoque gradual de 36px que eleva el dock de forma natural.
+  - Borde perimetral: `border-white/10 hover:border-white/20`.
+- **Aura Atmosférica Subsuperficial Atenuada**:
+  - `absolute -bottom-1 inset-x-12 h-4 bg-indigo-500/10 blur-xl rounded-full`: Suspensión sutil e ingrávida que no satura el pie de pantalla.
+- **Línea Especular Cenital (`Hairline Glint`)**:
+  - Hilo ultrafino de 1px (`h-px bg-gradient-to-r from-transparent via-white/30 to-transparent`).
+- **Cápsula de Pestaña Activa en Cristal Ahumado**:
+  - `bg-white/10 backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] font-medium`.
+  - Transición fluida con respuesta táctil elástica `active:scale-95`.
+- **Botón Central (+) Gema de Cristal Suave**:
+  - Gradiente enriquecido `bg-gradient-to-tr from-indigo-500/90 via-indigo-600/90 to-emerald-500/80`.
+  - Resplandor controlado `shadow-[0_4px_16px_rgba(99,102,241,0.3),inset_0_1px_1px_rgba(255,255,255,0.35)]` con destello cenital atenuado `via-white/50` y pulsación `active:scale-95`.
+
 ---
 
 ## 4. Microinteracciones y Haptic Feedback Visual

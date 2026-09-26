@@ -50,15 +50,49 @@ export interface HistoricalPricePoint {
 export interface InvestmentAsset {
   id: string;
   name: string;
-  identifier: string; // Ticker (e.g., 'AAPL', 'BTC') or ISIN (e.g., 'IE00BK5BQT80')
+  identifier: string; // Ticker (e.g., 'AAPL', 'BTC') o ISIN (e.g., 'IE00BK5BQT80')
+  ticker?: string;
+  isin?: string;
   assetType: AssetType;
   shares: number;
   averageBuyPrice: number;
+  averagePrice?: number; // Alias compatible
   currentPrice: number;
   currency: 'EUR' | 'USD';
   platform?: string;
+  brandId?: string;
   lastUpdated: string;
   historicalPrices?: HistoricalPricePoint[];
+  change24h?: number;
+  isOfflineCached?: boolean;
+  initialFee?: number;
+  acquisitionDate?: string;
+}
+
+export interface MarketAssetItem {
+  name: string;
+  identifier: string;
+  ticker?: string;
+  isin?: string;
+  assetType: AssetType;
+  currency: 'EUR' | 'USD';
+  basePrice: number;
+  change24h: number;
+  benchmarkOrIndex?: string;
+  keywords?: string[];
+  isCustom?: boolean;
+}
+
+export interface MarketQuoteResult {
+  identifier: string;
+  name: string;
+  ticker?: string;
+  isin?: string;
+  price: number;
+  change24h: number;
+  currency: 'EUR' | 'USD';
+  lastUpdated: string;
+  isOfflineCached: boolean;
 }
 
 export type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly';

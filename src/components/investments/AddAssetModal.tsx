@@ -1,10 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
-import { X, Check, RefreshCw } from 'lucide-react';
+import {
+  X,
+  Check,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Info,
+  Calendar,
+  Layers,
+  Coins,
+  Building2,
+  RefreshCw,
+} from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
-import { fetchLiveQuote } from '../../services/priceFeedService';
-import type { QuoteResult } from '../../services/priceFeedService';
-import type { AssetType } from '../../types/finance';
+import {
+  searchAssets,
+  fetchCurrentPrice,
+} from '../../services/marketDataService';
+import type { AssetType, MarketAssetItem } from '../../types/finance';
+import { formatCurrency, formatPercentage } from '../../utils/currency';
 
 interface AddAssetModalProps {
   isOpen: boolean;
@@ -14,38 +30,139 @@ interface AddAssetModalProps {
 export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose }) => {
   const addAsset = useFinanceStore((state) => state.addAsset);
 
-  const [identifier, setIdentifier] = useState('');
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<MarketAssetItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Form state
   const [name, setName] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [ticker, setTicker] = useState('');
+  const [isin, setIsin] = useState('');
   const [assetType, setAssetType] = useState<AssetType>('stock');
   const [shares, setShares] = useState('');
   const [averageBuyPrice, setAverageBuyPrice] = useState('');
+  const [totalInvestedInput, setTotalInvestedInput] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
   const [currency, setCurrency] = useState<'EUR' | 'USD'>('EUR');
   const [platform, setPlatform] = useState('');
-
+  const [acquisitionDate, setAcquisitionDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [initialFee, setInitialFee] = useState('');
+  const [change24h, setChange24h] = useState<number | undefined>(undefined);
+  const [isOfflineCached, setIsOfflineCached] = useState<boolean>(false);
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
-  const [lastQuoteResult, setLastQuoteResult] = useState<QuoteResult | null>(null);
+
+  // Search effect with debounce
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchAssets(searchQuery);
+        if (isMounted) {
+          setSearchResults(results);
+          setIsDropdownOpen(true);
+        }
+      } catch (err) {
+        console.error('Error searching assets:', err);
+      } finally {
+        if (isMounted) setIsSearching(false);
+      }
+    }, 180);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, isOpen]);
+
+  // Click outside listener for dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
-  const handleFetchQuote = async () => {
-    if (!identifier.trim()) return;
+  // Handle asset selection from search results
+  const handleSelectAsset = async (item: MarketAssetItem) => {
+    setName(item.name);
+    setIdentifier(item.identifier);
+    setTicker(item.ticker || (item.assetType === 'stock' || item.assetType === 'crypto' ? item.identifier : ''));
+    setIsin(item.isin || (/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(item.identifier) ? item.identifier : ''));
+    setAssetType(item.assetType);
+    setCurrency(item.currency);
+    setCurrentPrice(item.basePrice.toString());
+    setChange24h(item.change24h);
+    setIsDropdownOpen(false);
+    setSearchQuery('');
+
+    // If averageBuyPrice is empty, suggest currentPrice
+    if (!averageBuyPrice) {
+      setAverageBuyPrice(item.basePrice.toString());
+      const s = parseFloat(shares);
+      if (!isNaN(s) && s > 0) {
+        setTotalInvestedInput((s * item.basePrice).toFixed(2));
+      }
+    }
+
+    // Try fetching fresh live quote in background
     setIsFetchingQuote(true);
     try {
-      const quote = await fetchLiveQuote(identifier);
-      setLastQuoteResult(quote);
+      const quote = await fetchCurrentPrice(item.identifier);
       setCurrentPrice(quote.price.toString());
       setCurrency(quote.currency);
-      if (quote.name && !name) {
-        setName(quote.name);
-      }
+      setChange24h(quote.change24h);
+      setIsOfflineCached(quote.isOfflineCached);
       if (!averageBuyPrice) {
         setAverageBuyPrice(quote.price.toString());
+        const s = parseFloat(shares);
+        if (!isNaN(s) && s > 0) {
+          setTotalInvestedInput((s * quote.price).toFixed(2));
+        }
       }
-    } catch (e) {
-      console.error('Error fetching quote:', e);
+    } catch {
+      // Ignored, base price already set
     } finally {
       setIsFetchingQuote(false);
+    }
+  };
+
+  // Bidirectional calculations: shares & unit price <-> total invested
+  const handleSharesChange = (val: string) => {
+    setShares(val);
+    const numShares = parseFloat(val);
+    const numUnit = parseFloat(averageBuyPrice);
+    if (!isNaN(numShares) && !isNaN(numUnit) && numShares > 0) {
+      setTotalInvestedInput((numShares * numUnit).toFixed(2));
+    }
+  };
+
+  const handleUnitPriceChange = (val: string) => {
+    setAverageBuyPrice(val);
+    const numUnit = parseFloat(val);
+    const numShares = parseFloat(shares);
+    if (!isNaN(numUnit) && !isNaN(numShares) && numShares > 0) {
+      setTotalInvestedInput((numShares * numUnit).toFixed(2));
+    }
+  };
+
+  const handleTotalInvestedChange = (val: string) => {
+    setTotalInvestedInput(val);
+    const numTotal = parseFloat(val);
+    const numShares = parseFloat(shares);
+    if (!isNaN(numTotal) && !isNaN(numShares) && numShares > 0) {
+      setAverageBuyPrice((numTotal / numShares).toFixed(4));
     }
   };
 
@@ -54,176 +171,289 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
     const numShares = parseFloat(shares);
     const numBuyPrice = parseFloat(averageBuyPrice);
     const numCurrentPrice = parseFloat(currentPrice) || numBuyPrice;
+    const numFee = parseFloat(initialFee) || 0;
 
-    if (!identifier.trim() || !name.trim() || isNaN(numShares) || isNaN(numBuyPrice)) {
+    if (!identifier.trim() || !name.trim() || isNaN(numShares) || isNaN(numBuyPrice) || numShares <= 0) {
       return;
     }
 
     addAsset({
       name: name.trim(),
       identifier: identifier.trim().toUpperCase(),
+      ticker: ticker.trim().toUpperCase() || undefined,
+      isin: isin.trim().toUpperCase() || undefined,
       assetType,
       shares: numShares,
       averageBuyPrice: numBuyPrice,
+      averagePrice: numBuyPrice,
       currentPrice: numCurrentPrice,
       currency,
       platform: platform.trim() || undefined,
+      change24h,
+      isOfflineCached,
+      initialFee: numFee > 0 ? numFee : undefined,
+      acquisitionDate: acquisitionDate || undefined,
     });
 
     // Reset form
     setIdentifier('');
     setName('');
+    setTicker('');
+    setIsin('');
     setShares('');
     setAverageBuyPrice('');
+    setTotalInvestedInput('');
     setCurrentPrice('');
     setPlatform('');
-    setLastQuoteResult(null);
+    setInitialFee('');
+    setChange24h(undefined);
     onClose();
   };
 
+  const assetTypeLabels: Record<AssetType, string> = {
+    stock: 'Acción',
+    etf: 'ETF',
+    index_fund: 'Fondo Indexado',
+    crypto: 'Criptomoneda',
+    fixed_income: 'Renta Fija',
+    deposit: 'Depósito',
+  };
+
+  const assetTypeColors: Record<AssetType, string> = {
+    stock: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    etf: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    index_fund: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    crypto: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    fixed_income: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    deposit: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md transition-all duration-300">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md transition-all duration-300">
       <div
-        className="w-full max-w-md bg-[#0F1626]/95 border border-white/20 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 border border-white/20 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Specular Edge */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+        {/* Specular Edge Highlight */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400 to-transparent" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <h3 className="text-base font-bold text-white">Añadir Activo de Inversión</h3>
+        <div className="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
+              <Coins className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Añadir Inversión</h3>
+              <p className="text-[11px] text-slate-400">Cotizaciones oficiales en tiempo real y cálculo de P&L</p>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3.5 max-h-[75vh] overflow-y-auto pr-1">
-          {/* Ticker / ISIN with Live Quote Query Button */}
-          <div>
-            <label className="text-xs font-semibold text-slate-400">
-              Ticker o Código ISIN
+        {/* Form body */}
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4 overflow-y-auto pr-1">
+          {/* Smart Search Bar with Real-time Floating Dropdown */}
+          <div className="relative" ref={searchContainerRef}>
+            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5 text-indigo-400" />
+                Búsqueda Inteligente de Activos
+              </span>
+              <span className="text-[10px] text-indigo-300 font-normal">
+                S&P 500, MSCI Europe, Apple, Santander, BTC, ISIN...
+              </span>
             </label>
-            <div className="mt-1 flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. AAPL, VWCE.DE, IE00BK5BQT80, BTC..."
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm font-mono uppercase text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                />
-              </div>
 
-              <button
-                type="button"
-                onClick={handleFetchQuote}
-                disabled={isFetchingQuote || !identifier.trim()}
-                className="px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 disabled:opacity-40 text-xs font-semibold text-white flex items-center gap-1.5 shadow-md border border-indigo-400/30 transition-all cursor-pointer"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isFetchingQuote ? 'animate-spin' : ''}`} />
-                <span>{isFetchingQuote ? 'Buscando...' : 'Cotización'}</span>
-              </button>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Busca por nombre, empresa, índice, Ticker o código ISIN..."
+                value={searchQuery}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                className="w-full rounded-2xl bg-white/[0.08] border border-white/15 pl-10 pr-9 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 backdrop-blur-md shadow-inner"
+              />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+
+              {isSearching && (
+                <RefreshCw className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 animate-spin" />
+              )}
             </div>
 
-            {lastQuoteResult && (
-              <div className="mt-2 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between text-xs">
-                <span className="text-slate-300">
-                  Precio detectado: <strong className="text-emerald-400">{lastQuoteResult.price} {lastQuoteResult.currency}</strong>
-                </span>
-                <span className="text-[10px] text-slate-400">{lastQuoteResult.lastUpdated}</span>
+            {/* Floating Dropdown Card (Liquid Glass) */}
+            {isDropdownOpen && searchResults.length > 0 && (
+              <div className="absolute z-40 left-0 right-0 top-full mt-2 bg-[#0E1526]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 shadow-[0_16px_40px_rgba(0,0,0,0.6)] max-h-64 overflow-y-auto divide-y divide-white/5 animate-fadeIn">
+                {searchResults.map((item) => {
+                  const isPositive = item.change24h >= 0;
+                  return (
+                    <button
+                      key={`${item.identifier}-${item.name}`}
+                      type="button"
+                      onClick={() => handleSelectAsset(item)}
+                      className="w-full text-left p-2.5 rounded-xl hover:bg-white/[0.08] transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
+                            {item.name}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-md text-[10px] font-semibold border ${
+                              assetTypeColors[item.assetType]
+                            }`}
+                          >
+                            {assetTypeLabels[item.assetType]}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                          <span className="font-mono text-slate-300 font-semibold">{item.identifier}</span>
+                          {item.isin && item.isin !== item.identifier && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-[10px] text-slate-400">{item.isin}</span>
+                            </>
+                          )}
+                          {item.benchmarkOrIndex && (
+                            <>
+                              <span>•</span>
+                              <span className="text-indigo-400/90 text-[10px]">{item.benchmarkOrIndex}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price & 24h variation */}
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-bold text-white block">
+                          {formatCurrency(item.basePrice, item.currency)}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
+                            isPositive ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {isPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                          {formatPercentage(item.change24h)}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Asset Name */}
-          <div>
-            <label className="text-xs font-semibold text-slate-400">Nombre del Activo</label>
-            <input
-              type="text"
-              required
-              placeholder="Ej. Apple Inc., Vanguard All-World..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-            />
-          </div>
+          {/* Selected Asset Information Card */}
+          {identifier && (
+            <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between backdrop-blur-md">
+              <div className="min-w-0 pr-2">
+                <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Activo Seleccionado
+                </span>
+                <p className="text-sm font-bold text-white truncate mt-0.5">{name}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="px-1.5 py-0.2 rounded bg-white/10 font-mono text-xs text-indigo-200 border border-white/10">
+                    {identifier}
+                  </span>
+                  <span className={`px-2 py-0.2 rounded text-[10px] font-semibold border ${assetTypeColors[assetType]}`}>
+                    {assetTypeLabels[assetType]}
+                  </span>
+                </div>
+              </div>
 
-          {/* Asset Class */}
-          <div>
-            <label className="text-xs font-semibold text-slate-400">Tipo de Activo</label>
-            <select
-              value={assetType}
-              onChange={(e) => setAssetType(e.target.value as AssetType)}
-              className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
-            >
-              <option value="stock">Acciones Bursátiles</option>
-              <option value="etf">ETFs Cotizados</option>
-              <option value="index_fund">Fondos Indexados</option>
-              <option value="crypto">Criptomonedas</option>
-              <option value="fixed_income">Renta Fija / Bonos</option>
-              <option value="deposit">Depósitos Remunerados</option>
-            </select>
-          </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] text-slate-400 block">Cotización Actual</span>
+                <div className="flex items-center gap-1 justify-end">
+                  {isFetchingQuote ? (
+                    <RefreshCw className="h-3.5 w-3.5 text-indigo-400 animate-spin" />
+                  ) : (
+                    <span className="text-base font-extrabold text-emerald-400">
+                      {formatCurrency(parseFloat(currentPrice) || 0, currency)}
+                    </span>
+                  )}
+                </div>
+                {change24h !== undefined && (
+                  <span
+                    className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${
+                      change24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {change24h >= 0 ? '+' : ''}{formatPercentage(change24h)} 24h
+                  </span>
+                )}
+                {isOfflineCached && (
+                  <span className="text-[9px] text-amber-300 block">Dato en caché</span>
+                )}
+              </div>
+            </div>
+          )}
 
-          {/* Shares and Average Buy Price */}
+          {/* Manual Name & Identifier Inputs (if user didn't pick from search or wants to tweak) */}
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-xs font-semibold text-slate-400">Títulos / Unidades</label>
+              <label className="text-xs font-medium text-slate-400">Nombre / Título</label>
               <input
-                type="number"
-                step="any"
-                min="0.000001"
+                type="text"
                 required
-                placeholder="10"
-                value={shares}
-                onChange={(e) => setShares(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
+                placeholder="Ej. Apple Inc., Vanguard S&P 500..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-400">Precio Compra (PMCP)</label>
+              <label className="text-xs font-medium text-slate-400">Ticker o ISIN</label>
               <input
-                type="number"
-                step="any"
-                min="0.0001"
+                type="text"
                 required
-                placeholder="120.50"
-                value={averageBuyPrice}
-                onChange={(e) => setAverageBuyPrice(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
+                placeholder="AAPL, IE00B4L5Y983..."
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value.toUpperCase())}
+                className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-xs font-mono uppercase text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
               />
             </div>
           </div>
 
-          {/* Current Price and Currency */}
+          {/* Asset Class & Currency */}
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-xs font-semibold text-slate-400">Precio Actual</label>
-              <input
-                type="number"
-                step="any"
-                min="0.0001"
-                required
-                placeholder="124.80"
-                value={currentPrice}
-                onChange={(e) => setCurrentPrice(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
-              />
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                <Layers className="h-3 w-3 text-indigo-400" />
+                Tipo de Activo
+              </label>
+              <select
+                value={assetType}
+                onChange={(e) => setAssetType(e.target.value as AssetType)}
+                className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
+              >
+                <option value="stock">Acciones Bursátiles</option>
+                <option value="etf">ETFs Cotizados</option>
+                <option value="index_fund">Fondos Indexados</option>
+                <option value="crypto">Criptomonedas</option>
+                <option value="fixed_income">Renta Fija / Bonos</option>
+                <option value="deposit">Depósitos Remunerados</option>
+              </select>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-400">Divisa</label>
+              <label className="text-xs font-medium text-slate-400">Divisa</label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as 'EUR' | 'USD')}
-                className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-400"
+                className="mt-1 w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
               >
                 <option value="EUR">EUR (€)</option>
                 <option value="USD">USD ($)</option>
@@ -231,22 +461,112 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Broker / Platform */}
+          {/* Shares / Decimal Units */}
           <div>
-            <label className="text-xs font-semibold text-slate-400">Broker / Plataforma</label>
-            <input
-              type="text"
-              placeholder="Ej. MyInvestor, Trade Republic, Degiro, Kraken..."
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-            />
+            <label className="text-xs font-semibold text-slate-300">
+              Cantidad de Títulos / Participaciones (soporta decimales)
+            </label>
+            <div className="relative mt-1">
+              <input
+                type="number"
+                step="any"
+                min="0.000001"
+                required
+                placeholder="Ej. 10, 12.5 o 0.045 BTC"
+                value={shares}
+                onChange={(e) => handleSharesChange(e.target.value)}
+                className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                unidades
+              </span>
+            </div>
+          </div>
+
+          {/* Dual Input: Unit Buy Price vs Total Invested Capital */}
+          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col gap-2.5">
+            <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 text-indigo-400" />
+              Precio de Compra e Inversión Total (Cálculo bidireccional)
+            </span>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Precio por Título ({currency})</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.0001"
+                  required
+                  placeholder="Ej. 124.50"
+                  value={averageBuyPrice}
+                  onChange={(e) => handleUnitPriceChange(e.target.value)}
+                  className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Total Desembolsado ({currency})</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  placeholder="Ej. 1245.00"
+                  value={totalInvestedInput}
+                  onChange={(e) => handleTotalInvestedChange(e.target.value)}
+                  className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Details (Optional): Date, Initial Fees, Platform */}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1">
+                <Calendar className="h-3 w-3 text-indigo-400" />
+                Fecha Compra
+              </label>
+              <input
+                type="date"
+                value={acquisitionDate}
+                onChange={(e) => setAcquisitionDate(e.target.value)}
+                className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">Comisión (€/$)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={initialFee}
+                onChange={(e) => setInitialFee(e.target.value)}
+                className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1">
+                <Building2 className="h-3 w-3 text-indigo-400" />
+                Broker
+              </label>
+              <input
+                type="text"
+                placeholder="MyInvestor, Trade Republic..."
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+              />
+            </div>
           </div>
 
           {/* Submit Button */}
           <button
             type="submit"
-            className="mt-3 w-full py-3.5 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-400 hover:brightness-110 active:scale-[0.98] font-bold text-white text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="mt-2 w-full py-3.5 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-400 hover:brightness-110 active:scale-[0.98] font-bold text-white text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Check className="h-4 w-4 stroke-[3]" />
             Guardar en Cartera

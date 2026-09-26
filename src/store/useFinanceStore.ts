@@ -16,9 +16,24 @@ import {
   INITIAL_INVESTMENT_ASSETS,
   INITIAL_RECURRENCE_RULES,
 } from '../data/initialMockData';
-import { batchUpdateQuotes } from '../services/priceFeedService';
+import { batchUpdateMarketQuotes } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
 import { computeFinancialSummary } from '../utils/finance';
+import {
+  fetchUserCloudData,
+  insertCloudTransaction,
+  deleteCloudTransaction,
+  insertCloudAsset,
+  deleteCloudAsset,
+  updateCloudAssetPrice,
+} from '../services/cloudSyncService';
+
+function generateId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+}
 
 interface FinanceState {
   transactions: Transaction[];
@@ -29,11 +44,20 @@ interface FinanceState {
   timeRange: TimeRangeFilter;
   activeTab: 'home' | 'stats' | 'invest' | 'add';
   isLiveUpdating: boolean;
+  lastSyncTimestamp?: string;
+  userId: string | null;
+  isCloudLoading: boolean;
+  cloudSyncError: string | null;
 
   // Actions
+  setUserId: (userId: string | null) => void;
+  loadCloudData: (userId: string) => Promise<void>;
+  setTransactions: (transactions: Transaction[]) => void;
+  setAssets: (assets: InvestmentAsset[]) => void;
   addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
   deleteTransaction: (id: string) => void;
   addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
+  deleteAsset: (id: string) => void;
   updateAssetPrice: (id: string, newPrice: number) => void;
   refreshAllAssetPrices: () => Promise<void>;
   addRecurrence: (rule: Omit<RecurrenceRule, 'id'>) => void;
@@ -66,36 +90,106 @@ export const useFinanceStore = create<FinanceState>()(
       activeTab: 'home',
       isLiveUpdating: false,
       simulatedTimeOffsetDays: 0,
+      userId: null,
+      isCloudLoading: false,
+      cloudSyncError: null,
+
+      setUserId: (userId) => set({ userId }),
+
+      setTransactions: (transactions) => set({ transactions }),
+
+      setAssets: (assets) => set({ assets }),
+
+      loadCloudData: async (userId) => {
+        if (!userId) return;
+        set({ isCloudLoading: true, cloudSyncError: null });
+        try {
+          const result = await fetchUserCloudData(userId);
+          if (result.success) {
+            set({
+              transactions: result.transactions,
+              assets: result.assets,
+              isCloudLoading: false,
+              cloudSyncError: null,
+            });
+          } else {
+            set({
+              isCloudLoading: false,
+              cloudSyncError: result.error || 'Error al sincronizar con la nube',
+            });
+          }
+        } catch (err: any) {
+          set({
+            isCloudLoading: false,
+            cloudSyncError: err?.message || 'Error inesperado al cargar datos de la nube',
+          });
+        }
+      },
 
       addTransaction: (txData) => {
         const newTx: Transaction = {
           ...txData,
-          id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: generateId('tx'),
           createdAt: Date.now(),
         };
         set((state) => ({
           transactions: [newTx, ...state.transactions],
         }));
+
+        const { userId } = get();
+        if (userId) {
+          insertCloudTransaction(newTx, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for addTransaction:', err)
+          );
+        }
       },
 
       deleteTransaction: (id) => {
+        const { userId } = get();
         set((state) => ({
           transactions: state.transactions.filter((tx) => tx.id !== id),
         }));
+
+        if (userId) {
+          deleteCloudTransaction(id, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for deleteTransaction:', err)
+          );
+        }
       },
 
       addAsset: (assetData) => {
         const newAsset: InvestmentAsset = {
           ...assetData,
-          id: `asset-${Date.now()}`,
+          id: generateId('asset'),
           lastUpdated: 'Recién añadido',
         };
         set((state) => ({
-          assets: [...state.assets, newAsset],
+          assets: [newAsset, ...state.assets],
         }));
+
+        const { userId } = get();
+        if (userId) {
+          insertCloudAsset(newAsset, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for addAsset:', err)
+          );
+        }
+      },
+
+      deleteAsset: (id) => {
+        const { userId } = get();
+        set((state) => ({
+          assets: state.assets.filter((a) => a.id !== id),
+        }));
+
+        if (userId) {
+          deleteCloudAsset(id, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for deleteAsset:', err)
+          );
+        }
       },
 
       updateAssetPrice: (id, newPrice) => {
+        const { userId } = get();
         set((state) => ({
           assets: state.assets.map((asset) =>
             asset.id === id
@@ -107,6 +201,12 @@ export const useFinanceStore = create<FinanceState>()(
               : asset
           ),
         }));
+
+        if (userId) {
+          updateCloudAssetPrice(id, newPrice, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for updateAssetPrice:', err)
+          );
+        }
       },
 
       refreshAllAssetPrices: async () => {
@@ -114,16 +214,26 @@ export const useFinanceStore = create<FinanceState>()(
         try {
           const state = get();
           const identifiers = state.assets.map((a) => a.identifier);
-          const quotes = await batchUpdateQuotes(identifiers);
+          const quotes = await batchUpdateMarketQuotes(identifiers);
+          const syncTime = new Date().toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
 
           set((s) => ({
+            lastSyncTimestamp: syncTime,
             assets: s.assets.map((asset) => {
-              const quote = quotes[asset.identifier];
+              const quote = quotes[asset.identifier] || quotes[asset.identifier.toUpperCase()];
               if (quote) {
                 return {
                   ...asset,
                   currentPrice: quote.price,
-                  lastUpdated: `En vivo (${quote.lastUpdated})`,
+                  change24h: quote.change24h,
+                  isOfflineCached: quote.isOfflineCached,
+                  lastUpdated: quote.isOfflineCached
+                    ? `En caché (${quote.lastUpdated})`
+                    : `En vivo (${quote.lastUpdated})`,
                 };
               }
               return asset;
