@@ -70,6 +70,7 @@ interface FinanceState {
   resetSimulatedTime: () => void;
   simulatedTimeOffsetDays: number;
   resetToInitialData: () => void;
+  purgeUserData: () => void;
 
   // Methods
   getFinancialSummary: () => FinancialSummary;
@@ -349,6 +350,30 @@ export const useFinanceStore = create<FinanceState>()(
           brands: INITIAL_BRANDS,
           assets: INITIAL_INVESTMENT_ASSETS,
           recurrences: INITIAL_RECURRENCE_RULES,
+          timeRange: 'all',
+          activeTab: 'home',
+        });
+      },
+
+      purgeUserData: () => {
+        try {
+          localStorage.removeItem('fluo_finance_storage_v1');
+          localStorage.removeItem('fluo_finance_storage_v2');
+          localStorage.removeItem('fluo_finance_storage_v3');
+          localStorage.removeItem('fluo_market_quotes_cache_v1');
+          localStorage.removeItem('fluo_demo_mode_active');
+          localStorage.removeItem('fluo_security_lock_state');
+        } catch (e) {
+          console.warn('[Security] Error purging localStorage on logout:', e);
+        }
+        set({
+          transactions: [],
+          assets: [],
+          recurrences: [],
+          userId: null,
+          isCloudLoading: false,
+          cloudSyncError: null,
+          lastSyncTimestamp: undefined,
           timeRange: 'all',
           activeTab: 'home',
         });

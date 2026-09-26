@@ -339,5 +339,39 @@ Fluo está optimizada como una PWA de alto rendimiento instalable como aplicaci�
 - En Chromium/Android: captura el evento `beforeinstallprompt` y presenta un botón de instalación con un solo toque.
 - En iOS: presenta una guía contextual amigable explicando cómo usar el botón "Compartir" y "Añadir a la pantalla de inicio".
 
+---
+
+## 13. Blindaje de Ciberseguridad en Dispositivo Móvil & Nivel 1
+
+Fluo implementa un modelo de defensa en profundidad (*Defense in Depth*) adaptado a finanzas personales en movilidad:
+
+### 1. Bloqueo por Inactividad & Segundo Plano (`useSecurityLock.ts`)
+- **Detección de Inactividad (3 Minutos)**: Temporizador continuo reseteado por interacciones del usuario (`touchstart`, `click`, `mousemove`, `keydown`, `scroll`). Si transcurren 180 segundos sin actividad con PIN activo, la aplicación se bloquea de forma preventiva.
+- **Detección de Segundo Plano (`visibilitychange`)**: En cuanto el usuario cambia de pestaña, minimiza el navegador o bloquea el teléfono móvil (`document.visibilityState === 'hidden'`), se activa de inmediato el bloqueo de seguridad.
+- **Ofuscación de Privacidad**: El contenido del dashboard se desenfoca de forma automática (`filter blur-2xl opacity-40 pointer-events-none`) evitando capturas de pantalla accidentales en el selector de aplicaciones de iOS/Android.
+
+### 2. Criptografía Local y Bóveda de PIN (`SecurityLockScreen.tsx`)
+- **Hashing SHA-256**: Los PINs de 4 dígitos nunca se persisten en texto plano. Se procesan mediante la Web Cryptography API nativa (`crypto.subtle.digest('SHA-256')`) con sal interna de aplicación (`fluo_salt_v1_...`), neutralizando ataques de diccionario o tablas arcoíris en almacenamiento local.
+- **Diseño Liquid Glass Refractivo**: Telón de pantalla completa `fixed inset-0 z-[100] backdrop-blur-3xl bg-slate-950/85`, teclado numérico táctil translúcido y feedback háptico con animación de sacudida (*shake*) ante PIN incorrecto.
+
+### 3. Autenticación Biométrica Nativa (WebAuthn)
+- **API `PublicKeyCredential`**: Integración con el estándar W3C WebAuthn para desbloqueo rápido mediante Face ID, Touch ID, Windows Hello o sensor de huella dactilar de Android.
+- **Fallback Automático**: Si el usuario no tiene biometría configurada o cancela el sensor, el flujo conmuta suavemente al teclado numérico de 4 dígitos.
+
+### 4. Purga Integral y Sanitización de Datos (`purgeUserData`)
+- Al confirmar el cierre de sesión en [`SignOutConfirmModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/SignOutConfirmModal.tsx):
+  - Se eliminan explícitamente las claves de estado de Zustand: `fluo_finance_storage_v3`, `fluo_finance_storage_v2`, `fluo_finance_storage_v1`.
+  - Se purga la caché de cotizaciones financieras de terceros `fluo_market_quotes_cache_v1`.
+  - Se limpian las marcas de sesión demo y el estado de bloqueo `fluo_security_lock_state`.
+  - Se resetea el store de Zustand en memoria a colecciones vacías (`transactions: []`, `assets: []`, `userId: null`), impidiendo que un segundo usuario en el mismo dispositivo pueda acceder a datos residuales en memoria o almacenamiento.
+
+### 5. Content Security Policy (CSP) y Encabezados de Blindaje
+- Configurado en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html):
+  - Directiva `connect-src` restringida a Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), APIs de cotizaciones (Yahoo Finance, CoinGecko) y CDNs autorizadas de logos.
+  - Protección estricta contra clickjacking: `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+  - Protección de tipos MIME con `X-Content-Type-Options: nosniff`.
+  - Política de referencia `Referrer-Policy: strict-origin-when-cross-origin`.
+
+
 
 

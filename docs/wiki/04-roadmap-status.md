@@ -28,6 +28,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Autenticación en la Nube (Supabase)** | ✅ Completado | Login y Registro con Liquid Glass, gestión de sesiones JWT (`AuthContext`) y bypass Demo |
 | **Persistencia en la Nube & RLS** | ✅ Completado | Base de datos PostgreSQL en Supabase con Row Level Security, Optimistic UI y sincronización en segundo plano |
 | **Progressive Web App (PWA & iOS WebKit)** | ✅ Completado | `vite-plugin-pwa`, Workbox offline caching, soporte WebKit standalone, `safe-area-inset` y banner inteligente |
+| **Ciberseguridad Nivel 1 & Bloqueo Biométrico** | ✅ Completado | Detección de inactividad (3m), backgrounding, bóveda PIN SHA-256, WebAuthn, CSP y purga de sesión (`purgeUserData`) |
 
 ---
 
@@ -231,6 +232,34 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Calibración de sustrato a `bg-slate-900/40 backdrop-blur-2xl backdrop-saturate-150` con borde `border-white/10`.
   - Mayor paso de luz y refracción sobre el contenido que hace scroll por detrás.
 - **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (20/20 tests pasando).
+
+### v0.5.7 (Integración de Wordmark Oficial Liquid Glass en Cabecera)
+- **Wordmark Oficial "Fluo" ([`public/fluo-wordmark.png`](file:///c:/Users/santi/Documents/UNI/Fluo/public/fluo-wordmark.png))**:
+  - Incorporada la tipografía tubular Liquid Glass con cintas internas de color que replican el isotipo `F` de la aplicación (esmeralda, coral y violeta neón).
+  - **Recorte Técino de Bounding Box**: Se eliminaron los márgenes transparentes superiores e inferiores de 2048x2048 a 1665x721 píxeles, permitiendo que la tipografía ocupe el 100% de la altura visual asignada sin desperdiciar espacio en padding invisible.
+  - Rediseño minimalista en [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx): eliminados el icono de billetera y el texto secundario redundante "Smart Financial OS", luciendo el wordmark "Fluo" con tamaño sustancialmente mayor, presencia destacada y resplandor ambiental `drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)]`.
+  - Integrado también en la pantalla de bienvenida y login [`AuthScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/AuthScreen.tsx).
+- **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (20/20 tests pasando).
+
+### v0.5.8 (Blindaje de Ciberseguridad Nivel 1 & Bloqueo Biométrico)
+- **Hook de Inactividad & Bloqueo Preventivo ([`useSecurityLock.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSecurityLock.ts))**:
+  - Temporizador de inactividad de 3 minutos con reseteo ante actividad (`touch`, `click`, `scroll`, `keypress`).
+  - Bloqueo instantáneo al pasar a segundo plano mediante `visibilitychange` (`document.visibilityState === 'hidden'`).
+  - Hashing seguro SHA-256 en cliente con sal de aplicación vía Web Cryptography API (`crypto.subtle.digest`).
+  - Desbloqueo nativo biométrico con WebAuthn (`PublicKeyCredential`) compatible con Face ID, Touch ID, Windows Hello y sensor Android.
+- **Bóveda de Seguridad Liquid Glass ([`SecurityLockScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/security/SecurityLockScreen.tsx))**:
+  - Telón de pantalla completa ultra-desenfocado `z-[100] backdrop-blur-3xl bg-slate-950/85`.
+  - Teclado táctil translúcido para PIN de 4 dígitos, esferas indicadoras Liquid Glass y animación de sacudida (*shake*) ante código incorrecto.
+  - Ofuscación visual preventiva del dashboard (`filter blur-2xl opacity-40`) mientras la app permanece bloqueada.
+  - Botón de acceso directo en cabecera superior para bloquear o configurar PIN en cualquier instante.
+- **Purga y Sanitización Completa al Cerrar Sesión ([`purgeUserData`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts))**:
+  - Eliminación integral de `fluo_finance_storage_v3`, cachés de cotizaciones `fluo_market_quotes_cache_v1` y marcas residuales de sesión.
+  - Reseteo atómico de las colecciones en memoria de Zustand, garantizando cero fugas de datos entre sesiones en dispositivos compartidos.
+- **Content Security Policy (CSP) en Cabecera ([`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html))**:
+  - Directivas restrictivas: `connect-src` exclusivamente a Supabase y servicios de cotizaciones autorizados, `frame-ancestors 'none'` contra clickjacking, `X-Content-Type-Options: nosniff` y `strict-origin-when-cross-origin`.
+- **Suite de Pruebas Automatizadas**:
+  - Incorporados tests unitarios de hashing criptográfico SHA-256 en [`useSecurityLock.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSecurityLock.test.ts).
+  - 23 tests automatizados pasando al 100% (`npm test`).
 
 ---
 

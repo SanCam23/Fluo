@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Wallet, FastForward, LogOut, LogIn, Loader2, Cloud } from 'lucide-react';
+import { FastForward, LogOut, LogIn, Loader2, Cloud, Lock, ShieldCheck } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
+import { useSecurityLock } from './hooks/useSecurityLock';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
 import { HeroBalance } from './components/home/HeroBalance';
@@ -14,6 +15,7 @@ import { QuickAddTransactionModal } from './components/forms/QuickAddTransaction
 import { TimeSimulatorModal } from './components/common/TimeSimulatorModal';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { SignOutConfirmModal } from './components/auth/SignOutConfirmModal';
+import { SecurityLockScreen } from './components/security/SecurityLockScreen';
 import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
 import type { PillarType } from './types/finance';
 
@@ -25,7 +27,20 @@ export default function App() {
   const setUserId = useFinanceStore((state) => state.setUserId);
   const loadCloudData = useFinanceStore((state) => state.loadCloudData);
   const isCloudLoading = useFinanceStore((state) => state.isCloudLoading);
+  const purgeUserData = useFinanceStore((state) => state.purgeUserData);
 
+  const {
+    isLocked,
+    hasPin,
+    isBiometricsAvailable,
+    lockNow,
+    setupPin,
+    unlockWithPin,
+    unlockWithBiometrics,
+    resetSecurity,
+  } = useSecurityLock();
+
+  const [isConfiguringPin, setIsConfiguringPin] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
@@ -45,6 +60,8 @@ export default function App() {
   const handleConfirmSignOut = async () => {
     setIsLoggingOut(true);
     try {
+      purgeUserData();
+      resetSecurity();
       await signOut();
       setIsSignOutModalOpen(false);
     } finally {
@@ -57,12 +74,14 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0B0F19] text-white">
         <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-indigo-500 to-emerald-400 p-0.5 shadow-2xl shadow-indigo-500/30 animate-pulse">
-          <div className="flex h-full w-full items-center justify-center rounded-[22px] bg-[#0B0F19]/90 backdrop-blur-md">
-            <Wallet className="h-8 w-8 text-emerald-400" />
-          </div>
+          <img
+            src="/icon-192.jpg"
+            alt="Fluo"
+            className="h-full w-full rounded-[22px] object-cover"
+          />
         </div>
         <p className="text-xs font-semibold tracking-wide text-slate-300">
-          Iniciando Fluo OS...
+          Iniciando Fluo...
         </p>
       </div>
     );
@@ -78,28 +97,20 @@ export default function App() {
     <MobileContainer activePillar={activeTab === 'home' ? selectedPillar : 'all'}>
       {/* Top Mobile Bar */}
       <header className="flex items-center justify-between mb-5 px-1">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-emerald-400 p-0.5 shadow-lg shadow-indigo-500/25">
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0B0F19]/90 backdrop-blur-sm">
-              <Wallet className="h-5 w-5 text-emerald-400" />
+        <div className="flex items-center gap-2">
+          <img
+            src="/fluo-wordmark.png"
+            alt="Fluo"
+            className="h-9 sm:h-10 w-auto object-contain filter drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)] select-none"
+          />
+          {user && (
+            <div
+              className="flex items-center text-indigo-400/80 -ml-0.5"
+              title="Sincronizado con Supabase Cloud"
+            >
+              <Cloud className="h-4 w-4" />
             </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-                Fluo
-              </h1>
-              {user && (
-                <div
-                  className="flex items-center text-indigo-400/80"
-                  title="Sincronizado con Supabase Cloud"
-                >
-                  <Cloud className="h-3 w-3" />
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 font-medium">Smart Financial OS</p>
-          </div>
+          )}
         </div>
 
         {/* Header Right Actions */}
@@ -135,6 +146,31 @@ export default function App() {
             )}
           </button>
 
+          {/* Security PIN / App Lock */}
+          <button
+            type="button"
+            onClick={() => {
+              if (hasPin) {
+                lockNow();
+              } else {
+                setIsConfiguringPin(true);
+              }
+            }}
+            className={`p-1.5 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
+              hasPin
+                ? 'bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/12'
+                : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
+            }`}
+            title={hasPin ? 'Bloquear Fluo ahora' : 'Configurar PIN de seguridad (4 dígitos)'}
+            aria-label={hasPin ? 'Bloquear Fluo' : 'Configurar PIN'}
+          >
+            {hasPin ? (
+              <Lock className="h-3.5 w-3.5 text-slate-300" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+            )}
+          </button>
+
           {/* User Session / Sign Out or Login Button */}
           {user ? (
             <button
@@ -163,8 +199,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main View Switcher */}
-      <main className="flex-1 flex flex-col gap-6">
+      {/* Main View Switcher with Privacy Obfuscation when locked */}
+      <main
+        className={`flex-1 flex flex-col gap-6 transition-all duration-300 ${
+          isLocked ? 'filter blur-2xl pointer-events-none select-none opacity-40' : ''
+        }`}
+      >
         {activeTab === 'home' && (
           <>
             {/* 1. Hero Net Balance */}
@@ -214,6 +254,22 @@ export default function App() {
         onConfirm={handleConfirmSignOut}
         userEmail={user?.email}
         isLoggingOut={isLoggingOut}
+      />
+
+      {/* Security Lock Screen & Biometric PIN Vault */}
+      <SecurityLockScreen
+        isLocked={isLocked || isConfiguringPin}
+        hasPin={hasPin && !isConfiguringPin}
+        isBiometricsAvailable={isBiometricsAvailable}
+        onUnlockWithPin={unlockWithPin}
+        onUnlockWithBiometrics={unlockWithBiometrics}
+        onSetupPin={async (pin) => {
+          const success = await setupPin(pin);
+          if (success) {
+            setIsConfiguringPin(false);
+          }
+          return success;
+        }}
       />
 
       {/* PWA Smart Install Prompt (Android & iOS Safari Guide) */}

@@ -49,7 +49,7 @@ export const SignOutConfirmModal: React.FC<SignOutConfirmModalProps> = ({
             </p>
           )}
           <p className="text-[11px] text-slate-500 mt-2">
-            Tus datos en la nube están guardados de forma segura con Row Level Security.
+            Tus datos en la nube están protegidos con RLS. Al salir, se purgarán los datos locales de este dispositivo.
           </p>
         </div>
 

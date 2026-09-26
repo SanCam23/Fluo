@@ -15,6 +15,25 @@
     <meta name="theme-color" content="#0B0F19" />
     <meta name="description" content="Fluo - Gestión inteligente de finanzas personales e inversiones" />
     
+    <!-- Security & Hardening: Content Security Policy (CSP) -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' https:;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com data:;
+        img-src 'self' data: blob: https:;
+        connect-src 'self' https://*.supabase.co wss://*.supabase.co https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://autocomplete.clearbit.com https://api.coingecko.com https://*.coingecko.com;
+        frame-ancestors 'none';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+      "
+    />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
     <title>Fluo</title>
   </head>
   <body class="bg-[#0B0F19] text-white overflow-x-hidden antialiased select-none">
