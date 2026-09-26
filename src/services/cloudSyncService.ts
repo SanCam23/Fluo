@@ -115,6 +115,42 @@ export async function deleteCloudTransaction(id: string, userId?: string): Promi
 }
 
 /**
+ * Update an existing transaction in Supabase
+ */
+export async function updateCloudTransaction(
+  id: string,
+  updatedFields: Partial<Omit<Transaction, 'id' | 'createdAt'>>,
+  userId: string
+): Promise<boolean> {
+  if (!isSupabaseConfigured || !userId) return false;
+
+  try {
+    const patch: Record<string, any> = {};
+    if (updatedFields.amount !== undefined) patch.amount = updatedFields.amount;
+    if (updatedFields.pillar !== undefined) patch.pillar = updatedFields.pillar;
+    if (updatedFields.categoryId !== undefined) patch.category_id = updatedFields.categoryId;
+    if (updatedFields.concept !== undefined) patch.concept = updatedFields.concept;
+    if (updatedFields.date !== undefined) patch.date = updatedFields.date;
+    if (updatedFields.brandId !== undefined) patch.brand_id = updatedFields.brandId;
+
+    const { error } = await (supabase
+      .from('transactions') as any)
+      .update(patch)
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.warn('[CloudSync] Error updating transaction:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[CloudSync] Unexpected error updating transaction:', err);
+    return false;
+  }
+}
+
+/**
  * Persist a new investment asset in Supabase
  */
 export async function insertCloudAsset(asset: InvestmentAsset, userId: string): Promise<boolean> {

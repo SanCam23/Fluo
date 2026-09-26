@@ -26,11 +26,26 @@ export interface Category {
   id: string;
   name: string;
   pillar: PillarType;
-  icon: string;         // Nombre del icono Lucide (ej. 'Utensils', 'Home', 'Tv', 'Briefcase')
+  icon: string;         // Nombre del icono Lucide (ej. 'Utensils', 'Home', 'Tv', 'Briefcase', 'ArrowDownLeft', 'Laptop', 'Building2', etc.)
   color: string;        // Hexadecimal o clase CSS
   isDefault?: boolean;
 }
 ```
+
+### Catálogo de Categorías por Pilar
+- **Ingresos (`income`) - 10 Categorías Semánticas**:
+  1. `cat-salary`: Nómina y Salario (`Briefcase`, `#10B981`)
+  2. `cat-bizum-transfers`: Bizum y Transferencias (`ArrowDownLeft`, `#059669`)
+  3. `cat-dividends`: Dividendos y Rendimientos (`Coins`, `#34D399`)
+  4. `cat-freelance`: Freelance y Facturación (`Laptop`, `#10B981`)
+  5. `cat-sales`: Ventas y Segunda Mano (`Sparkles`, `#6EE7B7`)
+  6. `cat-rental-income`: Alquileres e Inmuebles (`Building2`, `#047857`)
+  7. `cat-bank-interest`: Intereses y Cuentas Remuneradas (`Percent`, `#34D399`)
+  8. `cat-refunds`: Devoluciones y Reembolsos (`RotateCcw`, `#6EE7B7`)
+  9. `cat-gifts-grants`: Premios, Regalos y Becas (`Gift`, `#A7F3D0`)
+  10. `cat-other-income`: Otros Ingresos (`Wallet`, `#059669`)
+- **Gastos (`expense`) - 7 Categorías**: Supermercado, Suscripciones, Vivienda, Transporte, Ocio, Compras y Salud.
+- **Inversiones (`invest`) - 5 Categorías**: Fondos y ETFs, Acciones, Criptoactivos, Renta Fija y Depósitos.
 
 ### Marca Comercial (`Brand`)
 Soporta marcas reales (Mercadona, Netflix, DAZN, Carrefour, Repsol, Apple, Spotify, Amazon, etc.) para identificar de un vistazo el origen del gasto/ingreso:
@@ -151,6 +166,11 @@ export interface Transaction {
 | `isRecurringGenerated` | `is_recurring_generated` | `BOOLEAN` | `DEFAULT FALSE` |
 | `recurrenceId` | `recurrence_id` | `TEXT` | `NULL` |
 | `createdAt` | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
+
+### Operaciones CRUD de Transacciones
+- **Alta (`addTransaction`)**: Inserta el registro local en Zustand e invoca en segundo plano `insertCloudTransaction` en Supabase.
+- **Edición (`updateTransaction`)**: Actualiza selectivamente los campos modificados (`amount`, `concept`, `pillar`, `categoryId`, `brandId`, `date`) en memoria y sincroniza vía `updateCloudTransaction(id, updatedFields, userId)`.
+- **Baja (`deleteTransaction`)**: Elimina el registro del estado reactivo y envía la petición de borrado a Supabase vía `deleteCloudTransaction`.
 
 ---
 

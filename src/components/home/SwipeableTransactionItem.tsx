@@ -1,5 +1,5 @@
 import { useState, useRef, memo } from 'react';
-import { Trash2, Repeat } from 'lucide-react';
+import { Trash2, Repeat, Pencil } from 'lucide-react';
 import type { Transaction, Category, Brand } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
 import { formatCurrency } from '../../utils/currency';
@@ -10,6 +10,7 @@ interface SwipeableTransactionItemProps {
   category?: Category;
   brand?: Brand;
   onDelete: (id: string) => void;
+  onEdit?: (tx: Transaction) => void;
 }
 
 export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> = memo(({
@@ -17,6 +18,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
   category,
   brand,
   onDelete,
+  onEdit,
 }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -63,15 +65,15 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     }
 
     if (isHorizontal.current) {
-      // Only allow swiping to the left
+      // Swiping to the left (Delete) or right (Edit) with elastic resistance past thresholds
       if (diffX < 0) {
-        // Apply resistance past -100px
         const clamped = diffX < -100 ? -100 + (diffX + 100) * 0.35 : diffX;
         currentOffset.current = clamped;
         setOffsetX(clamped);
       } else {
-        currentOffset.current = 0;
-        setOffsetX(0);
+        const clamped = diffX > 100 ? 100 + (diffX - 100) * 0.35 : diffX;
+        currentOffset.current = clamped;
+        setOffsetX(clamped);
       }
     }
   };
@@ -81,6 +83,10 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     setIsSwiping(false);
     if (currentOffset.current <= -80) {
       triggerDelete();
+    } else if (currentOffset.current >= 80) {
+      setOffsetX(0);
+      currentOffset.current = 0;
+      onEdit?.(tx);
     } else {
       setOffsetX(0);
       currentOffset.current = 0;
@@ -104,6 +110,10 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
       const clamped = diffX < -100 ? -100 + (diffX + 100) * 0.35 : diffX;
       currentOffset.current = clamped;
       setOffsetX(clamped);
+    } else {
+      const clamped = diffX > 100 ? 100 + (diffX - 100) * 0.35 : diffX;
+      currentOffset.current = clamped;
+      setOffsetX(clamped);
     }
   };
 
@@ -113,6 +123,10 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     setIsSwiping(false);
     if (currentOffset.current <= -80) {
       triggerDelete();
+    } else if (currentOffset.current >= 80) {
+      setOffsetX(0);
+      currentOffset.current = 0;
+      onEdit?.(tx);
     } else {
       setOffsetX(0);
       currentOffset.current = 0;
@@ -125,7 +139,8 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     }
   };
 
-  const isPastThreshold = offsetX <= -80;
+  const isPastDeleteThreshold = offsetX <= -80;
+  const isPastEditThreshold = offsetX >= 80;
 
   return (
     <div
@@ -136,10 +151,31 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
       }`}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Background layer revealed ONLY when swiping left */}
+      {/* Background layer revealed ONLY when swiping RIGHT (Edit) */}
+      <div
+        className={`absolute inset-0 flex items-center justify-start pl-5 rounded-2xl transition-colors duration-200 pointer-events-none ${
+          isPastEditThreshold ? 'bg-indigo-600/90 text-white' : 'bg-indigo-500/80 text-indigo-100'
+        } backdrop-blur-xl`}
+        style={{
+          opacity: offsetX > 0 ? Math.min(1, Math.abs(offsetX) / 25) : 0,
+          visibility: offsetX > 0 ? 'visible' : 'hidden',
+        }}
+      >
+        <div
+          className={`flex items-center gap-1.5 font-semibold text-xs transition-transform duration-150 ${
+            isPastEditThreshold ? 'scale-110 font-bold' : 'scale-100'
+          }`}
+          style={{ opacity: Math.min(1, Math.abs(offsetX) / 35) }}
+        >
+          <Pencil className="h-4 w-4" />
+          <span>{isPastEditThreshold ? 'Soltar para editar' : 'Editar'}</span>
+        </div>
+      </div>
+
+      {/* Background layer revealed ONLY when swiping LEFT (Delete) */}
       <div
         className={`absolute inset-0 flex items-center justify-end pr-5 rounded-2xl transition-colors duration-200 pointer-events-none ${
-          isPastThreshold ? 'bg-rose-600/90 text-white' : 'bg-rose-500/80 text-rose-100'
+          isPastDeleteThreshold ? 'bg-rose-600/90 text-white' : 'bg-rose-500/80 text-rose-100'
         } backdrop-blur-xl`}
         style={{
           opacity: offsetX < 0 ? Math.min(1, Math.abs(offsetX) / 25) : 0,
@@ -148,12 +184,12 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
       >
         <div
           className={`flex items-center gap-1.5 font-semibold text-xs transition-transform duration-150 ${
-            isPastThreshold ? 'scale-110 font-bold' : 'scale-100'
+            isPastDeleteThreshold ? 'scale-110 font-bold' : 'scale-100'
           }`}
           style={{ opacity: Math.min(1, Math.abs(offsetX) / 35) }}
         >
           <Trash2 className="h-4 w-4" />
-          <span>{isPastThreshold ? 'Soltar para eliminar' : 'Eliminar'}</span>
+          <span>{isPastDeleteThreshold ? 'Soltar para eliminar' : 'Eliminar'}</span>
         </div>
       </div>
 
@@ -229,18 +265,34 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
             </span>
           </div>
 
-          {/* Delete button (accessible on group hover or tap) */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              triggerDelete();
-            }}
-            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-opacity rounded-lg hover:bg-white/10 cursor-pointer -mr-1"
-            title="Eliminar movimiento"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {/* Action buttons (accessible on group hover) */}
+          <div className="flex items-center gap-0.5 -mr-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.(tx);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-indigo-400 transition-opacity rounded-lg hover:bg-white/10 cursor-pointer"
+              title="Editar movimiento"
+              aria-label="Editar movimiento"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerDelete();
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-opacity rounded-lg hover:bg-white/10 cursor-pointer"
+              title="Eliminar movimiento"
+              aria-label="Eliminar movimiento"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

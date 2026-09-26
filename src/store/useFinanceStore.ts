@@ -22,6 +22,7 @@ import { computeFinancialSummary } from '../utils/finance';
 import {
   fetchUserCloudData,
   insertCloudTransaction,
+  updateCloudTransaction,
   deleteCloudTransaction,
   insertCloudAsset,
   deleteCloudAsset,
@@ -55,6 +56,7 @@ interface FinanceState {
   setTransactions: (transactions: Transaction[]) => void;
   setAssets: (assets: InvestmentAsset[]) => void;
   addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  updateTransaction: (id: string, updatedFields: Partial<Omit<Transaction, 'id' | 'createdAt'>>) => void;
   deleteTransaction: (id: string) => void;
   addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
   deleteAsset: (id: string) => void;
@@ -141,6 +143,21 @@ export const useFinanceStore = create<FinanceState>()(
         if (userId) {
           insertCloudTransaction(newTx, userId).catch((err) =>
             console.warn('[Store] Cloud sync failed for addTransaction:', err)
+          );
+        }
+      },
+
+      updateTransaction: (id, updatedFields) => {
+        const { userId } = get();
+        set((state) => ({
+          transactions: state.transactions.map((tx) =>
+            tx.id === id ? { ...tx, ...updatedFields } : tx
+          ),
+        }));
+
+        if (userId) {
+          updateCloudTransaction(id, updatedFields, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for updateTransaction:', err)
           );
         }
       },
@@ -450,10 +467,26 @@ export const useFinanceStore = create<FinanceState>()(
             Array.isArray(p.transactions) && p.transactions.length > 0
               ? p.transactions
               : currentState.transactions,
-          categories:
-            Array.isArray(p.categories) && p.categories.length > 0
-              ? p.categories
-              : currentState.categories,
+          categories: (() => {
+            const initialMap = new Map(INITIAL_CATEGORIES.map((c) => [c.id, c]));
+            const merged: Category[] = INITIAL_CATEGORIES.map((initCat) => {
+              const stored = Array.isArray(p.categories)
+                ? p.categories.find((c) => c.id === initCat.id)
+                : null;
+              return {
+                ...initCat,
+                ...(stored || {}),
+              };
+            });
+            if (Array.isArray(p.categories)) {
+              for (const storedCat of p.categories) {
+                if (!initialMap.has(storedCat.id)) {
+                  merged.push(storedCat);
+                }
+              }
+            }
+            return merged;
+          })(),
           brands: (() => {
             const initialMap = new Map(INITIAL_BRANDS.map((b) => [b.id, b]));
             const merged: Brand[] = INITIAL_BRANDS.map((initBrand) => {

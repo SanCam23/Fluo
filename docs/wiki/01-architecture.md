@@ -58,13 +58,13 @@ Fluo/
 │   │   │   ├── PillarBadge.tsx     # Insignia semántica de pilar financiero
 │   │   │   └── PWAInstallPrompt.tsx # Banner inteligente de instalación PWA (Android / iOS)
 │   │   ├── layout/                 # Estructura del dispositivo móvil
-│   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante Liquid Glass (fixed)
+│   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante simétrica Liquid Glass (grid 4-cols)
 │   │   │   └── MobileContainer.tsx # Contenedor responsive max-w-md
 │   │   ├── home/                   # Vista de Inicio
 │   │   │   ├── HeroBalance.tsx     # Tarjeta principal con balance neto y tasa de ahorro
 │   │   │   ├── MetricPillars.tsx   # Los 3 pilares (Ingresos, Gastos, Inversión)
-│   │   │   ├── RecentTransactionsList.tsx # Listado de últimos movimientos filtrable
-│   │   │   ├── SwipeableTransactionItem.tsx # Elemento deslizable hacia la izquierda para eliminar
+│   │   │   ├── RecentTransactionsList.tsx # Listado de últimos movimientos filtrable con modal de edición
+│   │   │   ├── SwipeableTransactionItem.tsx # Elemento deslizable bidireccional (derecha: editar, izquierda: eliminar)
 │   │   │   └── RecurrenceSummaryWidget.tsx # Widget de pagos y cobros próximos recurrentes
 │   │   ├── investments/            # Vista de Cartera de Inversiones
 │   │   │   ├── AddAssetModal.tsx   # Modal legado/independiente de alta de activos

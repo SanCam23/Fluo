@@ -30,6 +30,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Progressive Web App (PWA & iOS WebKit)** | ✅ Completado | `vite-plugin-pwa`, Workbox offline caching, soporte WebKit standalone, `safe-area-inset` y banner inteligente |
 | **Ciberseguridad Nivel 1 & Bloqueo Biométrico** | ✅ Completado | Detección de inactividad (3m), backgrounding, bóveda PIN SHA-256, WebAuthn, CSP y purga de sesión (`purgeUserData`) |
 | **Optimización de Rendimiento & Aceleración GPU** | ✅ Completado | Aceleración GPU en Liquid Glass, bundle splitting (65% reducción), compresión Gzip/Brotli, viewport virtualization y SWR |
+| **Documentación Oficial & README Maestro** | ✅ Completado | `README.md` exhaustivo con arquitectura, diseño Liquid Glass, ciberseguridad, guía local y despliegue |
 
 ---
 
@@ -308,6 +309,43 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **Caché en Memoria y Red SWR**:
   - In-memory cache de marcas en [`BrandAvatar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/BrandAvatar.tsx) con `loading="lazy"` y `decoding="async"` para eliminar parpadeos de fallback.
   - Deduplicación de peticiones concurrentes y Stale-While-Revalidate (SWR) de 25s en [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts) para cotizaciones bursátiles y cripto.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+
+### v0.5.13 (Equidistancia Simétrica en Barra Flotante y Edición por Deslizamiento)
+- **Barra de Navegación 100% Equidistante ([`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx))**:
+  - Reestructuración de la barra flotante a una cuadrícula simétrica de 4 columnas (`grid grid-cols-4 items-stretch gap-1.5 p-1.5`).
+  - Los 4 elementos (Inicio, Estadísticas, Inversiones y el botón de acción rápida `+`) comparten idéntico ancho, centrado vertical y separación geométrica perfecta, eliminando la asimetría visual anterior.
+  - **Botón `+` Destacado**: Se eliminó la etiqueta de texto *"Añadir"* para optimizar la pureza visual y se aumentó el tamaño del icono a 24px (`h-6 w-6 stroke-[2.5]`), centrándolo como acción principal flotante.
+- **Gesto de Deslizamiento Bidireccional ([`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx))**:
+  - **Deslizar a la Derecha (Editar)**: Muestra una capa Liquid Glass índigo (`bg-indigo-500/80` o `bg-indigo-600/90`), icono `Pencil` y texto "Soltar para editar". Al superar 80px y soltar, activa el modal de edición.
+  - **Deslizar a la Izquierda (Eliminar)**: Muestra la capa Liquid Glass rojo coral para borrado.
+  - Botón de edición adicional visible en *hover* para uso en ordenadores de sobremesa.
+- **Edición en Modal ([`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx))**:
+  - Soporta la propiedad `editingTransaction`. Carga automáticamente importe, concepto, categoría, marca, fecha y pilar.
+  - Cambia dinámicamente el título a *"Editar Movimiento"* y el botón a *"Guardar Cambios"*.
+- **Persistencia en Store y Cloud ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts) & [`cloudSyncService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/cloudSyncService.ts))**:
+  - Acción `updateTransaction` que actualiza el estado local y sincroniza los cambios en la base de datos de Supabase vía `updateCloudTransaction`.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+
+### v0.5.14 (Ampliación del Catálogo de Categorías de Ingresos y Rehidratación Inteligente)
+- **10 Categorías Semánticas de Ingresos ([`categoriesAndBrands.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/data/categoriesAndBrands.ts))**:
+  - Ampliado el catálogo de ingresos con 7 nuevas categorías esenciales: *Bizum y Transferencias* (`cat-bizum-transfers`), *Freelance y Facturación* (`cat-freelance`), *Ventas y Segunda Mano* (`cat-sales`), *Alquileres e Inmuebles* (`cat-rental-income`), *Intereses y Cuentas Remuneradas* (`cat-bank-interest`), *Devoluciones y Reembolsos* (`cat-refunds`), *Premios, Regalos y Becas* (`cat-gifts-grants`) y *Otros Ingresos* (`cat-other-income`).
+  - Cada categoría cuenta con color esmeralda semántico armonizado y glifo vectorial representativo.
+- **Soporte Vectorial Completo ([`CategoryIcon.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/CategoryIcon.tsx))**:
+  - Incorporados nuevos glifos de Lucide React: `ArrowDownLeft`, `Building2`, `RotateCcw`, `Gift`, `Percent`, `Wallet` y `Laptop`.
+- **Rehidratación Inmediata de Categorías en Cliente ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts))**:
+  - Implementado algoritmo de *merge* inteligente en Zustand que propaga automáticamente las nuevas categorías a usuarios con sesiones activas en `localStorage` sin requerir reinicio de datos.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+
+### v0.5.15 (Documentación Maestra del Repositorio - README.md)
+- **README Oficial y Exhaustivo ([`README.md`](file:///c:/Users/santi/Documents/UNI/Fluo/README.md))**:
+  - Redacción técnica integral con cabecera de presentación, badges oficiales (React 19, TypeScript, Vite, Tailwind CSS v4, Supabase, PWA, Vitest, MIT License).
+  - Propuesta de valor detallada: flujo de caja, marcas vectoriales, motor de recurrencias descentralizado, seguimiento multiactivo con cotizaciones en vivo y analítica con Recharts.
+  - Diagrama de arquitectura del sistema (Local-First con Cloud Sync), tabla exhaustiva de tecnologías y explicación del diseño Liquid Glass.
+  - Modelo de ciberseguridad por 3 capas (dispositivo, transporte y base de datos con RLS).
+  - Guía completa de instalación, desarrollo en red local con QR (`--host`), comandos de testing y verificación estricta.
+  - Instrucciones de despliegue en Vercel y guía de instalación PWA en iOS y Android.
+  - Árbol de directorios representativo y enlaces a la wiki técnica interna (`/docs/wiki/`).
 - **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
 
 ---

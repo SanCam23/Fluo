@@ -17,6 +17,7 @@ import {
   Coins,
   ShieldCheck,
   Landmark,
+  Pencil,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -24,6 +25,7 @@ import type {
   RecurrenceFrequency,
   AssetType,
   MarketAssetItem,
+  Transaction,
 } from '../../types/finance';
 import { BrandPicker } from './BrandPicker';
 import { GlassSelect } from '../common/GlassSelect';
@@ -51,15 +53,18 @@ interface QuickAddTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialPillar?: PillarType;
+  editingTransaction?: Transaction | null;
 }
 
 export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> = ({
   isOpen,
   onClose,
   initialPillar,
+  editingTransaction,
 }) => {
   const categories = useFinanceStore((state) => state.categories);
   const addTransaction = useFinanceStore((state) => state.addTransaction);
+  const updateTransaction = useFinanceStore((state) => state.updateTransaction);
   const addRecurrence = useFinanceStore((state) => state.addRecurrence);
   const addAsset = useFinanceStore((state) => state.addAsset);
   const getBrandById = useFinanceStore((state) => state.getBrandById);
@@ -67,24 +72,35 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
   // Pillar selection
   const [pillar, setPillar] = useState<PillarType>(() => {
+    if (editingTransaction) return editingTransaction.pillar;
     if (initialPillar) return initialPillar;
     if (activeTab === 'invest') return 'invest';
     return 'expense';
   });
 
-  // Whenever modal opens or activeTab changes, auto-align pillar
+  // Whenever modal opens or activeTab/editingTransaction changes, auto-align state
   useEffect(() => {
     if (isOpen) {
-      setAssetSearchQuery('');
-      setAssetSearchResults([]);
-      setIsAssetDropdownOpen(false);
-      if (initialPillar) {
-        setPillar(initialPillar);
-      } else if (activeTab === 'invest') {
-        setPillar('invest');
+      if (editingTransaction) {
+        setPillar(editingTransaction.pillar);
+        setAmount(editingTransaction.amount.toString());
+        setConcept(editingTransaction.concept);
+        setCategoryId(editingTransaction.categoryId);
+        setBrandId(editingTransaction.brandId || '');
+        setStartDate(editingTransaction.date ? editingTransaction.date.substring(0, 10) : '');
+        setIsRecurring(!!editingTransaction.isRecurring);
+      } else {
+        setAssetSearchQuery('');
+        setAssetSearchResults([]);
+        setIsAssetDropdownOpen(false);
+        if (initialPillar) {
+          setPillar(initialPillar);
+        } else if (activeTab === 'invest') {
+          setPillar('invest');
+        }
       }
     }
-  }, [isOpen, initialPillar, activeTab]);
+  }, [isOpen, initialPillar, activeTab, editingTransaction]);
 
   // Standard movement fields (Expense / Income)
   const [amount, setAmount] = useState<string>('');
@@ -362,6 +378,30 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       return;
     }
 
+    // Editing existing movement
+    if (editingTransaction) {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) return;
+      if (!concept.trim()) return;
+
+      const txDate = startDate
+        ? new Date(`${startDate}T12:00:00.000Z`).toISOString()
+        : editingTransaction.date;
+
+      updateTransaction(editingTransaction.id, {
+        amount: numAmount,
+        pillar,
+        categoryId: selectedCatId,
+        brandId: brandId || undefined,
+        concept: concept.trim(),
+        date: txDate,
+      });
+
+      resetAllFormState();
+      onClose();
+      return;
+    }
+
     // Standard Expense / Income submission
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) return;
@@ -441,11 +481,22 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
           <div>
-            <h3 className="text-base font-bold text-white">
-              {pillar === 'invest' ? 'Nueva Inversión' : 'Nuevo Movimiento'}
+            <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+              {editingTransaction ? (
+                <>
+                  <Pencil className="h-4 w-4 text-indigo-400" />
+                  Editar Movimiento
+                </>
+              ) : pillar === 'invest' ? (
+                'Nueva Inversión'
+              ) : (
+                'Nuevo Movimiento'
+              )}
             </h3>
             <p className="text-[11px] text-slate-400">
-              {pillar === 'invest'
+              {editingTransaction
+                ? 'Modifica los datos del registro y guarda los cambios'
+                : pillar === 'invest'
                 ? 'Registra un activo en cartera con cotización oficial en vivo'
                 : 'Registra un gasto o ingreso en tu registro financiero'}
             </p>
@@ -1079,7 +1130,11 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
             className="mt-2 w-full py-3.5 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-400 hover:brightness-110 active:scale-[0.98] font-bold text-white text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Check className="h-4 w-4 stroke-[3]" />
-            {pillar === 'invest' ? 'Guardar Inversión en Cartera' : 'Guardar Movimiento'}
+            {editingTransaction
+              ? 'Guardar Cambios'
+              : pillar === 'invest'
+              ? 'Guardar Inversión en Cartera'
+              : 'Guardar Movimiento'}
           </button>
         </form>
       </div>

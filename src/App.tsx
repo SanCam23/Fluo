@@ -11,7 +11,7 @@ import { RecurrenceSummaryWidget } from './components/home/RecurrenceSummaryWidg
 import { RecentTransactionsList } from './components/home/RecentTransactionsList';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
-import type { PillarType } from './types/finance';
+import type { PillarType, Transaction } from './types/finance';
 
 // Code Splitting: Lazy load heavy analytical charts, secondary views & modals
 const AnalyticsView = lazy(() =>
@@ -70,6 +70,7 @@ export default function App() {
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Synchronize authenticated user with store and fetch cloud data
   useEffect(() => {
@@ -247,6 +248,7 @@ export default function App() {
             <RecentTransactionsList
               selectedPillar={selectedPillar}
               onSelectPillar={setSelectedPillar}
+              onEditTransaction={setEditingTransaction}
             />
           </>
         )}
@@ -267,12 +269,16 @@ export default function App() {
       {/* Floating Bottom Glass Navigation Bar */}
       <FloatingNavbar onOpenAddModal={() => setIsAddModalOpen(true)} />
 
-      {/* Quick Add Transaction Modal */}
-      {isAddModalOpen && (
+      {/* Quick Add / Edit Transaction Modal */}
+      {(isAddModalOpen || Boolean(editingTransaction)) && (
         <Suspense fallback={null}>
           <QuickAddTransactionModal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
+            isOpen={isAddModalOpen || Boolean(editingTransaction)}
+            onClose={() => {
+              setIsAddModalOpen(false);
+              setEditingTransaction(null);
+            }}
+            editingTransaction={editingTransaction}
           />
         </Suspense>
       )}

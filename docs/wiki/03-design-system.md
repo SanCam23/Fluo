@@ -65,9 +65,16 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 - Aplicación: Llamadas a la acción (CTA), registrar transacción, confirmar inversión.
 
 ### 4. Barra de Navegación Flotante (`FloatingNavbar` / `.safeAreaBar(.bottom)`)
-- Clases: `fixed bottom-4 inset-x-4 max-w-sm mx-auto z-50 bg-slate-950/40 backdrop-blur-2xl border border-white/15 rounded-3xl p-2 shadow-[0_12px_40px_rgba(0,0,0,0.5)]`
-- **Botón Central Elevado (+)**: `bg-gradient-to-tr from-indigo-500 to-indigo-400 text-white shadow-lg shadow-indigo-500/30 active:scale-90 transition-all rounded-2xl`
-- **Pestañas Activas**: Indicador con resplandor índigo sutil y texto `text-white font-medium`, inactivas en `text-slate-400 hover:text-slate-200`.
+- **Contenedor Simétrico Equidistante**: `fixed bottom-4 inset-x-4 max-w-sm mx-auto z-50 bg-slate-950/70 backdrop-blur-2xl border border-white/15 rounded-3xl p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.5)]`.
+- **Estructura en Cuadrícula 4 Columnas**: Organizada con `grid grid-cols-4 items-stretch gap-1.5`, garantizando una anchura e idéntica altura en todas las columnas con separación matemáticamente uniforme entre todos los botones.
+- **Botón de Acción Rápida (+)**: Cápsula Liquid Glass prominente con gradiente tricolor `bg-gradient-to-tr from-indigo-500/90 via-indigo-600/90 to-emerald-500/80`, glifo central `Plus` de 24px (`h-6 w-6 stroke-[2.5]`) sin etiqueta textual inferior, destello especular superior en la cresta del cristal y micro-interacción háptica `active:scale-90`.
+- **Pestañas Activas / Inactivas**: Las pestañas activas presentan cápsula refractiva `bg-white/[0.12] text-white shadow-sm border border-white/20`, mientras que las inactivas utilizan `text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]`.
+
+### 4.1. Fila de Movimiento Deslizable Bidireccional (`SwipeableTransactionItem`)
+- **Superficie Deslizable**: Tarjeta Liquid Glass `bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-2xl p-3.5` con amortiguación elástica tras sobrepasar el umbral de 100px.
+- **Deslizamiento hacia la Izquierda (Eliminar)**: Revela un sustrato rojo coral `bg-rose-500/80` (o `bg-rose-600/90` al rebasar 80px) con icono `Trash2` y texto dinámico *"Eliminar"* / *"Soltar para eliminar"*.
+- **Deslizamiento hacia la Derecha (Editar)**: Revela un sustrato índigo Liquid Glass `bg-indigo-500/80` (o `bg-indigo-600/90` al rebasar 80px) con icono `Pencil` y texto dinámico *"Editar"* / *"Soltar para editar"*. Al soltar tras superar el umbral, abre automáticamente el modal de edición pre-cargado.
+- **Acceso en Escritorio**: Botones de acción rápida (`Pencil` y `Trash2`) visibles al hacer *hover* sobre el registro.
 
 ### 5. Chips y Badges de Pilares
 - **Ingreso**: `bg-emerald-500/10 border border-emerald-500/25 text-emerald-400`

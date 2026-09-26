@@ -14,6 +14,13 @@ import {
   ShieldCheck,
   Landmark,
   CircleDollarSign,
+  ArrowDownLeft,
+  Building2,
+  RotateCcw,
+  Gift,
+  Percent,
+  Wallet,
+  Laptop,
 } from 'lucide-react';
 
 interface CategoryIconProps {
@@ -28,10 +35,25 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
   switch (iconName.toLowerCase()) {
     case 'briefcase':
       return <Briefcase className={className} />;
+    case 'arrowdownleft':
+      return <ArrowDownLeft className={className} />;
     case 'coins':
       return <Coins className={className} />;
     case 'sparkles':
       return <Sparkles className={className} />;
+    case 'laptop':
+      return <Laptop className={className} />;
+    case 'building2':
+    case 'building':
+      return <Building2 className={className} />;
+    case 'rotateccw':
+      return <RotateCcw className={className} />;
+    case 'gift':
+      return <Gift className={className} />;
+    case 'percent':
+      return <Percent className={className} />;
+    case 'wallet':
+      return <Wallet className={className} />;
     case 'shoppingbag':
       return <ShoppingBag className={className} />;
     case 'tv':

@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
-import type { PillarType } from '../../types/finance';
+import type { PillarType, Transaction } from '../../types/finance';
 import { SwipeableTransactionItem } from './SwipeableTransactionItem';
 
 interface RecentTransactionsListProps {
   selectedPillar: PillarType | 'all';
   onSelectPillar: (pillar: PillarType | 'all') => void;
+  onEditTransaction?: (tx: Transaction) => void;
 }
 
 const PAGE_SIZE = 25;
@@ -15,6 +16,7 @@ const PAGE_SIZE = 25;
 export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
   selectedPillar,
   onSelectPillar,
+  onEditTransaction,
 }) => {
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
@@ -104,6 +106,7 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
                 category={category}
                 brand={brand}
                 onDelete={deleteTransaction}
+                onEdit={onEditTransaction}
               />
             );
           })

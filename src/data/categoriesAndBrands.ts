@@ -3,8 +3,15 @@ import type { Category, Brand } from '../types/finance';
 export const INITIAL_CATEGORIES: Category[] = [
   // Ingresos
   { id: 'cat-salary', name: 'Nómina y Salario', pillar: 'income', icon: 'Briefcase', color: '#10B981' },
-  { id: 'cat-dividends', name: 'Dividendos y Rentas', pillar: 'income', icon: 'Coins', color: '#34D399' },
-  { id: 'cat-sales', name: 'Ventas y Freelance', pillar: 'income', icon: 'Sparkles', color: '#6EE7B7' },
+  { id: 'cat-bizum-transfers', name: 'Bizum y Transferencias', pillar: 'income', icon: 'ArrowDownLeft', color: '#059669' },
+  { id: 'cat-dividends', name: 'Dividendos y Rendimientos', pillar: 'income', icon: 'Coins', color: '#34D399' },
+  { id: 'cat-freelance', name: 'Freelance y Facturación', pillar: 'income', icon: 'Laptop', color: '#10B981' },
+  { id: 'cat-sales', name: 'Ventas y Segunda Mano', pillar: 'income', icon: 'Sparkles', color: '#6EE7B7' },
+  { id: 'cat-rental-income', name: 'Alquileres e Inmuebles', pillar: 'income', icon: 'Building2', color: '#047857' },
+  { id: 'cat-bank-interest', name: 'Intereses y Cuentas Remuneradas', pillar: 'income', icon: 'Percent', color: '#34D399' },
+  { id: 'cat-refunds', name: 'Devoluciones y Reembolsos', pillar: 'income', icon: 'RotateCcw', color: '#6EE7B7' },
+  { id: 'cat-gifts-grants', name: 'Premios, Regalos y Becas', pillar: 'income', icon: 'Gift', color: '#A7F3D0' },
+  { id: 'cat-other-income', name: 'Otros Ingresos', pillar: 'income', icon: 'Wallet', color: '#059669' },
 
   // Gastos
   { id: 'cat-food', name: 'Supermercado y Alimentación', pillar: 'expense', icon: 'ShoppingBag', color: '#F87171' },
@@ -167,8 +174,10 @@ export const INITIAL_BRANDS: Brand[] = [
   { id: 'brand-revolut', name: 'Revolut', slug: 'revolut', categoryId: 'cat-salary', domain: 'revolut.com', brandColor: '#0075EB', isPopular: true },
   { id: 'brand-n26', name: 'N26', slug: 'n26', categoryId: 'cat-salary', domain: 'n26.com', brandColor: '#36A18B', isPopular: true },
   { id: 'brand-wise', name: 'Wise', slug: 'wise', categoryId: 'cat-salary', domain: 'wise.com', brandColor: '#9FE870', isPopular: false },
-  { id: 'brand-paypal', name: 'PayPal', slug: 'paypal', categoryId: 'cat-salary', domain: 'paypal.com', brandColor: '#003087', isPopular: true },
-  { id: 'brand-bizum', name: 'Bizum', slug: 'bizum', categoryId: 'cat-salary', domain: 'bizum.es', brandColor: '#00B4D8', isPopular: true },
+  { id: 'brand-bizum', name: 'Bizum', slug: 'bizum', categoryId: 'cat-bizum-transfers', domain: 'bizum.es', brandColor: '#00B4D8', isPopular: true },
+  { id: 'brand-wallapop', name: 'Wallapop', slug: 'wallapop', categoryId: 'cat-sales', domain: 'wallapop.com', brandColor: '#13C1AC', isPopular: true },
+  { id: 'brand-vinted', name: 'Vinted', slug: 'vinted', categoryId: 'cat-sales', domain: 'vinted.es', brandColor: '#09B1BA', isPopular: true },
+  { id: 'brand-aeat', name: 'Agencia Tributaria (Hacienda)', slug: 'aeat', categoryId: 'cat-refunds', domain: 'agenciatributaria.gob.es', brandColor: '#003366', isPopular: true },
   { id: 'brand-vanguard', name: 'Vanguard', slug: 'vanguard', categoryId: 'cat-etf', domain: 'vanguard.com', brandColor: '#B81B1B', isPopular: true },
   { id: 'brand-traderepublic', name: 'Trade Republic', slug: 'traderepublic', categoryId: 'cat-stocks', domain: 'traderepublic.com', brandColor: '#1E293B', isPopular: true },
   { id: 'brand-myinvestor', name: 'MyInvestor', slug: 'myinvestor', categoryId: 'cat-etf', domain: 'myinvestor.es', brandColor: '#2B3674', isPopular: true },
