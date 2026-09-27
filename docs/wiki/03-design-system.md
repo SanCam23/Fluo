@@ -126,7 +126,14 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 ### 10. Sub-Métricas de Balance (`HeroBalance`)
 - **Cuadrícula Aislada de 2 Columnas**: `grid grid-cols-2 gap-2 text-xs` sobre `border-t border-white/10`.
 - **Celdas Vítreas Independientes**: `flex flex-col justify-center rounded-2xl bg-white/[0.04] border border-white/10 px-3 py-2`.
-- **Ventaja Ergonómica**: Erradica el quiebre de palabras ("Tasa de ahorro") y asegura márgenes amplios y lectura limpia de la Tasa de Ahorro y el Rendimiento latente sin solapamientos.
+- **Pureza Visual Simétrica**: Se erradican iconos decorativos redundantes (como el glifo `Sparkles` previo a "Rendimiento"), garantizando simetría visual pura con la celda de "Tasa de ahorro", eliminando colisiones y saltos de línea inoportunos.
+
+### 10.1. Avatar de Perfil y Cabecera Minimalista (`App.tsx`)
+- **Avatar Circular Ampliado**: Botón táctil `w-10 h-10` con sustrato Liquid Glass `bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 rounded-full`.
+- **Monograma de Alta Legibilidad**: Inicial del usuario renderizada en tipografía destacada `text-base sm:text-lg font-black text-white leading-none tracking-tight` (icono `User` fallback ampliado a `h-5 w-5`).
+- **Despeje de Cabecera**:
+  - Eliminación de iconos de estado superfluos (como el icono de nube `Cloud`), preservando el indicador de sincronización activa exclusivamente en momentos de mutación en red.
+  - Ocultación del botón de depuración `Simular` en cuentas con sesión iniciada (manteniéndolo activo únicamente en modo Demo no autenticado).
 
 ### 11. Tarjeta de Transacción Reciente (`RecentTransactionsList`)
 - **Estructura en Doble Eje Paralelo**:

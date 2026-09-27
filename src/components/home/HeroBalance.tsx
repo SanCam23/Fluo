@@ -3,7 +3,6 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  Sparkles,
   ArrowUpRight,
   ArrowDownRight,
   TrendingUp,
@@ -247,10 +246,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
             </div>
 
             <div className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2`}>
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-indigo-400 flex-shrink-0" />
-                <span className="text-[11px] font-medium text-slate-400">Rendimiento</span>
-              </div>
+              <span className="text-[11px] font-medium text-slate-400">Rendimiento</span>
               <span
                 className={`mt-0.5 text-xs font-bold truncate ${
                   summary.unrealizedPnL >= 0 ? 'text-indigo-300' : 'text-rose-400'

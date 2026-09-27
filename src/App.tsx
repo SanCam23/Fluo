@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FastForward, Loader2, Cloud, Lock, ShieldCheck, User } from 'lucide-react';
+import { FastForward, Loader2, Lock, ShieldCheck, User } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
 import { useSecurityLock } from './hooks/useSecurityLock';
@@ -136,14 +136,6 @@ export default function App() {
             alt="Fluo"
             className="h-9 sm:h-10 w-auto object-contain filter drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)] select-none"
           />
-          {user && (
-            <div
-              className="flex items-center text-indigo-400/80 -ml-0.5"
-              title="Sincronizado con Supabase Cloud"
-            >
-              <Cloud className="h-4 w-4" />
-            </div>
-          )}
         </div>
 
         {/* Header Right Actions */}
@@ -159,25 +151,27 @@ export default function App() {
             </div>
           )}
 
-          {/* Time & Recurrences Simulator */}
-          <button
-            type="button"
-            onClick={() => setIsSimulatorOpen(true)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md ${
-              simulatedTimeOffsetDays > 0
-                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-                : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
-            }`}
-            title="Simulador de Tiempo y Recurrencias"
-          >
-            <FastForward className="h-3 w-3" />
-            <span>Simular</span>
-            {simulatedTimeOffsetDays > 0 && (
-              <span className="text-[10px] font-bold text-amber-200">
-                +{simulatedTimeOffsetDays}d
-              </span>
-            )}
-          </button>
+          {/* Time & Recurrences Simulator (Only in Demo Mode / Not logged in) */}
+          {!user && (
+            <button
+              type="button"
+              onClick={() => setIsSimulatorOpen(true)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md ${
+                simulatedTimeOffsetDays > 0
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
+              }`}
+              title="Simulador de Tiempo y Recurrencias"
+            >
+              <FastForward className="h-3 w-3" />
+              <span>Simular</span>
+              {simulatedTimeOffsetDays > 0 && (
+                <span className="text-[10px] font-bold text-amber-200">
+                  +{simulatedTimeOffsetDays}d
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Security PIN / App Lock */}
           <button
@@ -204,7 +198,7 @@ export default function App() {
             )}
           </button>
 
-          {/* Floating Liquid Glass Profile Avatar Button (Replaces raw email text) */}
+          {/* Floating Liquid Glass Profile Avatar Button */}
           <button
             type="button"
             onClick={() => setIsProfileModalOpen(true)}
@@ -213,11 +207,11 @@ export default function App() {
             aria-label="Perfil y Ajustes de Cuenta"
           >
             {user?.email ? (
-              <span className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors uppercase">
+              <span className="text-base sm:text-lg font-black text-white group-hover:text-indigo-200 transition-colors uppercase leading-none">
                 {user.email.charAt(0)}
               </span>
             ) : (
-              <User className="h-4 w-4 text-slate-300 group-hover:text-white transition-colors" />
+              <User className="h-5 w-5 text-slate-300 group-hover:text-white transition-colors" />
             )}
             {/* Status dot indicator */}
             <span

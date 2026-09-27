@@ -381,8 +381,17 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - **Gestión de PIN & Bóveda**: Flujo de activación, cambio de PIN de 4 dígitos validado con SHA-256 (`changePin`) y opción de desactivación (`removePin`).
   - **Toggle Biométrico**: Conmutador estilo iOS para activar/desactivar WebAuthn (`toggleBiometrics`).
   - **Cambio de Contraseña**: Integración nativa con `supabase.auth.updateUser({ password })` con alternador de visibilidad (`Eye`/`EyeOff`) y alertas translúcidas.
-  - **Zona de Peligro & GDPR**: Modal de doble confirmación requiriendo confirmación textual `ELIMINAR` para ejecutar borrado en cascada en la base de datos (`delete_user_account`), purga de almacenamiento local (`purgeUserData`) y cierre seguro de sesión.
-- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (548ms).
+### v0.5.18 (Ajustes Ergonómicos de Cabecera, Balance e Isotipo Móvil PWA)
+- **Isotipo PWA & App Icons con Letra 'F' Optimizada**:
+  - Re-encuadre técnico de `public/icon-512.jpg`, `public/icon-192.jpg` y `public/icon-180.jpg` mediante pipeline de interpolación bicúbica de alta precisión.
+  - La letra `F` tubular Liquid Glass incrementa su escala visual ~35%, eliminando el exceso de márgenes negros periféricos y manteniendo las zonas de seguridad (safe bounds) para squircles de iOS y máscaras adaptativas de Android.
+- **Depuración de la Cabecera Superior ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx))**:
+  - Eliminado el icono estático de la nube (`Cloud`).
+  - El botón `Simular` queda condicionado estrictamente al modo Demo (`!user`), ocultándose automáticamente para usuarios con sesión activa donde la recurrencia corre de forma autónoma.
+  - Avatar de perfil con monograma ampliado a `text-base sm:text-lg font-black` (e icono `User` a 20px) para una presencia más nítida y legible.
+- **Simetría y Limpieza en Tarjeta de Balance ([`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx))**:
+  - Eliminado el icono de estrellas (`Sparkles`) previo a la palabra "Rendimiento", logrando una lectura limpia, equilibrada y perfectamente simétrica con la celda de "Tasa de ahorro".
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
 
 ---
 
