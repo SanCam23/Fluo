@@ -459,12 +459,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   };
 
   const assetTypeColors: Record<AssetType, string> = {
-    stock: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    etf: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-    index_fund: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    crypto: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    fixed_income: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    deposit: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+    stock: 'bg-blue-500/20 text-blue-300 border-blue-500/30 light:bg-blue-500/10 light:text-blue-700 light:border-blue-500/30',
+    etf: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 light:bg-indigo-500/10 light:text-indigo-700 light:border-indigo-500/30',
+    index_fund: 'bg-purple-500/20 text-purple-300 border-purple-500/30 light:bg-purple-500/10 light:text-purple-700 light:border-purple-500/30',
+    crypto: 'bg-amber-500/20 text-amber-300 border-amber-500/30 light:bg-amber-500/15 light:text-amber-800 light:border-amber-500/35',
+    fixed_income: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 light:bg-emerald-500/10 light:text-emerald-700 light:border-emerald-500/30',
+    deposit: 'bg-teal-500/20 text-teal-300 border-teal-500/30 light:bg-teal-500/10 light:text-teal-700 light:border-teal-500/30',
   };
 
   if (!isOpen) return null;
@@ -665,14 +665,14 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
               {/* Selected Asset Information Badge */}
               {identifier && (
-                <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between backdrop-blur-md">
+                <div className="p-3 rounded-2xl bg-indigo-500/10 light:bg-indigo-50/70 border border-indigo-500/25 light:border-indigo-200 flex items-center justify-between backdrop-blur-md">
                   <div className="min-w-0 pr-2">
-                    <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider flex items-center gap-1">
+                    <span className="text-[10px] uppercase font-bold text-indigo-300 light:text-indigo-700 tracking-wider flex items-center gap-1">
                       <Sparkles className="h-3 w-3" /> Activo Detectado
                     </span>
                     <p className="text-xs font-bold text-white truncate mt-0.5">{assetName}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="px-1.5 py-0.2 rounded bg-white/10 font-mono text-[10px] text-indigo-200 border border-white/10">
+                      <span className="px-1.5 py-0.2 rounded bg-white/10 light:bg-indigo-100/80 font-mono text-[10px] text-indigo-200 light:text-indigo-800 border border-white/10 light:border-indigo-200">
                         {identifier}
                       </span>
                       <span className={`px-2 py-0.2 rounded text-[10px] font-semibold border ${assetTypeColors[assetType]}`}>
@@ -682,12 +682,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-400 block">Cotización Oficial</span>
+                    <span className="text-[10px] text-slate-400 light:text-slate-600 block">Cotización Oficial</span>
                     <div className="flex items-center gap-1 justify-end">
                       {isFetchingQuote ? (
                         <RefreshCw className="h-3.5 w-3.5 text-indigo-400 animate-spin" />
                       ) : (
-                        <span className="text-sm font-extrabold text-emerald-400">
+                        <span className="text-sm font-extrabold text-emerald-400 light:text-emerald-700">
                           {formatCurrency(parseFloat(currentPrice) || 0, currency)}
                         </span>
                       )}
@@ -695,14 +695,14 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                     {change24h !== undefined && (
                       <span
                         className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${
-                          change24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                          change24h >= 0 ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
                         }`}
                       >
                         {change24h >= 0 ? '+' : ''}{formatPercentage(change24h)} 24h
                       </span>
                     )}
                     {isOfflineCached && (
-                      <span className="text-[9px] text-amber-300 block">Dato en caché</span>
+                      <span className="text-[9px] text-amber-300 light:text-amber-800 block">Dato en caché</span>
                     )}
                   </div>
                 </div>

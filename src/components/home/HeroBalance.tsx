@@ -108,48 +108,48 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
     switch (selectedPillar) {
       case 'income':
         return {
-          border: 'border-emerald-500/20',
+          border: 'border-emerald-500/30',
           shadow: 'shadow-2xl shadow-black/50',
           hairline: 'from-transparent via-emerald-400/20 to-transparent',
           dot: 'bg-emerald-400',
           accentText: 'text-emerald-400',
-          subCardBg: 'bg-white/[0.04] border-white/10',
+          subCardBg: 'bg-white/[0.06] border-white/[0.16] shadow-sm',
           title: 'Total Ingresos',
           sign: '+',
           signColor: 'text-emerald-400',
         };
       case 'expense':
         return {
-          border: 'border-rose-500/20',
+          border: 'border-rose-500/30',
           shadow: 'shadow-2xl shadow-black/50',
           hairline: 'from-transparent via-rose-400/20 to-transparent',
           dot: 'bg-rose-400',
           accentText: 'text-rose-400',
-          subCardBg: 'bg-white/[0.04] border-white/10',
+          subCardBg: 'bg-white/[0.06] border-white/[0.16] shadow-sm',
           title: 'Total Gastos',
           sign: '-',
           signColor: 'text-rose-400',
         };
       case 'invest':
         return {
-          border: 'border-indigo-500/20',
+          border: 'border-indigo-500/30',
           shadow: 'shadow-2xl shadow-black/50',
           hairline: 'from-transparent via-indigo-400/20 to-transparent',
           dot: 'bg-indigo-400',
           accentText: 'text-indigo-400',
-          subCardBg: 'bg-white/[0.04] border-white/10',
+          subCardBg: 'bg-white/[0.06] border-white/[0.16] shadow-sm',
           title: 'Cartera de Inversión',
           sign: '',
           signColor: '',
         };
       default:
         return {
-          border: 'border-white/20',
+          border: 'border-white/25',
           shadow: 'shadow-2xl shadow-black/50',
           hairline: 'from-transparent via-white/50 to-transparent',
           dot: 'bg-emerald-400',
           accentText: 'text-slate-400',
-          subCardBg: 'bg-white/[0.04] border-white/10',
+          subCardBg: 'bg-white/[0.06] border-white/[0.16] shadow-sm',
           title: 'Patrimonio Neto Total',
           sign: '',
           signColor: '',

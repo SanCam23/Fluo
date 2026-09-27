@@ -14,10 +14,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
+  Palette,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSecurityLock } from '../../hooks/useSecurityLock';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { useTheme } from '../../hooks/useTheme';
 
 interface ProfileSettingsModalProps {
   isOpen: boolean;
@@ -32,6 +37,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 }) => {
   const { user, updatePassword, deleteUserAccount } = useAuth();
   const purgeUserData = useFinanceStore((state) => state.purgeUserData);
+  const { themeMode, setThemeMode } = useTheme();
 
   const {
     hasPin,
@@ -284,6 +290,64 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
             <span>{passwordError}</span>
           </div>
         )}
+
+        {/* 1.5. Appearance & Theme Selection */}
+        <div className="rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
+              <Palette className="h-3.5 w-3.5 text-indigo-400" />
+              <span>Apariencia / Tema</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-medium">
+              {themeMode === 'system' ? 'Automático' : themeMode === 'light' ? 'Modo Claro' : 'Modo Oscuro'}
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slate-400">
+            Personaliza el entorno visual de Fluo. El modo claro utiliza la estética Blanco Perla iOS con cristal refractivo.
+          </p>
+
+          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/10">
+            <button
+              type="button"
+              onClick={() => setThemeMode('light')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                themeMode === 'light'
+                  ? 'bg-white text-slate-900 shadow-md border border-white font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+              }`}
+            >
+              <Sun className={`h-3.5 w-3.5 ${themeMode === 'light' ? 'text-amber-500' : ''}`} />
+              <span>Claro</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setThemeMode('dark')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                themeMode === 'dark'
+                  ? 'bg-white/15 text-white shadow-md border border-white/20 font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+              }`}
+            >
+              <Moon className={`h-3.5 w-3.5 ${themeMode === 'dark' ? 'text-indigo-400' : ''}`} />
+              <span>Oscuro</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setThemeMode('system')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                themeMode === 'system'
+                  ? 'bg-white/15 text-white shadow-md border border-white/20 font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+              }`}
+            >
+              <Monitor className={`h-3.5 w-3.5 ${themeMode === 'system' ? 'text-emerald-400' : ''}`} />
+              <span>Sistema</span>
+            </button>
+          </div>
+        </div>
 
         {/* 2. Security Section (PIN & Biometrics) */}
         <div className="rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 p-4 flex flex-col gap-3.5">

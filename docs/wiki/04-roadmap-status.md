@@ -393,13 +393,65 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **Hardening de Caché Edge en CDN ([`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json))**:
   - Reglas estrictas `Cache-Control: no-cache, no-store, must-revalidate` para `/`, `sw.js`, `workbox-*.js`, `manifest.webmanifest` e `index.html`.
   - Garantiza que las comprobaciones del navegador móvil consulten siempre el último bundle de producción.
-### v0.5.20 (Soporte Edge-to-Edge Android & Inmersión en Pantalla Completa)
-- **Adaptación Edge-to-Edge para Android y MagicOS / OneUI**:
-  - Declaración nativa de `<meta name="color-scheme" content="dark" />` y `<meta name="mobile-web-app-capable" content="yes" />` en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html).
-  - Duplicación de etiquetas `theme-color` con `(prefers-color-scheme: dark)` y `(prefers-color-scheme: light)` a `#0B0F19` para impedir que el motor Chromium aplique un velo o tinte negro sobre la barra de estado.
-  - Estilización del nodo raíz `html`, `body` y `#root` en [`index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css) con `background-color: var(--color-fluo-dark); color-scheme: dark;` y `min-height: 100dvh`, erradicando discrepancias de color en el lienzo base del viewport.
-  - Configuración de `display_override: ['standalone', 'minimal-ui']` en el manifiesto PWA.
-- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (539ms).
+### v0.5.21 (Soporte Oficial de Modo Claro "Blanco Perla iOS" y Selector en Ajustes)
+- **Modo Claro "Blanco Perla iOS"**:
+  - Lienzo frío slate-100 (`#F1F5F9`) y tarjetas de cristal perlado translúcido (`bg-white/[0.78] backdrop-blur-2xl border-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.06),inset_0_1px_1px_rgba(255,255,255,1)]`).
+  - Orbes atmosféricos adaptados a tonos pastel suaves (`bg-emerald-400/20`, `bg-rose-400/20`, `bg-indigo-400/20`).
+  - Dock flotante con sustrato vítreo claro (`bg-white/85`), pestañas con cápsula ahumada y botón (+) gema esmeralda/índigo.
+  - Tipografía oscura de alto contraste (`#0F172A` Slate 900) con preservación inteligente de texto blanco en botones de acción primarios.
+- **Hook Unificado de Tema ([`useTheme.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useTheme.ts))**:
+  - Gestión reactiva del estado `themeMode: 'system' | 'dark' | 'light'` persistido en Zustand (`fluo_finance_storage_v3`).
+  - Sincronización automática de clases `dark` / `light` en `document.documentElement`, atributos `data-theme`, `color-scheme` y etiquetas `<meta name="theme-color">` (`#0B0F19` ↔ `#F1F5F9`).
+  - Detección en vivo de cambios en las preferencias del sistema operativo (`window.matchMedia('(prefers-color-scheme: dark)')`).
+- **Selector Triple en Centro de Ajustes ([`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx))**:
+  - Nuevo bloque de *Apariencia / Tema* con segmented control estilo iOS:
+    - *Claro* (`Sun` con acento ámbar).
+    - *Oscuro* (`Moon` con acento índigo).
+    - *Sistema* (`Monitor` con acento esmeralda).
+### v0.5.22 (Calibración de Contraste Global y Distribución Espacial de Movimientos)
+- **Calibración Óptica de Contraste ("Sin Pasarte")**:
+  - **Modo Oscuro**: Borde perimetral elevado de `border-white/10` a `border-white/[0.18]` y fondos vítreos a `bg-white/[0.07] - bg-white/[0.08]` con bisel superior `shadow-inner` y relieve suave. Aplicado en `SwipeableTransactionItem`, `HeroBalance` (submétricas de ahorro y rendimiento), `MetricPillars`, `RecurrenceSummaryWidget` y reglas base de `index.css`.
+  - **Modo Claro ("Blanco Perla iOS")**: Sustrato perla `rgba(255, 255, 255, 0.88 - 0.92)` y contornos nítidos `rgba(203, 213, 225, 0.85)` con luz cenital `inset 0 1px 0 rgba(255,255,255,1)` y sombra difusa, garantizando separación limpia de cada recuadro frente al lienzo `#F1F5F9`.
+- **Alineación Ergonómica de Movimientos ([`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx))**:
+  - **Importe Pegado a la Derecha**: Padding perimetral `py-3 pl-3 pr-2.5 sm:pr-3` con el importe y fecha situados pegados al borde derecho (`text-right whitespace-nowrap`).
+  - **Mayor Amplitud para el Concepto**: Margen del avatar reducido a `mr-2.5`, separación central a `mr-2` y supresión de límites artificiales de ancho (`max-w-[180px]`), otorgando entre 25px y 35px adicionales al nombre del comercio o movimiento antes de truncar.
+  - **Adaptabilidad Móvil**: Botones de acción rápida de escritorio (`Pencil` y `Trash2`) encapsulados con `hidden sm:flex` para no robar espacio horizontal en pantallas táctiles.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (570ms).
+
+### v0.5.23 (Legibilidad y Alto Contraste en Carteles de Inversión en Modo Claro)
+- **Eliminación del Efecto Claro sobre Claro**:
+  - Se identificó que las pastillas de tipo de activo (`ETF`, `Acción`, `Fondo Indexado`, `Cripto`, `Renta Fija`, `Depósito`), identificadores de activo (`Ticker/ISIN`), badges de datos offline y porcentajes de P&L usaban tonalidades pastel claras (`*-300`, `*-200`), las cuales sobre el cristal perlado de modo claro resultaban casi ilegibles (ratios < 1.8:1).
+- **Adaptación Cromática de Alta Definición**:
+  - En [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx), [`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx), [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) e [`index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css):
+    - `ETF` / Índigo: `light:text-indigo-700 light:bg-indigo-500/10 light:border-indigo-500/30`.
+    - `Acción` / Azul: `light:text-blue-700 light:bg-blue-500/10 light:border-blue-500/30`.
+    - `Fondo Indexado` / Púrpura: `light:text-purple-700 light:bg-purple-500/10 light:border-purple-500/30`.
+    - `Cripto` y Caché / Ámbar: `light:text-amber-800 light:bg-amber-500/15 light:border-amber-500/35`.
+    - `Renta Fija` / Esmeralda: `light:text-emerald-700 light:bg-emerald-500/10 light:border-emerald-500/30`.
+    - `Depósito` / Cerceta: `light:text-teal-700 light:bg-teal-500/10 light:border-teal-500/30`.
+    - Ticker e ISIN: `light:bg-indigo-50/80 light:text-indigo-800 light:border-indigo-200/80`.
+    - Botón "Cotizaciones": `light:text-indigo-700 light:bg-indigo-50 light:border-indigo-300 hover:light:bg-indigo-100`.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (600ms).
+
+### v0.5.24 (Ajuste Ergonómico de KPIs en Estadísticas & Dock Flotante Liquid Glass en Modo Claro)
+- **Ajuste Espacial y Formateo en Estadísticas ([`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx))**:
+  - **Identidad de los 3 Cuadrados**: Las 3 tarjetas superiores reflejan inequívocamente los pilares de **Ingresos**, **Gastos** e **Inversiones**.
+  - **Margen Compacto Sin Vacíos**: Reducción del padding a `p-2.5 sm:p-3` y eliminación de `justify-between`, unificando el título y su contenido con un espaciado vertical armónico (`gap-1`, `mt-0.5`).
+  - **Eliminación de Saltos de Línea Forzados**:
+    - Importes formateados con `formatCompactCurrency` y `whitespace-nowrap`, garantizando que nunca se desborden ni rompan en dos líneas en pantallas estrechas.
+    - Subtextos condensados en una sola línea clara (`% ahorro`, `importe/día`, `% ROI`).
+- **Auténtica Estética Liquid Glass en Barra de Navegación ([`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx), [`index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css))**:
+  - **Translucidez Óptica Orgánica**: Reducción de la opacidad del dock en Modo Claro de `0.88` a `0.65` (`bg-white/65 backdrop-blur-2xl backdrop-saturate-200 border border-white/85`), permitiendo que el contenido refracte con fluidez al hacer scroll inferior.
+  - **Pestaña Activa como Lente Elevada**: La pestaña activa pasa de un gris opaco a una lente vítrea blanca brillante `light:bg-white/85 light:text-indigo-600 light:border-white light:shadow-[0_2px_8px_rgba(15,23,42,0.08),inset_0_1px_1px_rgba(255,255,255,1)] font-bold`.
+  - **Bisel Especular y Aura Atmosférica**: Destello cenital `light:via-white/90` y suspensión subsuperficial `light:bg-indigo-500/25 blur-xl`.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (545ms).
+
+### v0.5.25 (Refinamiento de Translucidez Liquid Glass en Barra de Navegación)
+- **Incremento de Transparencia Óptica en Modo Claro**:
+  - Calibración del sustrato del dock de `0.65` a `0.48` (`rgba(255, 255, 255, 0.48)` con `backdrop-blur-2xl` y `saturate(210%)`), logrando un efecto cristalino auténtico donde las tarjetas y colores del scroll inferior refractan con naturalidad e ingravidez.
+  - Reducción del degradado interior `light:from-white/30` a `light:from-white/15` para eliminar cualquier velo lechoso residual.
+  - Ajuste de la pastilla de pestaña activa a `light:bg-white/75` para integrarse armoniosamente sobre la base más translúcida.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (584ms).
 
 ---
 

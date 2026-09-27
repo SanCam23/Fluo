@@ -25,12 +25,12 @@ const assetTypeLabels: Record<AssetType, string> = {
 };
 
 const assetTypeColors: Record<AssetType, string> = {
-  stock: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
-  etf: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25',
-  index_fund: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
-  crypto: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
-  fixed_income: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
-  deposit: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
+  stock: 'bg-blue-500/15 text-blue-300 border-blue-500/25 light:bg-blue-500/10 light:text-blue-700 light:border-blue-500/30',
+  etf: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25 light:bg-indigo-500/10 light:text-indigo-700 light:border-indigo-500/30',
+  index_fund: 'bg-purple-500/15 text-purple-300 border-purple-500/25 light:bg-purple-500/10 light:text-purple-700 light:border-purple-500/30',
+  crypto: 'bg-amber-500/15 text-amber-300 border-amber-500/25 light:bg-amber-500/15 light:text-amber-800 light:border-amber-500/35',
+  fixed_income: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25 light:bg-emerald-500/10 light:text-emerald-700 light:border-emerald-500/30',
+  deposit: 'bg-teal-500/15 text-teal-300 border-teal-500/25 light:bg-teal-500/10 light:text-teal-700 light:border-teal-500/30',
 };
 
 interface AssetCardProps {
@@ -56,7 +56,7 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
 
           {/* Metadata Badges */}
           <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-            <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-bold text-indigo-200 border border-white/15">
+            <span className="px-2 py-0.5 rounded-md bg-white/10 light:bg-indigo-50/80 text-[10px] font-mono font-bold text-indigo-200 light:text-indigo-800 border border-white/15 light:border-indigo-200/80">
               {asset.identifier}
             </span>
 
@@ -69,14 +69,14 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
             </span>
 
             {asset.platform && (
-              <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                <Building2 className="h-2.5 w-2.5 text-slate-500" />
+              <span className="text-[10px] text-slate-400 light:text-slate-600 flex items-center gap-0.5">
+                <Building2 className="h-2.5 w-2.5 text-slate-500 light:text-slate-600" />
                 {asset.platform}
               </span>
             )}
 
             {asset.isOfflineCached && (
-              <span className="px-1.5 py-0.2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-semibold flex items-center gap-1">
+              <span className="px-1.5 py-0.2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 light:bg-amber-50 light:text-amber-800 light:border-amber-300 text-[10px] font-semibold flex items-center gap-1">
                 <Clock className="h-2.5 w-2.5" />
                 Dato offline / en caché
               </span>
@@ -93,8 +93,8 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
           <span
             className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full mt-1 backdrop-blur-md border shadow-sm transition-all ${
               isProfit
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                : 'bg-rose-500/15 text-rose-400 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
+                ? 'bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                : 'bg-rose-500/15 text-rose-400 light:bg-rose-50 light:text-rose-700 light:border-rose-200 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
             }`}
           >
             {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -132,7 +132,7 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
             {asset.change24h !== undefined && (
               <span
                 className={`text-[10px] font-bold block ${
-                  asset.change24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  asset.change24h >= 0 ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
                 }`}
               >
                 {asset.change24h >= 0 ? '+' : ''}{formatPercentage(asset.change24h)} 24h
@@ -215,13 +215,13 @@ export const InvestmentsView: React.FC = () => {
         {/* Header Action Row */}
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-1.5">
-              <PieChart className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 flex items-center gap-1.5">
+              <PieChart className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600" />
               Valoración Total Cartera
             </span>
             {lastSyncTimestamp && (
-              <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                <Clock className="h-2.5 w-2.5 text-indigo-400" />
+              <span className="text-[10px] text-slate-400 light:text-slate-500 flex items-center gap-1 mt-0.5">
+                <Clock className="h-2.5 w-2.5 text-indigo-400 light:text-indigo-600" />
                 Sincronizado: {lastSyncTimestamp}
               </span>
             )}
@@ -232,7 +232,7 @@ export const InvestmentsView: React.FC = () => {
               type="button"
               onClick={() => refreshAllAssetPrices()}
               disabled={isLiveUpdating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 light:text-indigo-700 light:bg-indigo-50 light:border-indigo-300 hover:light:bg-indigo-100 border border-indigo-500/30 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-sm"
               title="Actualizar cotizaciones oficiales en vivo"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLiveUpdating ? 'animate-spin' : ''}`} />
@@ -251,13 +251,13 @@ export const InvestmentsView: React.FC = () => {
         {/* Global Metrics Dual Card (Patrimonio Total Invertido & Plusvalía/Minusvalía Real) */}
         <div className="grid grid-cols-2 gap-2.5 mt-4 pt-3.5 border-t border-white/10">
           <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
               Patrimonio Invertido
             </span>
-            <span className="text-base font-bold text-slate-200 block mt-1">
+            <span className="text-base font-bold text-slate-200 light:text-slate-800 block mt-1">
               {formatCurrency(totalCost)}
             </span>
-            <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
               Coste base total
             </span>
           </div>
@@ -265,23 +265,23 @@ export const InvestmentsView: React.FC = () => {
           <div
             className={`p-3 rounded-2xl border backdrop-blur-md transition-all flex flex-col justify-between ${
               isOverallProfit
-                ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                : 'bg-rose-500/10 border-rose-500/25 shadow-[0_0_15px_rgba(244,63,94,0.15)]'
+                ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.15)] light:bg-emerald-50/70 light:border-emerald-200'
+                : 'bg-rose-500/10 border-rose-500/25 shadow-[0_0_15px_rgba(244,63,94,0.15)] light:bg-rose-50/70 light:border-rose-200'
             }`}
           >
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
               P&L Total No Realizado
             </span>
             <span
               className={`text-base font-bold tracking-tight block mt-1 ${
-                isOverallProfit ? 'text-emerald-400' : 'text-rose-400'
+                isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
               {isOverallProfit ? '+' : ''}{formatCurrency(totalPnL)}
             </span>
             <div
               className={`flex items-center gap-1 text-[11px] font-semibold mt-0.5 ${
-                isOverallProfit ? 'text-emerald-400' : 'text-rose-400'
+                isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
               {isOverallProfit ? <TrendingUp className="h-3 w-3 flex-shrink-0" /> : <TrendingDown className="h-3 w-3 flex-shrink-0" />}
@@ -302,8 +302,8 @@ export const InvestmentsView: React.FC = () => {
               onClick={() => setSelectedType(tab.type)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
                 isSelected
-                  ? 'bg-indigo-600/80 text-white border border-indigo-400/50 shadow-md font-semibold'
-                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+                  ? 'bg-indigo-600/80 text-white border border-indigo-400/50 shadow-md font-semibold light:bg-indigo-600 light:text-white'
+                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 light:text-slate-700 light:bg-white/80 light:border-slate-300/80 border border-white/10'
               }`}
             >
               {tab.label}

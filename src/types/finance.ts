@@ -127,3 +127,6 @@ export interface FinancialSummary {
 }
 
 export type TimeRangeFilter = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all';
+
+export type ThemeMode = 'system' | 'dark' | 'light';
+

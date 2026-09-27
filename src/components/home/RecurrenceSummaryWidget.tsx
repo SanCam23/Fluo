@@ -38,7 +38,7 @@ export const RecurrenceSummaryWidget: React.FC = () => {
           return (
             <div
               key={rule.id}
-              className="flex-shrink-0 w-48 rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 p-3 flex flex-col justify-between transition-all duration-200"
+              className="flex-shrink-0 w-48 rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] backdrop-blur-xl border border-white/[0.18] p-3 flex flex-col justify-between transition-all duration-200 shadow-sm"
             >
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2 min-w-0">

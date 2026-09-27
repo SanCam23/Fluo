@@ -207,10 +207,10 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
           transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           touchAction: 'pan-y',
         }}
-        className="group relative flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-200 cursor-grab active:cursor-grabbing"
+        className="group relative flex items-center justify-between py-3 pl-3 pr-2.5 sm:pr-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.18] hover:border-white/30 transition-all duration-200 cursor-grab active:cursor-grabbing shadow-[0_2px_8px_-1px_rgba(0,0,0,0.3)] shadow-inner"
       >
         {/* Left side: Avatar */}
-        <div className="flex-shrink-0 mr-3.5 pointer-events-none">
+        <div className="flex-shrink-0 mr-2.5 pointer-events-none">
           <BrandAvatar
             brand={brand}
             fallbackText={category?.name || 'TX'}
@@ -220,14 +220,14 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
           />
         </div>
 
-        {/* Center: Concept + Category & Badges */}
-        <div className="flex-1 min-w-0 pr-2 pointer-events-none">
-          <span className="text-sm font-semibold text-white tracking-tight truncate block">
+        {/* Center: Concept + Category & Badges (expanded room for concept title) */}
+        <div className="flex-1 min-w-0 mr-2 pointer-events-none">
+          <span className="text-[13.5px] sm:text-sm font-semibold text-white tracking-tight truncate block">
             {tx.concept}
           </span>
 
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-            <span className="truncate max-w-[150px]">
+          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-400">
+            <span className="truncate">
               {category?.name || 'General'}
             </span>
 
@@ -246,27 +246,27 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
           </div>
         </div>
 
-        {/* Right side: Amount and relative date */}
-        <div className="flex items-center gap-2 flex-shrink-0 text-right">
+        {/* Right side: Amount and relative date shifted rightward */}
+        <div className="flex items-center gap-1 flex-shrink-0 text-right">
           <div className="flex flex-col items-end pointer-events-none">
             <span
-              className={`text-[15px] font-bold tracking-tight block ${
+              className={`text-[14.5px] sm:text-[15px] font-bold tracking-tight block whitespace-nowrap ${
                 isIncome
-                  ? 'text-emerald-400'
+                  ? 'text-emerald-400 light:text-emerald-600'
                   : isInvest
-                  ? 'text-indigo-400'
-                  : 'text-rose-400'
+                  ? 'text-indigo-400 light:text-indigo-600'
+                  : 'text-rose-400 light:text-rose-600'
               }`}
             >
               {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
             </span>
-            <span className="text-xs text-slate-400 font-medium mt-0.5">
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium mt-0.5 whitespace-nowrap">
               {formatRelativeDate(tx.date)}
             </span>
           </div>
 
-          {/* Action buttons (accessible on group hover) */}
-          <div className="flex items-center gap-0.5 -mr-1">
+          {/* Action buttons (only on desktop hover so they don't push the amount away on mobile) */}
+          <div className="hidden sm:flex items-center gap-0.5 -mr-1">
             <button
               type="button"
               onClick={(e) => {

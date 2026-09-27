@@ -9,6 +9,7 @@ import type {
   RecurrenceRule,
   FinancialSummary,
   TimeRangeFilter,
+  ThemeMode,
 } from '../types/finance';
 import { INITIAL_CATEGORIES, INITIAL_BRANDS } from '../data/categoriesAndBrands';
 import {
@@ -43,6 +44,7 @@ interface FinanceState {
   assets: InvestmentAsset[];
   recurrences: RecurrenceRule[];
   timeRange: TimeRangeFilter;
+  themeMode: ThemeMode;
   activeTab: 'home' | 'stats' | 'invest' | 'add';
   isLiveUpdating: boolean;
   lastSyncTimestamp?: string;
@@ -52,6 +54,7 @@ interface FinanceState {
 
   // Actions
   setUserId: (userId: string | null) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   loadCloudData: (userId: string) => Promise<void>;
   setTransactions: (transactions: Transaction[]) => void;
   setAssets: (assets: InvestmentAsset[]) => void;
@@ -91,12 +94,15 @@ export const useFinanceStore = create<FinanceState>()(
       assets: [],
       recurrences: [],
       timeRange: 'all',
+      themeMode: 'dark',
       activeTab: 'home',
       isLiveUpdating: false,
       simulatedTimeOffsetDays: 0,
       userId: null,
       isCloudLoading: false,
       cloudSyncError: null,
+
+      setThemeMode: (themeMode) => set({ themeMode }),
 
       setUserId: (userId) => {
         const prevId = get().userId;
@@ -477,6 +483,7 @@ export const useFinanceStore = create<FinanceState>()(
         assets: state.assets,
         recurrences: state.recurrences,
         timeRange: state.timeRange,
+        themeMode: state.themeMode,
       }),
       onRehydrateStorage: () => (state) => {
         state?.triggerRecurrencesCheck();
@@ -486,6 +493,7 @@ export const useFinanceStore = create<FinanceState>()(
         return {
           ...currentState,
           ...p,
+          themeMode: p.themeMode || currentState.themeMode || 'dark',
           transactions:
             Array.isArray(p.transactions)
               ? p.transactions

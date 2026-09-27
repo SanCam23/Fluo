@@ -3,6 +3,7 @@ import { FastForward, Loader2, Lock, ShieldCheck, User } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
 import { useSecurityLock } from './hooks/useSecurityLock';
+import { useTheme } from './hooks/useTheme';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
 import { HeroBalance } from './components/home/HeroBalance';
@@ -50,6 +51,7 @@ const ViewSkeletonFallback = () => (
 
 export default function App() {
   const { user, loading: isAuthLoading, isDemoMode, signOut } = useAuth();
+  useTheme();
 
   const activeTab = useFinanceStore((state) => state.activeTab);
   const simulatedTimeOffsetDays = useFinanceStore((state) => state.simulatedTimeOffsetDays);

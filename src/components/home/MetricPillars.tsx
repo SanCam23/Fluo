@@ -23,7 +23,7 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
         className={`relative flex flex-col items-start p-3 rounded-2xl border backdrop-blur-xl transition-all duration-200 text-left cursor-pointer ${
           selectedPillar === 'income'
             ? 'bg-emerald-500/20 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-            : 'bg-white/[0.06] hover:bg-white/[0.09] border-white/10'
+            : 'bg-white/[0.07] hover:bg-white/[0.11] border-white/[0.18] hover:border-white/30 shadow-sm'
         }`}
       >
         <div className="flex items-center justify-between w-full">
@@ -43,7 +43,7 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
         className={`relative flex flex-col items-start p-3 rounded-2xl border backdrop-blur-xl transition-all duration-200 text-left cursor-pointer ${
           selectedPillar === 'expense'
             ? 'bg-rose-500/20 border-rose-500/50 shadow-lg shadow-rose-500/10'
-            : 'bg-white/[0.06] hover:bg-white/[0.09] border-white/10'
+            : 'bg-white/[0.07] hover:bg-white/[0.11] border-white/[0.18] hover:border-white/30 shadow-sm'
         }`}
       >
         <div className="flex items-center justify-between w-full">
@@ -63,7 +63,7 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
         className={`relative flex flex-col items-start p-3 rounded-2xl border backdrop-blur-xl transition-all duration-200 text-left cursor-pointer ${
           selectedPillar === 'invest'
             ? 'bg-indigo-500/25 border-indigo-500/50 shadow-lg shadow-indigo-500/15'
-            : 'bg-white/[0.06] hover:bg-white/[0.09] border-white/10'
+            : 'bg-white/[0.07] hover:bg-white/[0.11] border-white/[0.18] hover:border-white/30 shadow-sm'
         }`}
       >
         <div className="flex items-center justify-between w-full">

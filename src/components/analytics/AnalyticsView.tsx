@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import {
   TrendingUp,
-  Percent,
-  Calendar,
   Layers,
   ArrowUpRight,
+  ArrowDownRight,
   PieChart as PieIcon,
   BarChart3,
   Flame,
@@ -25,7 +24,7 @@ import {
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { TimeRangeFilter } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
-import { formatCurrency, formatPercentage } from '../../utils/currency';
+import { formatCurrency, formatCompactCurrency } from '../../utils/currency';
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -324,57 +323,58 @@ export const AnalyticsView: React.FC = () => {
         })}
       </div>
 
-      {/* 2. Top KPI Cards Grid (Liquid Glass) */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {/* KPI 1: Tasa de Ahorro */}
-        <div className="p-3.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span>Ahorro</span>
-            <Percent className="h-3.5 w-3.5 text-emerald-400" />
+      {/* 2. Top KPI Cards Grid (Liquid Glass - Ingresos, Gastos, Inversiones) */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        {/* 1. Ingresos */}
+        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-400 light:text-emerald-700">
+            <span>Ingresos</span>
+            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400 light:text-emerald-600 flex-shrink-0" />
           </div>
-          <div className="mt-2">
-            <span className="text-base font-extrabold text-emerald-400 block leading-tight">
-              {formatPercentage(periodSavingsRate, false)}
+          <div className="mt-0.5">
+            <span className="text-[14px] sm:text-base font-extrabold text-emerald-400 light:text-emerald-700 block leading-tight tracking-tight whitespace-nowrap">
+              +{formatCompactCurrency(periodIncome)}
             </span>
-            <span className="text-[10px] text-slate-400">
-              +{formatCurrency(Math.max(0, periodIncome - periodExpense))}
-            </span>
-          </div>
-        </div>
-
-        {/* KPI 2: Gasto Medio Diario */}
-        <div className="p-3.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span>Gasto / Día</span>
-            <Calendar className="h-3.5 w-3.5 text-rose-400" />
-          </div>
-          <div className="mt-2">
-            <span className="text-base font-extrabold text-white block leading-tight">
-              {formatCurrency(dailyAverageSpend)}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              {daysInPeriod} días analizados
+            <span className="text-[10px] text-slate-400 light:text-slate-600 font-medium block truncate mt-0.5">
+              {periodSavingsRate.toFixed(0)}% ahorro
             </span>
           </div>
         </div>
 
-        {/* KPI 3: Rendimiento Cartera */}
-        <div className="p-3.5 rounded-2xl bg-white/[0.06] backdrop-blur-xl border border-white/15 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span>Cartera</span>
-            <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
+        {/* 2. Gastos */}
+        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-rose-400 light:text-rose-700">
+            <span>Gastos</span>
+            <ArrowDownRight className="h-3.5 w-3.5 text-rose-400 light:text-rose-600 flex-shrink-0" />
           </div>
-          <div className="mt-2">
+          <div className="mt-0.5">
+            <span className="text-[14px] sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight tracking-tight whitespace-nowrap">
+              -{formatCompactCurrency(periodExpense)}
+            </span>
+            <span className="text-[10px] text-slate-400 light:text-slate-600 font-medium block truncate mt-0.5">
+              {formatCompactCurrency(dailyAverageSpend)}/día
+            </span>
+          </div>
+        </div>
+
+        {/* 3. Inversiones */}
+        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-400 light:text-indigo-700">
+            <span>Inversiones</span>
+            <TrendingUp className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600 flex-shrink-0" />
+          </div>
+          <div className="mt-0.5">
+            <span className="text-[14px] sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight tracking-tight whitespace-nowrap">
+              {formatCompactCurrency(portfolioPerformance.portfolioMarketValue)}
+            </span>
             <span
-              className={`text-base font-extrabold block leading-tight ${
-                portfolioPerformance.roi >= 0 ? 'text-indigo-400' : 'text-rose-400'
+              className={`text-[10px] font-semibold block truncate mt-0.5 ${
+                portfolioPerformance.roi >= 0
+                  ? 'text-indigo-400 light:text-indigo-700'
+                  : 'text-rose-400 light:text-rose-700'
               }`}
             >
-              {portfolioPerformance.roi >= 0 ? '+' : ''}
-              {portfolioPerformance.roi.toFixed(2)}%
-            </span>
-            <span className="text-[10px] text-slate-400">
-              {formatCurrency(portfolioPerformance.portfolioMarketValue)}
+              {portfolioPerformance.roi >= 0 ? '+' : ''}{portfolioPerformance.roi.toFixed(1)}% ROI
             </span>
           </div>
         </div>

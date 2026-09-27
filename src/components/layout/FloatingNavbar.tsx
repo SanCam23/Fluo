@@ -12,7 +12,7 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
   return (
     <div className="fixed bottom-4 inset-x-4 max-w-sm mx-auto z-50 gpu-layer transform-gpu">
       {/* Subsurface soft atmospheric aura underneath the dock */}
-      <div className="pointer-events-none absolute -bottom-1 inset-x-12 h-4 bg-indigo-500/10 blur-xl rounded-full" />
+      <div className="pointer-events-none absolute -bottom-1 inset-x-12 h-4 bg-indigo-500/10 light:bg-indigo-500/25 blur-xl rounded-full" />
 
       {/* Main Liquid Glass Dock Container with Symmetrical 4-Slot Distribution */}
       <nav
@@ -23,10 +23,10 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
           shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_16px_36px_-8px_rgba(0,0,0,0.45)]"
       >
         {/* Specular hairline top reflection simulating curved glass rim */}
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/30 light:via-white/90 to-transparent" />
 
         {/* Ambient interior refraction sheen */}
-        <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.04] to-transparent" />
+        <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.04] light:from-white/15 to-transparent" />
 
         {/* Tab 1: Inicio */}
         <button
@@ -34,8 +34,8 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
           onClick={() => setActiveTab('home')}
           className={`relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer active:scale-95 ${
             activeTab === 'home'
-              ? 'text-white bg-white/12 backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] font-semibold'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent font-medium'
+              ? 'text-white light:text-indigo-600 bg-white/12 light:bg-white/75 backdrop-blur-md border border-white/15 light:border-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] light:shadow-[0_2px_8px_rgba(15,23,42,0.07),inset_0_1px_1px_rgba(255,255,255,0.9)] font-bold'
+              : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.04] light:hover:bg-white/40 border border-transparent font-medium'
           }`}
         >
           <Home className="h-4 w-4" />
@@ -48,8 +48,8 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
           onClick={() => setActiveTab('stats')}
           className={`relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer active:scale-95 ${
             activeTab === 'stats'
-              ? 'text-white bg-white/12 backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] font-semibold'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent font-medium'
+              ? 'text-white light:text-indigo-600 bg-white/12 light:bg-white/75 backdrop-blur-md border border-white/15 light:border-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] light:shadow-[0_2px_8px_rgba(15,23,42,0.07),inset_0_1px_1px_rgba(255,255,255,0.9)] font-bold'
+              : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.04] light:hover:bg-white/40 border border-transparent font-medium'
           }`}
         >
           <BarChart3 className="h-4 w-4" />
@@ -62,8 +62,8 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
           onClick={() => setActiveTab('invest')}
           className={`relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer active:scale-95 ${
             activeTab === 'invest'
-              ? 'text-white bg-white/12 backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] font-semibold'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent font-medium'
+              ? 'text-white light:text-indigo-600 bg-white/12 light:bg-white/75 backdrop-blur-md border border-white/15 light:border-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.25)] light:shadow-[0_2px_8px_rgba(15,23,42,0.07),inset_0_1px_1px_rgba(255,255,255,0.9)] font-bold'
+              : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.04] light:hover:bg-white/40 border border-transparent font-medium'
           }`}
         >
           <TrendingUp className="h-4 w-4" />
@@ -77,7 +77,8 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
           className="relative z-10 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer active:scale-90
             bg-gradient-to-tr from-indigo-500/90 via-indigo-600/90 to-emerald-500/80 text-white
             shadow-[0_4px_16px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.35)]
-            border border-white/25 hover:brightness-110"
+            light:shadow-[0_4px_16px_rgba(99,102,241,0.45),inset_0_1px_1px_rgba(255,255,255,0.6)]
+            border border-white/25 light:border-white/40 hover:brightness-110"
           aria-label="Registrar nueva transacción o inversión"
         >
           {/* Specular curved glint on button apex */}

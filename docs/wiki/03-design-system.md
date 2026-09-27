@@ -137,13 +137,14 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 
 ### 11. Tarjeta de Transacción Reciente (`RecentTransactionsList`)
 - **Estructura en Doble Eje Paralelo**:
-  - **Eje Izquierdo**: Avatar de marca (`BrandAvatar`) con separación clara `mr-3.5 flex-shrink-0`.
-  - **Eje Central (`flex-1 min-w-0 pr-2`)**:
-    - Fila 1: Concepto de la transacción (`text-sm font-semibold text-white tracking-tight truncate block`).
-    - Fila 2: Categoría (`text-xs text-slate-400 truncate`) + Badge vítreo de recurrencia si aplica (`Auto` / `Recurrente`).
-  - **Eje Derecho (`flex-shrink-0 text-right`)**:
-    - Fila 1: Importe en `text-[15px] font-bold tracking-tight` con coloración semántica exclusiva (sin etiqueta textual `EXPENSE`/`INCOME`/`INVEST` redundante).
+  - **Eje Izquierdo**: Avatar de marca (`BrandAvatar`) con separación ergonómica `mr-3 flex-shrink-0`.
+  - **Eje Central (`flex-1 min-w-0 pr-3`)**:
+    - Fila 1: Concepto de la transacción (`text-sm font-semibold text-white tracking-tight truncate block`), con espacio horizontal expandido (hasta 45px adicionales al desacoplar botones de escritorio en móvil) para evitar truncamientos prematuros.
+    - Fila 2: Categoría (`text-xs text-slate-400 truncate max-w-[180px]`) + Badge vítreo de recurrencia si aplica (`Auto` / `Recurrente`).
+  - **Eje Derecho (`flex items-center gap-1 flex-shrink-0 text-right`)**:
+    - Fila 1: Importe en `text-[15px] font-bold tracking-tight` alineado de forma pura hacia el límite derecho de la tarjeta.
     - Fila 2: Fecha relativa (`formatRelativeDate`) en `text-xs text-slate-400 font-medium mt-0.5`.
+    - Botones de acción rápida en escritorio (`Pencil` y `Trash2`): configurados con `hidden sm:flex` para no consumir ancho útil en pantallas móviles.
   - **Gesto de Deslizar para Eliminar (`Swipe-to-Delete`)**:
     - Reconocimiento táctil con `touch-action: pan-y` para permitir scroll vertical nativo y captura horizontal precisa.
     - Fondo de acción reactivo: capa roja (`bg-rose-600/90 backdrop-blur-xl`) oculta al reposo (`visibility: hidden, opacity: 0`) para erradicar cualquier fuga o sombreado rojo a través del cristal translúcido de la tarjeta (`bg-white/[0.05]`). Solo se hace visible y proporcional al arrastre cuando `offsetX < 0`.
@@ -186,11 +187,43 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - Gradiente enriquecido `bg-gradient-to-tr from-indigo-500/90 via-indigo-600/90 to-emerald-500/80`.
   - Resplandor controlado `shadow-[0_4px_16px_rgba(99,102,241,0.3),inset_0_1px_1px_rgba(255,255,255,0.35)]` con destello cenital atenuado `via-white/50` y pulsación `active:scale-95`.
 
+### 15. Modo Claro Liquid Glass: "Blanco Perla iOS"
+- **Lienzo Base**: `#F1F5F9` (Slate-100 frío), sustituyendo el negro obsidiana `#0B0F19` con una atmósfera luminosa, limpia y elegante.
+- **Superficie de Cristal Perla (`Pearl Glass Cards`)**:
+  - `bg-white/[0.88] backdrop-blur-2xl backdrop-saturate-180 border border-slate-300/80`: Las tarjetas adoptan un cristal translúcido de aspecto lechoso y refracción nítida con contorno definido.
+  - Luz Cenital y Sombra Suave: `box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 4px 20px -2px rgba(15, 23, 42, 0.07)`.
+- **Dock Flotante en Modo Claro (Auténtico Liquid Glass con Mayor Translucidez)**:
+  - Material vítreo con 52% de translucidez (`bg-white/48 backdrop-blur-2xl backdrop-saturate-210 border border-white/80`), permitiendo que el contenido refracte con fluidez y viveza al desplazarse por detrás del dock.
+  - Biselado especular continuo: `box-shadow: inset 0 1.5px 1px 0 #FFFFFF, inset 0 -1px 1px 0 rgba(0,0,0,0.03), 0 16px 40px -8px rgba(15,23,42,0.12), 0 4px 12px -2px rgba(15,23,42,0.06)`.
+  - Pestañas activas con lente de cristal blanco óptico elevado: `light:bg-white/75 light:text-indigo-600 light:border-white light:shadow-[0_2px_8px_rgba(15,23,42,0.07),inset_0_1px_1px_rgba(255,255,255,0.9)] font-bold`.
+  - Botón central (+) gema con resplandor subsuperficial `light:shadow-[0_4px_16px_rgba(99,102,241,0.45),inset_0_1px_1px_rgba(255,255,255,0.6)]`.
+- **Orbes Ambientales en Modo Claro**:
+  - Difusiones en tonos pastel suaves (`bg-emerald-400/20`, `bg-rose-400/20`, `bg-indigo-400/20 blur-[140px]`) que refractan sutilmente a través del cristal perlado al hacer scroll.
+- **Jerarquía Tipográfica y Contraste**:
+  - Títulos principales: `text-slate-900` (`#0F172A`) con nitidez absoluta.
+  - Subtítulos y metadatos: `text-slate-600` (`#475569`) y `text-slate-400` (`#94A3B8`).
+  - Colores semánticos vibrantes calibrados para fondos claros: Esmeralda esmerilado para ingresos, Carmesí para gastos y Violeta/Índigo para inversión.
+- **Selector Triple en Ajustes**:
+  - Segmented control estilo iOS con 3 pastillas: *Claro* (`Sun`), *Oscuro* (`Moon`) y *Sistema* (`Monitor`).
+- **Carteles y Badges de Activos con Alto Contraste**:
+  - Sustitución de tonos pastel claros (`*-300`, `*-200`) por variantes saturadas de alta legibilidad (`light:text-indigo-700`, `light:text-blue-700`, `light:text-purple-700`, `light:text-amber-800`, `light:text-emerald-700`, `light:text-teal-700`).
+  - Fondos de cápsula calibrados a `12-15%` de opacidad con bordes definidos (`light:border-indigo-200`, `light:bg-indigo-50`), garantizando ratios de contraste superiores a 6:1 (AAA/AA) sobre cristal perlado y fondos claros en carteles como `ETF`, `Acción`, `Cripto`, `Fondo Indexado`, `ISIN/Ticker` y `P&L`.
+
+### 16. Calibración de Contraste y Distribución Espacial de Movimientos
+- **Contraste de Recuadros en Modo Oscuro**:
+  - `border-white/10` elevado a `rgba(255, 255, 255, 0.16)` y `border-white/12` a `rgba(255, 255, 255, 0.18)`.
+  - Fondos de tarjetas secundarias y submétricas: `bg-white/[0.06] - bg-white/[0.08]` con relieve volumétrico `shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_2px_8px_rgba(0,0,0,0.3)]`.
+- **Estructura Optimizada de la Fila de Transacción (`SwipeableTransactionItem`)**:
+  - **Alineación a Extremos**: Padding perimetral `py-3 pl-3 pr-2.5 sm:pr-3` con el importe y fecha situados pegados al borde derecho (`text-right whitespace-nowrap`).
+  - **Ampliación del Título del Concepto**: Margen del avatar ajustado a `mr-2.5`, separación central reducida a `mr-2` y supresión de límites artificiales de ancho (`max-w-[180px]`), otorgando entre 25px y 35px adicionales al nombre del comercio o movimiento antes de truncar.
+  - **Adaptabilidad Móvil**: Botones de acción de escritorio (`Pencil`, `Trash2`) encapsulados con `hidden sm:flex` para no robar espacio horizontal en pantallas compactas.
+
 ---
 
 ## 4. Microinteracciones y Haptic Feedback Visual
 
 - **Active State**: Cada botón o tarjeta interactiva implementa `active:scale-[0.97]` con curva suave `cubic-bezier(0.16, 1, 0.3, 1)`.
 - **Luces Ambientales**: Tres orbes difusos de color en el fondo (`blur-3xl`) se sitúan detrás de la capa de interfaz, permitiendo que el efecto de cristal cobre vida al hacer scroll y refractar diferentes colores.
+
 
 
