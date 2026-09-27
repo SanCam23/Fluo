@@ -348,6 +348,20 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Árbol de directorios representativo y enlaces a la wiki técnica interna (`/docs/wiki/`).
 - **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
 
+### v0.5.16 (Preparación Integral para Despliegue en Vercel & Blindaje de Ciberseguridad)
+- **Configuración Oficial para Vercel ([`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json))**:
+  - Reescritura universal de rutas SPA (`rewrites: [{ source: "/(.*)", destination: "/index.html" }]`) que elimina por completo los errores 404 al recargar subrutas o con el Service Worker PWA.
+  - Cabeceras HTTP de seguridad emitidas por el servidor: `Strict-Transport-Security` (HSTS de 2 años), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` y CSP completa.
+  - Estrategia de caché en CDN: `Cache-Control: public, max-age=0, must-revalidate` para `index.html`, `sw.js` y `manifest.webmanifest`, asegurando despliegues atómicos sin usuarios atascados en versiones antiguas; y `Cache-Control: immutable` para `/assets/*`.
+- **Corrección de Conectividad CSP ([`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html))**:
+  - Incorporado `https://api.binance.com` a la directiva `connect-src`, permitiendo la ingesta de cotizaciones cripto en vivo sin bloqueos de navegador.
+- **Protección contra Fuerza Bruta y Lockout en PIN ([`useSecurityLock.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSecurityLock.ts) y [`SecurityLockScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/security/SecurityLockScreen.tsx))**:
+  - Retardo artificial defensivo (200ms) entre verificaciones para neutralizar scripts automatizados.
+  - Penalización temporal progresiva: 30 segundos tras 5 intentos fallidos, 60 segundos tras 8 intentos y 300 segundos (5 minutos) tras 10+ intentos erróneos.
+  - Interfaz Liquid Glass con aviso de advertencia, cuenta regresiva dinámica en vivo y bloqueo temporal del teclado táctil.
+  - Detección dinámica de `rp.id` para autenticación WebAuthn en dominios públicos de producción.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+
 ---
 
 ## Próximos Hitos (v0.6.0)

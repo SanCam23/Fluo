@@ -350,27 +350,50 @@ Fluo implementa un modelo de defensa en profundidad (*Defense in Depth*) adaptad
 - **Segundo Plano Inteligente (`visibilitychange`)**: Al conmutar de pestaña o ventana, se registra la marca temporal. Al regresar, el sistema calcula si transcurrieron los 3 minutos de inactividad (`Date.now() - lastActivity >= 180s`). Si el usuario vuelve tras unos segundos o un lapso inferior, la app continúa abierta de forma fluida sin requerir desbloqueo forzado.
 - **Ofuscación de Privacidad**: El contenido del dashboard se desenfoca de forma automática (`filter blur-2xl opacity-40 pointer-events-none`) evitando capturas de pantalla accidentales en el selector de aplicaciones de iOS/Android cuando la pantalla está bloqueada.
 
-### 2. Criptografía Local y Bóveda de PIN (`SecurityLockScreen.tsx`)
+### 2. Criptografía Local, Bóveda de PIN y Mitigación de Fuerza Bruta (`SecurityLockScreen.tsx`)
 - **Hashing SHA-256**: Los PINs de 4 dígitos nunca se persisten en texto plano. Se procesan mediante la Web Cryptography API nativa (`crypto.subtle.digest('SHA-256')`) con sal interna de aplicación (`fluo_salt_v1_...`), neutralizando ataques de diccionario o tablas arcoíris en almacenamiento local.
+- **Defensa contra Ataques de Fuerza Bruta & Lockout Progresivo**:
+  - Inclusión de un retardo artificial de temporización (200ms) por intento para neutralizar scripts automatizados.
+  - Bloqueo temporal progresivo ante intentos erróneos acumulados:
+    - $\ge$ 5 intentos: penalización de 30 segundos.
+    - $\ge$ 8 intentos: penalización de 60 segundos.
+    - $\ge$ 10 intentos: penalización de 300 segundos (5 minutos).
+  - La pantalla de seguridad desactiva el teclado numérico y muestra una cuenta atrás en vivo durante el periodo de bloqueo.
 - **Diseño Liquid Glass Refractivo**: Telón de pantalla completa `fixed inset-0 z-[100] backdrop-blur-3xl bg-slate-950/85`, teclado numérico táctil translúcido y feedback háptico con animación de sacudida (*shake*) ante PIN incorrecto.
 
 ### 3. Autenticación Biométrica Nativa (WebAuthn)
 - **API `PublicKeyCredential`**: Integración con el estándar W3C WebAuthn para desbloqueo rápido mediante Face ID, Touch ID, Windows Hello o sensor de huella dactilar de Android.
+- **Aislamiento de Dominio (`rp.id`)**: Configuración dinámica de `rp.id` según el hostname de producción para evitar discrepancias de origen (*origin mismatch*) en navegadores WebKit/iOS.
 - **Fallback Automático**: Si el usuario no tiene biometría configurada o cancela el sensor, el flujo conmuta suavemente al teclado numérico de 4 dígitos.
 
 ### 4. Purga Integral y Sanitización de Datos (`purgeUserData`)
 - Al confirmar el cierre de sesión en [`SignOutConfirmModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/SignOutConfirmModal.tsx):
   - Se eliminan explícitamente las claves de estado de Zustand: `fluo_finance_storage_v3`, `fluo_finance_storage_v2`, `fluo_finance_storage_v1`.
-  - Se purga la caché de cotizaciones financieras de terceros `fluo_market_quotes_cache_v1`.
+  - Se purga la caché de cotizaciones financieras de terceros `fluo_market_quotes_cache_v1` y contadores de seguridad.
   - Se limpian las marcas de sesión demo y el estado de bloqueo `fluo_security_lock_state`.
   - Se resetea el store de Zustand en memoria a colecciones vacías (`transactions: []`, `assets: []`, `userId: null`), impidiendo que un segundo usuario en el mismo dispositivo pueda acceder a datos residuales en memoria o almacenamiento.
 
 ### 5. Content Security Policy (CSP) y Encabezados de Blindaje
-- Configurado en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html):
-  - Directiva `connect-src` restringida a Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), APIs de cotizaciones (Yahoo Finance, CoinGecko) y CDNs autorizadas de logos.
-  - Protección estricta contra clickjacking: `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+- Configurado en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html) y reforzado a nivel de servidor HTTP en [`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json):
+  - Directiva `connect-src` ampliada con `https://api.binance.com`, Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), APIs de cotizaciones (Yahoo Finance, CoinGecko) y CDNs de marcas (Clearbit).
+  - Protección estricta contra clickjacking mediante `X-Frame-Options: DENY` y `frame-ancestors 'none'`.
+  - Aislamiento de plugins y formularios: `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
   - Protección de tipos MIME con `X-Content-Type-Options: nosniff`.
   - Política de referencia `Referrer-Policy: strict-origin-when-cross-origin`.
+  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (HSTS de 2 años).
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`.
+
+---
+
+## 15. Despliegue e Infraestructura Web en Vercel (`vercel.json`)
+
+Para garantizar alta disponibilidad y cero errores de ruta en producción:
+
+1. **Reescritura Universal de Rutas SPA (`rewrites`)**:
+   - `[{ "source": "/(.*)", "destination": "/index.html" }]`: Permite recargas profundas y navegación fluida sin respuestas 404 en el CDN.
+2. **Estrategia de Caché de Capa Edge**:
+   - **Assets Inmutables**: `/assets/(.*)` con `Cache-Control: public, max-age=31536000, immutable`.
+   - **Documentos Críticos y PWA**: `/index.html`, `/sw.js`, `/manifest.webmanifest` con `Cache-Control: public, max-age=0, must-revalidate` para forzar actualizaciones atómicas inmediatas tras cada despliegue.
 
 ---
 

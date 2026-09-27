@@ -5,6 +5,7 @@ interface SecurityLockScreenProps {
   isLocked: boolean;
   hasPin: boolean;
   isBiometricsAvailable: boolean;
+  lockoutSecondsRemaining?: number;
   onUnlockWithPin: (pin: string) => Promise<boolean>;
   onUnlockWithBiometrics: () => Promise<boolean>;
   onSetupPin: (pin: string) => Promise<boolean>;
@@ -15,6 +16,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
   isLocked,
   hasPin,
   isBiometricsAvailable,
+  lockoutSecondsRemaining = 0,
   onUnlockWithPin,
   onUnlockWithBiometrics,
   onSetupPin,
@@ -52,7 +54,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
   };
 
   const handleDigitPress = async (digit: string) => {
-    if (pin.length >= 4 || isVerifying || isSuccess) return;
+    if (pin.length >= 4 || isVerifying || isSuccess || lockoutSecondsRemaining > 0) return;
 
     const nextPin = pin + digit;
     setPin(nextPin);
@@ -209,13 +211,18 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
             })}
           </div>
 
-          {/* Error Message */}
-          {errorMessage && (
+          {/* Lockout Countdown or Error Message */}
+          {lockoutSecondsRemaining > 0 ? (
+            <div className="mb-2 flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-full animate-fadeIn">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+              <span>Demasiados intentos. Espera {lockoutSecondsRemaining}s</span>
+            </div>
+          ) : errorMessage ? (
             <div className="mb-2 flex items-center gap-1.5 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full animate-fadeIn">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               <span>{errorMessage}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Translucent Keypad (3x4 grid) */}
@@ -225,7 +232,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
               key={digit}
               type="button"
               onClick={() => handleDigitPress(digit)}
-              disabled={isVerifying || isSuccess}
+              disabled={isVerifying || isSuccess || lockoutSecondsRemaining > 0}
               className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-lg font-bold text-white transition-all flex items-center justify-center cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] disabled:opacity-40"
             >
               {digit}
@@ -238,7 +245,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
               <button
                 type="button"
                 onClick={handleBiometricAuth}
-                disabled={isVerifying || isSuccess}
+                disabled={isVerifying || isSuccess || lockoutSecondsRemaining > 0}
                 title="Desbloquear con Face ID / Huella"
                 className="h-12 w-full rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 border border-indigo-500/30 text-indigo-400 transition-all flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)] disabled:opacity-40"
               >
@@ -252,7 +259,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
           <button
             type="button"
             onClick={() => handleDigitPress('0')}
-            disabled={isVerifying || isSuccess}
+            disabled={isVerifying || isSuccess || lockoutSecondsRemaining > 0}
             className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-lg font-bold text-white transition-all flex items-center justify-center cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] disabled:opacity-40"
           >
             0
@@ -261,7 +268,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
           <button
             type="button"
             onClick={handleDelete}
-            disabled={pin.length === 0 || isVerifying || isSuccess}
+            disabled={pin.length === 0 || isVerifying || isSuccess || lockoutSecondsRemaining > 0}
             title="Borrar dígito"
             className="h-12 rounded-2xl bg-white/[0.04] hover:bg-white/[0.09] active:scale-95 border border-white/10 text-slate-400 hover:text-white transition-all flex items-center justify-center cursor-pointer disabled:opacity-30"
           >

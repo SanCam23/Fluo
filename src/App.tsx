@@ -57,6 +57,7 @@ export default function App() {
     isLocked,
     hasPin,
     isBiometricsAvailable,
+    lockoutSecondsRemaining,
     lockNow,
     setupPin,
     unlockWithPin,
@@ -313,6 +314,7 @@ export default function App() {
             isLocked={isLocked || isConfiguringPin}
             hasPin={hasPin && !isConfiguringPin}
             isBiometricsAvailable={isBiometricsAvailable}
+            lockoutSecondsRemaining={lockoutSecondsRemaining}
             onUnlockWithPin={unlockWithPin}
             onUnlockWithBiometrics={unlockWithBiometrics}
             onSetupPin={async (pin) => {

@@ -4,6 +4,8 @@ const PIN_STORAGE_KEY = 'fluo_security_pin_hash';
 const LOCK_STORAGE_KEY = 'fluo_security_lock_state';
 const LAST_ACTIVITY_KEY = 'fluo_last_activity_time';
 const BIOMETRICS_KEY = 'fluo_biometrics_credential_id';
+const FAILED_ATTEMPTS_KEY = 'fluo_security_failed_attempts';
+const LOCKOUT_TIMESTAMP_KEY = 'fluo_security_lockout_until';
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos de inactividad
 
 /**
@@ -47,8 +49,37 @@ export function useSecurityLock() {
     }
   });
 
+  const [lockoutSecondsRemaining, setLockoutSecondsRemaining] = useState<number>(() => {
+    try {
+      const lockoutUntil = Number(localStorage.getItem(LOCKOUT_TIMESTAMP_KEY) || 0);
+      const diff = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      return diff > 0 ? diff : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   const [isBiometricsAvailable, setIsBiometricsAvailable] = useState<boolean>(false);
   const idleTimerRef = useRef<number | null>(null);
+
+  // Intervalo regresivo para periodo de penalización por intentos fallidos
+  useEffect(() => {
+    if (lockoutSecondsRemaining <= 0) return;
+    const interval = window.setInterval(() => {
+      setLockoutSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          try {
+            localStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
+          } catch {
+            // ignore
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [lockoutSecondsRemaining]);
 
   const recordActivity = useCallback(() => {
     try {
@@ -120,8 +151,19 @@ export function useSecurityLock() {
     }
   }, [recordActivity]);
 
-  // 5. Validar PIN para desbloquear
+  // 5. Validar PIN para desbloquear con mitigación de fuerza bruta y lockout progresivo
   const unlockWithPin = useCallback(async (candidatePin: string): Promise<boolean> => {
+    // A. Si está en periodo de penalización (lockout) activo
+    const currentLockoutUntil = Number(localStorage.getItem(LOCKOUT_TIMESTAMP_KEY) || 0);
+    if (currentLockoutUntil > Date.now()) {
+      const remaining = Math.ceil((currentLockoutUntil - Date.now()) / 1000);
+      setLockoutSecondsRemaining(remaining);
+      return false;
+    }
+
+    // B. Retardo defensivo contra ataques automatizados de fuerza bruta y temporización (200ms)
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
     try {
       const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
       if (!storedHash) {
@@ -130,9 +172,47 @@ export function useSecurityLock() {
       }
       const candidateHash = await hashPin(candidatePin);
       if (candidateHash === storedHash) {
+        // Éxito: restablecer intentos fallidos
+        try {
+          localStorage.removeItem(FAILED_ATTEMPTS_KEY);
+          localStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
+        } catch {
+          // ignore
+        }
+        setLockoutSecondsRemaining(0);
         unlockNow();
         return true;
       }
+
+      // Fallo: registrar intento fallido y aplicar lockout progresivo
+      let failedCount = 1;
+      try {
+        const storedCount = Number(localStorage.getItem(FAILED_ATTEMPTS_KEY) || 0);
+        failedCount = storedCount + 1;
+        localStorage.setItem(FAILED_ATTEMPTS_KEY, String(failedCount));
+      } catch {
+        // ignore
+      }
+
+      let penaltySeconds = 0;
+      if (failedCount >= 10) {
+        penaltySeconds = 300; // 5 minutos
+      } else if (failedCount >= 8) {
+        penaltySeconds = 60;  // 1 minuto
+      } else if (failedCount >= 5) {
+        penaltySeconds = 30;  // 30 segundos
+      }
+
+      if (penaltySeconds > 0) {
+        const lockoutTimestamp = Date.now() + penaltySeconds * 1000;
+        try {
+          localStorage.setItem(LOCKOUT_TIMESTAMP_KEY, String(lockoutTimestamp));
+        } catch {
+          // ignore
+        }
+        setLockoutSecondsRemaining(penaltySeconds);
+      }
+
       return false;
     } catch (e) {
       console.error('[Security] Failed to verify PIN:', e);
@@ -153,12 +233,20 @@ export function useSecurityLock() {
       // Verificamos si ya existe una credencial guardada
       const existingCredId = localStorage.getItem(BIOMETRICS_KEY);
 
+      // Resolver rpId dinámicamente según el hostname (omite localhost e IPs numéricas para evitar errores de WebAuthn)
+      const isLocalOrIp =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname);
+      const rpId = !isLocalOrIp ? window.location.hostname : undefined;
+
       if (existingCredId) {
         // Intento de autenticación biométrica existente
         const rawId = Uint8Array.from(atob(existingCredId), (c) => c.charCodeAt(0));
         const assertion = await navigator.credentials.get({
           publicKey: {
             challenge,
+            ...(rpId ? { rpId } : {}),
             allowCredentials: [
               {
                 id: rawId,
@@ -172,6 +260,13 @@ export function useSecurityLock() {
         });
 
         if (assertion) {
+          try {
+            localStorage.removeItem(FAILED_ATTEMPTS_KEY);
+            localStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
+          } catch {
+            // ignore
+          }
+          setLockoutSecondsRemaining(0);
           unlockNow();
           return true;
         }
@@ -180,7 +275,10 @@ export function useSecurityLock() {
         const credential = await navigator.credentials.create({
           publicKey: {
             challenge,
-            rp: { name: 'Fluo Financial OS' },
+            rp: {
+              name: 'Fluo Financial OS',
+              ...(rpId ? { id: rpId } : {}),
+            },
             user: {
               id: new Uint8Array([1, 2, 3, 4]),
               name: 'usuario@fluo.app',
@@ -203,6 +301,13 @@ export function useSecurityLock() {
             String.fromCharCode(...new Uint8Array(credential.rawId))
           );
           localStorage.setItem(BIOMETRICS_KEY, credIdBase64);
+          try {
+            localStorage.removeItem(FAILED_ATTEMPTS_KEY);
+            localStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
+          } catch {
+            // ignore
+          }
+          setLockoutSecondsRemaining(0);
           unlockNow();
           return true;
         }
@@ -289,11 +394,14 @@ export function useSecurityLock() {
   const resetSecurity = useCallback(() => {
     setIsLocked(false);
     setHasPin(false);
+    setLockoutSecondsRemaining(0);
     try {
       localStorage.removeItem(PIN_STORAGE_KEY);
       localStorage.removeItem(LOCK_STORAGE_KEY);
       localStorage.removeItem(LAST_ACTIVITY_KEY);
       localStorage.removeItem(BIOMETRICS_KEY);
+      localStorage.removeItem(FAILED_ATTEMPTS_KEY);
+      localStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
     } catch {
       // Ignorar errores en LocalStorage
     }
@@ -303,6 +411,7 @@ export function useSecurityLock() {
     isLocked,
     hasPin,
     isBiometricsAvailable,
+    lockoutSecondsRemaining,
     lockNow,
     unlockNow,
     setupPin,
