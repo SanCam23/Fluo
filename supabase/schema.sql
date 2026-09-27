@@ -90,3 +90,20 @@ CREATE POLICY "Users can update their own investments"
 CREATE POLICY "Users can delete their own investments"
     ON public.investments FOR DELETE
     USING (auth.uid() = user_id);
+
+
+-- 3. Función RPC para Eliminación Definitiva de Cuenta (GDPR / Derecho al Olvido)
+CREATE OR REPLACE FUNCTION public.delete_user_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Eliminar datos de transacciones del usuario
+    DELETE FROM public.transactions WHERE user_id = auth.uid();
+    -- Eliminar activos e inversiones del usuario
+    DELETE FROM public.investments WHERE user_id = auth.uid();
+    -- Eliminar el registro del usuario en auth.users
+    DELETE FROM auth.users WHERE id = auth.uid();
+END;
+$$;

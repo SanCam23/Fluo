@@ -283,6 +283,24 @@ export const AnalyticsView: React.FC = () => {
 
   const maxBrandTotal = sortedBrands[0]?.total || 1;
 
+  if (transactions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6 py-4 pb-20">
+        <div className="py-16 px-6 text-center rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 flex flex-col items-center justify-center gap-4 shadow-2xl">
+          <div className="h-16 w-16 rounded-3xl bg-gradient-to-tr from-indigo-500/20 via-indigo-600/15 to-emerald-500/10 border border-white/15 flex items-center justify-center text-indigo-400 shadow-[0_4px_20px_rgba(99,102,241,0.2)]">
+            <BarChart3 className="h-8 w-8 text-indigo-300" />
+          </div>
+          <div className="flex flex-col gap-2 max-w-sm">
+            <h3 className="text-base font-bold text-white tracking-tight">Sin métricas aún</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Los gráficos de distribución de gastos, flujo de caja mensual y evolución patrimonial se generarán con los primeros registros.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-16">
       {/* 1. Time Range Selector Segmented Control */}

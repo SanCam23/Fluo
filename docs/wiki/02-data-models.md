@@ -341,3 +341,54 @@ export interface FinancialSummary {
 
 export type TimeRangeFilter = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all';
 ```
+
+---
+
+## 7. Modelos de Autenticación, Perfil y Bóveda de Seguridad
+
+### Contrato del Contexto de Autenticación (`AuthContextType`)
+```typescript
+export interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  isDemoMode: boolean;
+  signInWithEmail: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ error: AuthError | Error | null; data?: any }>;
+  signOut: () => Promise<void>;
+  enterDemoMode: () => void;
+  exitDemoMode: () => void;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | Error | null }>;
+  deleteUserAccount: () => Promise<{ error: Error | null }>;
+}
+```
+
+### Contrato del Modal de Perfil (`ProfileSettingsModalProps`)
+```typescript
+export interface ProfileSettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSignOut: () => void;
+}
+```
+
+### Bóveda Criptográfica y Estado de Seguridad (`useSecurityLock`)
+```typescript
+export interface SecurityLockHookResult {
+  isLocked: boolean;
+  hasPin: boolean;
+  isBiometricsAvailable: boolean;
+  isBiometricsEnabled: boolean;
+  lockoutSecondsRemaining: number;
+  lockNow: () => void;
+  unlockNow: () => void;
+  setupPin: (pin: string) => Promise<boolean>;
+  changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
+  removePin: () => void;
+  verifyCurrentPin: (pin: string) => Promise<boolean>;
+  toggleBiometrics: (enable: boolean) => Promise<boolean>;
+  unlockWithPin: (pin: string) => Promise<boolean>;
+  unlockWithBiometrics: () => Promise<boolean>;
+  resetSecurity: () => void;
+}
+```

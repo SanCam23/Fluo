@@ -314,13 +314,22 @@ export const InvestmentsView: React.FC = () => {
 
       {/* Assets List */}
       <div className="flex flex-col gap-3">
-        {filteredAssets.length === 0 ? (
-          <div className="py-12 px-4 text-center rounded-3xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs flex flex-col items-center gap-2">
-            <Layers className="h-8 w-8 text-slate-500 opacity-60 mb-1" />
+        {assets.length === 0 ? (
+          <div className="py-12 px-5 text-center rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 flex flex-col items-center justify-center gap-3 shadow-xl">
+            <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <PieChart className="h-7 w-7 text-indigo-400 opacity-80" />
+            </div>
+            <div className="flex flex-col gap-1.5 max-w-xs">
+              <h3 className="text-sm font-bold text-white">Tu cartera está vacía</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Añade tus acciones, ETFs o fondos para seguir su rentabilidad en tiempo real.
+              </p>
+            </div>
+          </div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="py-10 px-4 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs flex flex-col items-center gap-1.5">
+            <Layers className="h-6 w-6 text-slate-500 opacity-60 mb-0.5" />
             <p className="font-semibold text-slate-300">No tienes activos registrados en esta categoría.</p>
-            <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
-              Usa el botón central (+) de la barra inferior y selecciona <strong className="text-indigo-300">Inversión</strong> para añadir un activo con cotización en tiempo real.
-            </p>
           </div>
         ) : (
           filteredAssets.map((asset) => (

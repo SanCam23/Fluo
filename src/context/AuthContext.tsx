@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { useFinanceStore } from '../store/useFinanceStore';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +13,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   enterDemoMode: () => void;
   exitDemoMode: () => void;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | Error | null }>;
+  deleteUserAccount: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -146,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore
     }
+    useFinanceStore.getState().loadDemoData();
   };
 
   const exitDemoMode = () => {
@@ -154,6 +158,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('fluo_demo_mode_active');
     } catch {
       // Ignore
+    }
+    useFinanceStore.getState().purgeUserData();
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      return { error };
+    } catch (err: any) {
+      return { error: err as Error };
+    }
+  };
+
+  const deleteUserAccount = async () => {
+    try {
+      if (user?.id) {
+        // 1. Delete user transactions & investments from cloud tables
+        try {
+          await supabase.rpc('delete_user_account');
+        } catch {
+          // Fallback direct RLS cascade deletion
+          await supabase.from('transactions').delete().eq('user_id', user.id);
+          await supabase.from('investments').delete().eq('user_id', user.id);
+        }
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: err as Error };
     }
   };
 
@@ -168,6 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signOut,
       enterDemoMode,
       exitDemoMode,
+      updatePassword,
+      deleteUserAccount,
     }),
     [user, session, loading, isDemoMode]
   );

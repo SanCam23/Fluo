@@ -49,6 +49,14 @@ export function useSecurityLock() {
     }
   });
 
+  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem(BIOMETRICS_KEY));
+    } catch {
+      return false;
+    }
+  });
+
   const [lockoutSecondsRemaining, setLockoutSecondsRemaining] = useState<number>(() => {
     try {
       const lockoutUntil = Number(localStorage.getItem(LOCKOUT_TIMESTAMP_KEY) || 0);
@@ -390,10 +398,126 @@ export function useSecurityLock() {
     };
   }, [hasPin, isLocked, lockNow, recordActivity]);
 
-  // 10. Función para purgar seguridad (en logout)
+  // 10. Alternar habilitación de biometría
+  const toggleBiometrics = useCallback(async (enable: boolean): Promise<boolean> => {
+    if (!enable) {
+      try {
+        localStorage.removeItem(BIOMETRICS_KEY);
+        setIsBiometricsEnabled(false);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+      return false;
+    }
+
+    try {
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      const userId = new Uint8Array(16);
+      crypto.getRandomValues(userId);
+
+      const isLocalOrIp =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname);
+      const rpId = !isLocalOrIp ? window.location.hostname : undefined;
+
+      const credential = (await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: {
+            name: 'Fluo Security Vault',
+            ...(rpId ? { id: rpId } : {}),
+          },
+          user: {
+            id: userId,
+            name: 'fluo_user',
+            displayName: 'Fluo User',
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },
+            { type: 'public-key', alg: -257 },
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'preferred',
+          },
+          timeout: 60000,
+        },
+      })) as PublicKeyCredential;
+
+      if (credential && credential.rawId) {
+        const credIdBase64 = btoa(
+          String.fromCharCode(...new Uint8Array(credential.rawId))
+        );
+        localStorage.setItem(BIOMETRICS_KEY, credIdBase64);
+        setIsBiometricsEnabled(true);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.warn('[Security] Could not register biometrics:', err);
+      return false;
+    }
+  }, []);
+
+  // 11. Verificar si un PIN coincide con el PIN actual
+  const verifyCurrentPin = useCallback(async (candidatePin: string): Promise<boolean> => {
+    try {
+      const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
+      if (!storedHash) return true;
+      const candidateHash = await hashPin(candidatePin);
+      return candidateHash === storedHash;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // 12. Cambiar PIN existente por uno nuevo tras validar el actual
+  const changePin = useCallback(
+    async (
+      currentPin: string,
+      newPin: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      if (!/^\d{4}$/.test(newPin)) {
+        return { success: false, error: 'El nuevo PIN debe tener exactamente 4 dígitos numéricos.' };
+      }
+      const isValid = await verifyCurrentPin(currentPin);
+      if (!isValid) {
+        return { success: false, error: 'El PIN actual no es correcto.' };
+      }
+      const ok = await setupPin(newPin);
+      if (ok) {
+        return { success: true };
+      }
+      return { success: false, error: 'Error al guardar el nuevo PIN.' };
+    },
+    [verifyCurrentPin, setupPin]
+  );
+
+  // 13. Desactivar y eliminar PIN
+  const removePin = useCallback(() => {
+    try {
+      localStorage.removeItem(PIN_STORAGE_KEY);
+      localStorage.removeItem(LOCK_STORAGE_KEY);
+      localStorage.removeItem(BIOMETRICS_KEY);
+      setHasPin(false);
+      setIsLocked(false);
+      setIsBiometricsEnabled(false);
+    } catch (e) {
+      console.warn('[Security] Error removing PIN:', e);
+    }
+  }, []);
+
+  // 14. Función para purgar seguridad (en logout)
   const resetSecurity = useCallback(() => {
     setIsLocked(false);
     setHasPin(false);
+    setIsBiometricsEnabled(false);
     setLockoutSecondsRemaining(0);
     try {
       localStorage.removeItem(PIN_STORAGE_KEY);
@@ -411,10 +535,15 @@ export function useSecurityLock() {
     isLocked,
     hasPin,
     isBiometricsAvailable,
+    isBiometricsEnabled,
     lockoutSecondsRemaining,
     lockNow,
     unlockNow,
     setupPin,
+    changePin,
+    removePin,
+    verifyCurrentPin,
+    toggleBiometrics,
     unlockWithPin,
     unlockWithBiometrics,
     resetSecurity,

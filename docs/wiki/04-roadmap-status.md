@@ -31,6 +31,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Ciberseguridad Nivel 1 & Bloqueo Biométrico** | ✅ Completado | Detección de inactividad (3m), backgrounding, bóveda PIN SHA-256, WebAuthn, CSP y purga de sesión (`purgeUserData`) |
 | **Optimización de Rendimiento & Aceleración GPU** | ✅ Completado | Aceleración GPU en Liquid Glass, bundle splitting (65% reducción), compresión Gzip/Brotli, viewport virtualization y SWR |
 | **Documentación Oficial & README Maestro** | ✅ Completado | `README.md` exhaustivo con arquitectura, diseño Liquid Glass, ciberseguridad, guía local y despliegue |
+| **Onboarding Limpio a Cero (Zero-State)** | ✅ Completado | Estado inicial a 0 € para cuentas nuevas sin filtración de datos demo; empty states Liquid Glass en Home, Inversiones y Estadísticas |
+| **Centro de Control de Cuenta & Perfil** | ✅ Completado | Avatar flotante en cabecera, `ProfileSettingsModal`, gestión de PIN y WebAuthn, cambio de contraseña Supabase y borrado GDPR (`delete_user_account`) |
 
 ---
 
@@ -361,6 +363,26 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Interfaz Liquid Glass con aviso de advertencia, cuenta regresiva dinámica en vivo y bloqueo temporal del teclado táctil.
   - Detección dinámica de `rp.id` para autenticación WebAuthn en dominios públicos de producción.
 - **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+
+### v0.5.17 (Onboarding Limpio a Cero, Avatar Flotante & Centro de Control de Cuenta)
+- **Onboarding Limpio a Cero (Zero-State Onboarding)**:
+  - Inicialización estricta a 0 € y colecciones vacías (`transactions: []`, `assets: []`, `recurrences: []`) para cuentas registradas e inicios de sesión reales.
+  - Corrección de la lógica de merge en persistencia de Zustand (`useFinanceStore.ts`) para preservar arrays vacíos sin revertir a datos semilla (`INITIAL_TRANSACTIONS`).
+  - Separación formal de datos de demostración mediante acción `loadDemoData()` activada únicamente bajo `isDemoMode: true` y purgada al salir.
+  - **Empty States Liquid Glass Reutilizables**:
+    - **Home ([`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx))**: Mensaje inspirador con icono vítreo `Receipt` indicando cómo registrar el primer movimiento.
+    - **Inversiones ([`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx))**: Tarjeta con icono `PieChart` invitando a añadir activos para monitorizar cotizaciones en vivo.
+    - **Estadísticas ([`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx))**: Ilustración translúcida Liquid Glass informando que las métricas y gráficos se generarán con los primeros registros.
+- **Botón Flotante de Avatar en Cabecera ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx))**:
+  - Reemplazo del correo en texto plano por un botón circular Liquid Glass `w-10 h-10` con inicial en relieve o icono `User` y punto de estado en vivo (verde esmeralda para cuenta cloud con RLS activo, ámbar para modo demo local).
+- **Centro de Control de Perfil y Ajustes ([`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx))**:
+  - Modal flotante Liquid Glass con cobertura móvil completa y desenfoque vítreo `backdrop-blur-2xl`.
+  - **Cabecera de Perfil**: Avatar con gradiente y destello especular, correo electrónico y badge de protección cloud.
+  - **Gestión de PIN & Bóveda**: Flujo de activación, cambio de PIN de 4 dígitos validado con SHA-256 (`changePin`) y opción de desactivación (`removePin`).
+  - **Toggle Biométrico**: Conmutador estilo iOS para activar/desactivar WebAuthn (`toggleBiometrics`).
+  - **Cambio de Contraseña**: Integración nativa con `supabase.auth.updateUser({ password })` con alternador de visibilidad (`Eye`/`EyeOff`) y alertas translúcidas.
+  - **Zona de Peligro & GDPR**: Modal de doble confirmación requiriendo confirmación textual `ELIMINAR` para ejecutar borrado en cascada en la base de datos (`delete_user_account`), purga de almacenamiento local (`purgeUserData`) y cierre seguro de sesión.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (548ms).
 
 ---
 

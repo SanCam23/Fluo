@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Receipt } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { PillarType, Transaction } from '../../types/finance';
 import { SwipeableTransactionItem } from './SwipeableTransactionItem';
@@ -90,9 +90,21 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
 
       {/* List of items with Swipe-to-Delete and GPU viewport skipping (cv-auto) */}
       <div className="flex flex-col gap-2.5">
-        {filteredTransactions.length === 0 ? (
+        {transactions.length === 0 ? (
+          <div className="py-10 px-5 text-center rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 flex flex-col items-center justify-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-400 shadow-inner">
+              <Receipt className="h-6 w-6 text-slate-400 opacity-70" />
+            </div>
+            <div className="flex flex-col gap-1 max-w-xs">
+              <p className="text-sm font-semibold text-white">Sin movimientos registrados aún</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Pulsa el botón central <strong className="text-indigo-300 font-bold">(+)</strong> para registrar tu primer ingreso o gasto.
+              </p>
+            </div>
+          </div>
+        ) : filteredTransactions.length === 0 ? (
           <div className="py-8 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs">
-            No hay transacciones registradas en este filtro.
+            No hay movimientos registrados en este filtro.
           </div>
         ) : (
           visibleTransactions.map((tx) => {

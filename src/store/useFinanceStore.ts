@@ -72,6 +72,7 @@ interface FinanceState {
   resetSimulatedTime: () => void;
   simulatedTimeOffsetDays: number;
   resetToInitialData: () => void;
+  loadDemoData: () => void;
   purgeUserData: () => void;
 
   // Methods
@@ -84,11 +85,11 @@ interface FinanceState {
 export const useFinanceStore = create<FinanceState>()(
   persist(
     (set, get) => ({
-      transactions: INITIAL_TRANSACTIONS,
+      transactions: [],
       categories: INITIAL_CATEGORIES,
       brands: INITIAL_BRANDS,
-      assets: INITIAL_INVESTMENT_ASSETS,
-      recurrences: INITIAL_RECURRENCE_RULES,
+      assets: [],
+      recurrences: [],
       timeRange: 'all',
       activeTab: 'home',
       isLiveUpdating: false,
@@ -97,11 +98,32 @@ export const useFinanceStore = create<FinanceState>()(
       isCloudLoading: false,
       cloudSyncError: null,
 
-      setUserId: (userId) => set({ userId }),
+      setUserId: (userId) => {
+        const prevId = get().userId;
+        if (userId && prevId !== userId) {
+          // Switching to authenticated user: wipe any local demo data immediately
+          set({
+            userId,
+            transactions: [],
+            assets: [],
+            recurrences: [],
+          });
+        } else {
+          set({ userId });
+        }
+      },
 
       setTransactions: (transactions) => set({ transactions }),
 
       setAssets: (assets) => set({ assets }),
+
+      loadDemoData: () => {
+        set({
+          transactions: INITIAL_TRANSACTIONS,
+          assets: INITIAL_INVESTMENT_ASSETS,
+          recurrences: INITIAL_RECURRENCE_RULES,
+        });
+      },
 
       loadCloudData: async (userId) => {
         if (!userId) return;
@@ -112,6 +134,7 @@ export const useFinanceStore = create<FinanceState>()(
             set({
               transactions: result.transactions,
               assets: result.assets,
+              recurrences: [],
               isCloudLoading: false,
               cloudSyncError: null,
             });
@@ -464,7 +487,7 @@ export const useFinanceStore = create<FinanceState>()(
           ...currentState,
           ...p,
           transactions:
-            Array.isArray(p.transactions) && p.transactions.length > 0
+            Array.isArray(p.transactions)
               ? p.transactions
               : currentState.transactions,
           categories: (() => {
@@ -510,11 +533,11 @@ export const useFinanceStore = create<FinanceState>()(
             return merged;
           })(),
           assets:
-            Array.isArray(p.assets) && p.assets.length > 0
+            Array.isArray(p.assets)
               ? p.assets
               : currentState.assets,
           recurrences:
-            Array.isArray(p.recurrences) && p.recurrences.length > 0
+            Array.isArray(p.recurrences)
               ? p.recurrences
               : currentState.recurrences,
         };

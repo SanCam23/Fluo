@@ -123,6 +123,10 @@ Fluo/
 3. **Escudo de Resiliencia (`ErrorBoundary`)**:
    - Envuelve el árbol raíz de React en [`main.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/main.tsx).
    - Proporciona recuperación visual Liquid Glass con opciones para reintentar la renderización o limpiar la caché local ante datos corruptos.
+4. **Onboarding Limpio a Cero (Zero-State Onboarding)**:
+   - Para nuevos registros y usuarios autenticados, el store arranca estrictamente en colecciones vacías (`transactions: []`, `assets: []`, `recurrences: []`).
+   - El middleware `persist` preserva colecciones vacías evitando la sobreescritura accidental con semillas de prueba (`INITIAL_TRANSACTIONS`).
+   - Los datos de demostración solo se cargan si el usuario activa explícitamente el Modo Demo (`loadDemoData`), y se purgan al salir (`purgeUserData`).
 
 ---
 
@@ -304,6 +308,13 @@ Fluo integra **Supabase** como backend oficial para autenticación y persistenci
       USING (auth.uid() = user_id);
   ```
   Impidiendo que un usuario pueda acceder, modificar o eliminar registros de cualquier otra cuenta.
+
+### 6. Centro de Control de Cuenta y Ajustes de Seguridad (`ProfileSettingsModal.tsx`)
+- **Cabecera Flotante con Avatar**: El correo en texto plano en la barra superior se sustituye por un botón avatar Liquid Glass circular con badge de estado en tiempo real (esmeralda para cuenta cloud con RLS activo, ámbar para modo demo local).
+- **Gestión de Bóveda y PIN**: Permite activar, cambiar o desactivar el PIN de 4 dígitos mediante validación previa con hash SHA-256 local (`changePin`, `removePin`).
+- **Control Biométrico**: Switch estilo iOS para activar o desactivar credenciales de WebAuthn (`toggleBiometrics`).
+- **Actualización de Credenciales**: Cambio seguro de contraseña mediante la API oficial de Supabase Auth (`supabase.auth.updateUser({ password })`) con feedback visual instantáneo.
+- **Derecho al Olvido (GDPR / Eliminación Definitiva)**: Zona de peligro con diálogo modal de doble confirmación donde el usuario debe escribir "ELIMINAR" para disparar la eliminación en cascada de transacciones e inversiones en la base de datos (`delete_user_account`), purgar el almacenamiento local (`purgeUserData`) y cerrar la sesión.
 
 ---
 

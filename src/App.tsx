@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FastForward, LogOut, LogIn, Loader2, Cloud, Lock, ShieldCheck } from 'lucide-react';
+import { FastForward, Loader2, Cloud, Lock, ShieldCheck, User } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
 import { useSecurityLock } from './hooks/useSecurityLock';
@@ -34,6 +34,11 @@ const SignOutConfirmModal = lazy(() =>
 const SecurityLockScreen = lazy(() =>
   import('./components/security/SecurityLockScreen').then((m) => ({ default: m.SecurityLockScreen }))
 );
+const ProfileSettingsModal = lazy(() =>
+  import('./components/profile/ProfileSettingsModal').then((m) => ({
+    default: m.ProfileSettingsModal,
+  }))
+);
 
 const ViewSkeletonFallback = () => (
   <div className="flex flex-col gap-4 animate-pulse p-1">
@@ -44,7 +49,7 @@ const ViewSkeletonFallback = () => (
 );
 
 export default function App() {
-  const { user, loading: isAuthLoading, isDemoMode, signOut, exitDemoMode } = useAuth();
+  const { user, loading: isAuthLoading, isDemoMode, signOut } = useAuth();
 
   const activeTab = useFinanceStore((state) => state.activeTab);
   const simulatedTimeOffsetDays = useFinanceStore((state) => state.simulatedTimeOffsetDays);
@@ -69,6 +74,7 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -90,6 +96,7 @@ export default function App() {
       resetSecurity();
       await signOut();
       setIsSignOutModalOpen(false);
+      setIsProfileModalOpen(false);
     } finally {
       setIsLoggingOut(false);
     }
@@ -140,7 +147,7 @@ export default function App() {
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {/* Cloud Sync indicator */}
           {isCloudLoading && (
             <div
@@ -182,7 +189,7 @@ export default function App() {
                 setIsConfiguringPin(true);
               }
             }}
-            className={`p-1.5 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
+            className={`p-2 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
               hasPin
                 ? 'bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/12'
                 : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
@@ -197,31 +204,30 @@ export default function App() {
             )}
           </button>
 
-          {/* User Session / Sign Out or Login Button */}
-          {user ? (
-            <button
-              type="button"
-              onClick={() => setIsSignOutModalOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white text-xs font-medium border border-white/12 transition-all cursor-pointer"
-              title={`Conectado como ${user.email}. Pulsa para salir.`}
-            >
-              <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-              <span className="max-w-[70px] truncate sm:max-w-[100px]">
-                {user.email?.split('@')[0]}
+          {/* Floating Liquid Glass Profile Avatar Button (Replaces raw email text) */}
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="relative w-10 h-10 rounded-full bg-slate-800/60 backdrop-blur-xl border border-white/15 flex items-center justify-center hover:bg-slate-700/60 transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-95 group"
+            title={user ? `Cuenta: ${user.email} (Perfil y Seguridad)` : 'Modo Demostración — Perfil y Ajustes'}
+            aria-label="Perfil y Ajustes de Cuenta"
+          >
+            {user?.email ? (
+              <span className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors uppercase">
+                {user.email.charAt(0)}
               </span>
-              <LogOut className="h-3 w-3 text-slate-400 ml-0.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={exitDemoMode}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition-all cursor-pointer"
-              title="Iniciar sesión con tu cuenta"
-            >
-              <LogIn className="h-3 w-3 text-indigo-400" />
-              <span>Acceder</span>
-            </button>
-          )}
+            ) : (
+              <User className="h-4 w-4 text-slate-300 group-hover:text-white transition-colors" />
+            )}
+            {/* Status dot indicator */}
+            <span
+              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0B0F19] ${
+                user
+                  ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
+                  : 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]'
+              }`}
+            />
+          </button>
         </div>
       </header>
 
@@ -290,6 +296,17 @@ export default function App() {
           <TimeSimulatorModal
             isOpen={isSimulatorOpen}
             onClose={() => setIsSimulatorOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* Profile & Account Settings Modal (Liquid Glass) */}
+      {isProfileModalOpen && (
+        <Suspense fallback={null}>
+          <ProfileSettingsModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            onSignOut={handleConfirmSignOut}
           />
         </Suspense>
       )}
