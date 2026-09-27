@@ -88,13 +88,27 @@
   color-scheme: dark;
 }
 
+html {
+  background-color: var(--color-fluo-dark);
+  color-scheme: dark;
+  height: 100%;
+}
+
 body {
   background-color: var(--color-fluo-dark);
   color: #F3F4F6;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+#root {
+  background-color: var(--color-fluo-dark);
+  min-height: 100vh;
+  min-height: 100dvh;
 }

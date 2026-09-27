@@ -24,6 +24,7 @@ export default defineConfig({
     }),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'icon-180.jpg', 'icon-192.jpg', 'icon-512.jpg'],
       manifest: {
         name: 'Fluo',
@@ -32,6 +33,7 @@ export default defineConfig({
         theme_color: '#0B0F19',
         background_color: '#0B0F19',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait',
         start_url: '/',
         icons: [
@@ -56,6 +58,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 3000000,
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,woff2}'],
         runtimeCaching: [

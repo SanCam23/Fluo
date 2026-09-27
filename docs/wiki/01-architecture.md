@@ -402,9 +402,14 @@ Para garantizar alta disponibilidad y cero errores de ruta en producción:
 
 1. **Reescritura Universal de Rutas SPA (`rewrites`)**:
    - `[{ "source": "/(.*)", "destination": "/index.html" }]`: Permite recargas profundas y navegación fluida sin respuestas 404 en el CDN.
-2. **Estrategia de Caché de Capa Edge**:
+2. **Estrategia de Caché de Capa Edge & PWA Live Updates**:
    - **Assets Inmutables**: `/assets/(.*)` con `Cache-Control: public, max-age=31536000, immutable`.
-   - **Documentos Críticos y PWA**: `/index.html`, `/sw.js`, `/manifest.webmanifest` con `Cache-Control: public, max-age=0, must-revalidate` para forzar actualizaciones atómicas inmediatas tras cada despliegue.
+   - **Documentos Críticos y PWA**: `/`, `/index.html`, `/sw.js`, `/workbox-*.js`, `/manifest.webmanifest` con `Cache-Control: no-cache, no-store, must-revalidate` y cabecera `Service-Worker-Allowed: /`, forzando comprobaciones atómicas en tiempo real sin almacenamiento en caché estale en navegadores móviles.
+   - **Controlador de Actualización en Vivo ([`pwaUpdateService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/pwaUpdateService.ts))**:
+     - Resuelve el problema histórico de PWAs en móviles (iOS WebKit standalone y Chrome Android) donde procesos suspendidos en RAM sirven código antiguo sin recargar.
+     - Detección inmediata en primer plano: escucha `visibilitychange` (`document.visibilityState === 'visible'`), `focus` y reconexión a red (`online`) para llamar a `registration.update()` al instante cada vez que el usuario vuelve a Fluo.
+     - Activación atómica con Workbox `skipWaiting: true` y `clientsClaim: true`.
+     - Recarga automática fluida ante `controllerchange` (evitando recargas en la primera visita gracias a la comprobación de `hasController`), garantizando que la aplicación móvil siempre corre el último despliegue de Vercel de forma transparente.
 
 ---
 

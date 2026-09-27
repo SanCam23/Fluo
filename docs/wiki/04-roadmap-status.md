@@ -381,17 +381,25 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - **Gestión de PIN & Bóveda**: Flujo de activación, cambio de PIN de 4 dígitos validado con SHA-256 (`changePin`) y opción de desactivación (`removePin`).
   - **Toggle Biométrico**: Conmutador estilo iOS para activar/desactivar WebAuthn (`toggleBiometrics`).
   - **Cambio de Contraseña**: Integración nativa con `supabase.auth.updateUser({ password })` con alternador de visibilidad (`Eye`/`EyeOff`) y alertas translúcidas.
-### v0.5.18 (Ajustes Ergonómicos de Cabecera, Balance e Isotipo Móvil PWA)
-- **Isotipo PWA & App Icons con Letra 'F' Optimizada**:
-  - Re-encuadre técnico de `public/icon-512.jpg`, `public/icon-192.jpg` y `public/icon-180.jpg` mediante pipeline de interpolación bicúbica de alta precisión.
-  - La letra `F` tubular Liquid Glass incrementa su escala visual ~35%, eliminando el exceso de márgenes negros periféricos y manteniendo las zonas de seguridad (safe bounds) para squircles de iOS y máscaras adaptativas de Android.
-- **Depuración de la Cabecera Superior ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx))**:
-  - Eliminado el icono estático de la nube (`Cloud`).
-  - El botón `Simular` queda condicionado estrictamente al modo Demo (`!user`), ocultándose automáticamente para usuarios con sesión activa donde la recurrencia corre de forma autónoma.
-  - Avatar de perfil con monograma ampliado a `text-base sm:text-lg font-black` (e icono `User` a 20px) para una presencia más nítida y legible.
-- **Simetría y Limpieza en Tarjeta de Balance ([`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx))**:
-  - Eliminado el icono de estrellas (`Sparkles`) previo a la palabra "Rendimiento", logrando una lectura limpia, equilibrada y perfectamente simétrica con la celda de "Tasa de ahorro".
-- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso.
+### v0.5.19 (PWA Live Updates Automático y Calibración Milimétrica de Isotipo)
+- **Calibración Equilibrada de la 'F' en el Isotipo Móvil**:
+  - Re-escalado suave a factor +23% (crop `415×415`) en `public/icon-512.jpg`, `icon-192.jpg` e `icon-180.jpg`.
+  - Proporción visual armónica: la letra `F` tubular destaca con nitidez sin quedar encajonada, asegurando aire perimetral suficiente para el recorte curvo de Apple y Android.
+- **PWA Live Update Controller ([`pwaUpdateService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/pwaUpdateService.ts))**:
+  - Eliminado el problema en el que la PWA móvil servía código obsoleto desde memoria al volver a la app tras un despliegue en Vercel.
+  - Comprobación inmediata ante eventos de reanudación: `visibilitychange` (`document.visibilityState === 'visible'`), `focus` y reconexión de red (`online`) disparan `registration.update()`.
+  - Configuración atómica en VitePWA Workbox: `skipWaiting: true`, `clientsClaim: true`, `cleanupOutdatedCaches: true`.
+  - Detección reactiva de toma de control (`controllerchange`): recarga automática limpia de la ventana para usuarios con sesión activa (sin recargas indeseadas en la primera instalación).
+- **Hardening de Caché Edge en CDN ([`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json))**:
+  - Reglas estrictas `Cache-Control: no-cache, no-store, must-revalidate` para `/`, `sw.js`, `workbox-*.js`, `manifest.webmanifest` e `index.html`.
+  - Garantiza que las comprobaciones del navegador móvil consulten siempre el último bundle de producción.
+### v0.5.20 (Soporte Edge-to-Edge Android & Inmersión en Pantalla Completa)
+- **Adaptación Edge-to-Edge para Android y MagicOS / OneUI**:
+  - Declaración nativa de `<meta name="color-scheme" content="dark" />` y `<meta name="mobile-web-app-capable" content="yes" />` en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html).
+  - Duplicación de etiquetas `theme-color` con `(prefers-color-scheme: dark)` y `(prefers-color-scheme: light)` a `#0B0F19` para impedir que el motor Chromium aplique un velo o tinte negro sobre la barra de estado.
+  - Estilización del nodo raíz `html`, `body` y `#root` en [`index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css) con `background-color: var(--color-fluo-dark); color-scheme: dark;` y `min-height: 100dvh`, erradicando discrepancias de color en el lienzo base del viewport.
+  - Configuración de `display_override: ['standalone', 'minimal-ui']` en el manifiesto PWA.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (539ms).
 
 ---
 
