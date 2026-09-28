@@ -336,15 +336,15 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 {selectedPillar === 'all' && (
                   <>
                     <div
-                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2`}
+                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Tasa de ahorro
                       </span>
-                      <span className="mt-0.5 text-sm font-bold text-emerald-400">
+                      <span className="mt-0.5 text-sm font-bold text-emerald-400 truncate">
                         {formatPercentage(summary.savingsRate, false)}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         Ahorro este mes
                       </span>
                     </div>
@@ -352,7 +352,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                     <div
                       className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Rendimiento
                       </span>
                       <span
@@ -365,7 +365,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                         {summary.unrealizedPnL >= 0 ? '+' : ''}
                         {formatCurrency(summary.unrealizedPnL)}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         {formatPercentage(summary.unrealizedPnLPercentage)} global
                       </span>
                     </div>
@@ -376,15 +376,15 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 {selectedPillar === 'income' && (
                   <>
                     <div
-                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2`}
+                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Ingresos Recurrentes
                       </span>
-                      <span className="mt-0.5 text-sm font-bold text-emerald-400">
+                      <span className="mt-0.5 text-sm font-bold text-emerald-400 truncate">
                         +{formatCurrency(recurringIncome)}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         {recurringIncomeCount > 0
                           ? `${recurringIncomeCount} fijos / nómina`
                           : 'Sin cobros fijos'}
@@ -394,7 +394,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                     <div
                       className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Mayor Ingreso
                       </span>
                       <span className="mt-0.5 text-sm font-bold text-white truncate">
@@ -413,15 +413,15 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 {selectedPillar === 'expense' && (
                   <>
                     <div
-                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2`}
+                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Gasto Medio Diario
                       </span>
-                      <span className="mt-0.5 text-sm font-bold text-rose-400">
+                      <span className="mt-0.5 text-sm font-bold text-rose-400 truncate">
                         {formatCurrency(dailyAverageExpense)}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         Ritmo este mes
                       </span>
                     </div>
@@ -429,7 +429,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                     <div
                       className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Gastos Recurrentes
                       </span>
                       <span className="mt-0.5 text-sm font-bold text-white truncate">
@@ -448,15 +448,15 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 {selectedPillar === 'invest' && (
                   <>
                     <div
-                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2`}
+                      className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Patrimonio Invertido
                       </span>
-                      <span className="mt-0.5 text-sm font-bold text-slate-200">
+                      <span className="mt-0.5 text-sm font-bold text-slate-200 truncate">
                         {formatCurrency(totalInvestedCost)}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         Coste base total
                       </span>
                     </div>
@@ -464,7 +464,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                     <div
                       className={`flex flex-col justify-center rounded-2xl ${theme.subCardBg} px-3 py-2 min-w-0`}
                     >
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         P&L No Realizado
                       </span>
                       <span
@@ -485,7 +485,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                         ) : (
                           <TrendingDown className="h-2.5 w-2.5 flex-shrink-0" />
                         )}
-                        <span>{formatPercentage(portfolioPnLPercentage)}</span>
+                        <span className="truncate">{formatPercentage(portfolioPnLPercentage)}</span>
                       </div>
                     </div>
                   </>
@@ -495,7 +495,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
               {/* Internal slide indicator in bottom-right corner */}
               {totalSlides > 1 && (
                 <div className="mt-2.5 flex items-center justify-end">
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md">
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.08] light:bg-slate-200/80 border border-white/10 light:border-slate-300 backdrop-blur-md">
                     {Array.from({ length: totalSlides }).map((_, idx) => (
                       <button
                         key={idx}
@@ -507,7 +507,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                         className={`transition-all duration-300 rounded-full cursor-pointer ${
                           activeSlide === idx
                             ? 'w-4 h-1.5 bg-gradient-to-r from-indigo-400 to-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]'
-                            : 'w-1.5 h-1.5 bg-white/30 hover:bg-white/50'
+                            : 'w-1.5 h-1.5 bg-white/30 light:bg-slate-400/50 hover:bg-white/50 hover:light:bg-slate-600/70'
                         }`}
                         aria-label={`Ir a ${idx === 0 ? 'Patrimonio Neto Total' : sortedSources[idx - 1]?.name}`}
                       />
@@ -538,10 +538,10 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
 
                 {/* Header row: Source Icon, Name, Institution badge & Privacy */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                     <SourceAvatar source={source} size="sm" />
 
-                    <div className="flex flex-col min-w-0">
+                    <div className="flex flex-col min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-bold text-white tracking-tight truncate">
                           {source.name}
@@ -593,20 +593,20 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 {/* Bottom Sub-Metrics */}
                 <div className="mt-3 pt-3 border-t border-white/10">
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex flex-col justify-center rounded-2xl bg-white/[0.06] border border-white/[0.16] shadow-sm px-3 py-2">
-                      <span className="text-[11px] font-medium text-slate-400">
+                    <div className="flex flex-col justify-center rounded-2xl bg-white/[0.06] border border-white/[0.16] shadow-sm px-3 py-2 min-w-0">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Movimientos
                       </span>
-                      <span className="mt-0.5 text-sm font-bold text-white">
+                      <span className="mt-0.5 text-sm font-bold text-white truncate">
                         {balanceInfo.transactionCount}
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
+                      <span className="text-[10px] text-slate-400 mt-0.5 truncate">
                         {isBank ? 'Transacciones banco' : 'Movimientos en efectivo'}
                       </span>
                     </div>
 
                     <div className="flex flex-col justify-center rounded-2xl bg-white/[0.06] border border-white/[0.16] shadow-sm px-3 py-2 min-w-0">
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 truncate">
                         Balance Inicial
                       </span>
                       <span className="mt-0.5 text-sm font-bold text-slate-200 truncate">
@@ -627,7 +627,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                   {/* Internal slide indicator in bottom-right corner */}
                   {totalSlides > 1 && (
                     <div className="mt-2.5 flex items-center justify-end">
-                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md">
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.08] light:bg-slate-200/80 border border-white/10 light:border-slate-300 backdrop-blur-md">
                         {Array.from({ length: totalSlides }).map((_, idx) => (
                           <button
                             key={idx}
@@ -639,7 +639,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                             className={`transition-all duration-300 rounded-full cursor-pointer ${
                               activeSlide === idx
                                 ? 'w-4 h-1.5 bg-gradient-to-r from-indigo-400 to-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]'
-                                : 'w-1.5 h-1.5 bg-white/30 hover:bg-white/50'
+                                : 'w-1.5 h-1.5 bg-white/30 light:bg-slate-400/50 hover:bg-white/50 hover:light:bg-slate-600/70'
                             }`}
                             aria-label={`Ir a ${idx === 0 ? 'Patrimonio Neto Total' : sortedSources[idx - 1]?.name}`}
                           />

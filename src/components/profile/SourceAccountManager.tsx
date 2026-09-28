@@ -206,19 +206,19 @@ export const SourceAccountManager: React.FC = () => {
                 </div>
 
                 {/* Middle: Icon & Info */}
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                   <SourceAvatar source={source} size="sm" />
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <span className="text-xs font-bold text-white truncate">
                         {source.name}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded-md bg-white/[0.08] text-[9px] font-semibold text-slate-400 uppercase">
+                      <span className="px-1.5 py-0.2 rounded-md bg-white/[0.08] text-[9px] font-semibold text-slate-400 uppercase flex-shrink-0">
                         {source.institution || (isBank ? 'Banco' : 'Efectivo')}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                      <span>Saldo: <strong className="text-white font-medium">{formatCurrency(balanceInfo.netBalance)}</strong></span>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 truncate">
+                      <span className="truncate">Saldo: <strong className="text-white font-medium">{formatCurrency(balanceInfo.netBalance)}</strong></span>
                     </div>
                   </div>
                 </div>

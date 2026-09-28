@@ -521,6 +521,32 @@ Fluo permite a los usuarios gestionar múltiples orígenes de dinero (cuentas ba
 - Botones de reordenación táctil arriba/abajo que actualizan reactivamente `orderIndex` en el store Zustand y mediante actualización por lotes en Supabase.
 - Modificación de nombre y balance inicial, alta modal de nuevas fuentes y borrado con validación preventiva si existen transacciones asociadas.
 
+---
+
+## 16. Motor Matemático de Ahorro Neto e Inteligencia Analítica (`finance.ts` & `AnalyticsView.tsx`)
+
+Fluo dispone de un subsistema dedicado para cuantificar la capacidad de retención de capital del usuario con métricas absolutas, relativas y proyecciones dinámicas:
+
+### 1. Métricas de Ahorro Neto (`computeSavingsMetrics`)
+- **Importe Ahorrado Neto**:
+  $$\text{NetSavings} = \text{Total Ingresos}_{\text{periodo}} - \text{Total Gastos}_{\text{periodo}}$$
+  Distingue con semántica estricta entre superávit ($\ge 0 €$, esmeralda) y déficit ($< 0 €$, rojo coral).
+- **Tasa de Ahorro Relativa**:
+  $$\text{SavingsRate} = \begin{cases} \left(\frac{\text{NetSavings}}{\text{Ingresos}}\right) \times 100 & \text{si Ingresos} > 0 \\ -100\% & \text{si Ingresos} = 0 \text{ y Gastos} > 0 \\ 0\% & \text{si Ingresos} = 0 \text{ y Gastos} = 0 \end{cases}$$
+- **Ritmo Medio Diario**:
+  $$\text{DailyAverageSavings} = \frac{\text{NetSavings}}{\text{Días Transcurridos del Periodo}}$$
+- **Proyección de Cierre de Mes**:
+  $$\text{MonthEndProjection} = \text{DailyAverageSavings} \times \text{Días Totales del Mes Corriente}$$
+
+### 2. Generador de Series Temporales (`generateSavingsEvolution`)
+- Genera puntos cronológicos para el gráfico de área interactivo con spline `monotone`:
+  - **`this_month`**: Trayectoria diaria acumulada desde el día 1 hasta el día corriente (`now.getDate()`).
+  - **`last_month`**: Serie diaria completa para todos los días del mes anterior cerrado.
+  - **`last_3_months`**: 6 intervalos quincenales continuos con agregación de flujo.
+  - **`last_6_months` / `this_year` / `all`**: Cubos mensuales con suma de ingresos, gastos, ahorro neto puntual y ahorro acumulado continuo.
+- **Línea de Referencia en Cero**: `<ReferenceLine y={0} />` que delimita instantáneamente zonas de acumulación patrimonial frente a periodos de déficit.
+- **Aislamiento Multicuenta**: El cálculo se filtra estrictamente por `activeSourceId`, recalculando el ahorro neto total consolidado o el de una cuenta bancaria / efectivo específico.
+
 
 
 

@@ -107,7 +107,20 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 
 ### 10. Gráficos y Métricas Visuales (`Recharts` adaptado a Liquid Glass)
 - **Contenedores de Gráfico**: `rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl` con línea especular superior `h-px bg-gradient-to-r from-transparent via-white/50 to-transparent`.
-- **Tooltips Flotantes (`GlassTooltip`)**: `rounded-2xl bg-[#0F1626]/95 border border-white/20 p-3 shadow-2xl backdrop-blur-2xl text-xs z-50` con viñetas coloreadas y tipografía de alto contraste.
+- **Tooltips Flotantes (`GlassTooltip` y `SavingsCustomTooltip`)**: `rounded-2xl bg-[#0F1626]/95 border border-white/20 p-3 shadow-2xl backdrop-blur-2xl text-xs z-50` con viñetas coloreadas, badges de estado y tipografía de alto contraste.
+- **Tarjeta Unificada de Ahorro y Balance (`AnalyticsView.tsx`)**:
+  - Superficie Liquid Glass compacta (~160px de altura): `bg-slate-900/60 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]`.
+  - Reflector especular cenital y halo ambiental dinámico (`bg-emerald-500/15` para superávit, `bg-rose-500/15` para déficit).
+  - Insignias semánticas Liquid Glass en cabecera: Tasa de Ahorro (`+42.5% tasa`) y estado con icono `TrendingUp` ("Superávit") o `TrendingDown` ("Déficit").
+  - Importe neto de alto impacto tipográfico: `text-3xl sm:text-4xl font-black` con resplandor neón (`drop-shadow-[0_0_24px_rgba(16,185,129,0.35)]`).
+  - Cuadrícula vítrea integrada de 4 celdas (`grid-cols-2 sm:grid-cols-4`):
+    - *Ingresos*: Total del periodo con flecha diagonal `ArrowUpRight` en verde esmeralda.
+    - *Gastos*: Total del periodo con flecha diagonal `ArrowDownRight` y media diaria `/día`.
+    - *Ritmo Ahorro*: Ahorro medio diario en euros/día (`/d`) según días transcurridos.
+    - *Cierre Mes (Est.)*: Proyección calculada de ahorro al ritmo actual para final de mes.
+- **Hub Analítico con Conmutador de 4 Vistas (`[Ahorro | Categorías | Mensual | Patrimonio]`)**:
+  - Pestaña predeterminada `Ahorro`: Despliega el gráfico interactivo de área (`AreaChart` h-60) con spline `monotone`, gradiente `#savingsAreaGradient`, `<ReferenceLine y={0} />`, conmutador de modo `[Acumulado | Neto]`, tooltip enriquecido `SavingsCustomTooltip` y cinta inferior de 5 pastillas mensuales de superávit/déficit en un solo bloque no invasivo.
+  - Elimina redundancias de tarjetas apiladas intermedias, reduciendo la altura vertical de la página de ~1.550px a ~880px para una navegación ligera y óptima en móviles.
 - **Gráfico de Dona (Distribución de Gastos)**:
   - Centro hueco (`innerRadius={68}`, `outerRadius={92}`).
   - Contador central en doble capa tipográfica ("Total Gastado" + importe en `text-lg font-black text-white`).
@@ -243,6 +256,23 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 - **Contención Vertical Dinámica (`max-h-[92dvh] overflow-y-auto`)**:
   - Contenedor con soporte dinámico de viewport móvil (`max-h-[92dvh]`) y desplazamiento con inercia sin scrollbar visible (`no-scrollbar`), previniendo desbordamientos verticales en pantallas de teléfonos móviles (como el Honor Magic 6 Pro con barras de navegación activas) cuando se selecciona "Cuenta Bancaria" y emergen campos adicionales de entidad y botones de selección rápida.
   - Ajuste ergonómico en proporciones de icono central, textos, inputs compactados y botón de envío principal siempre visible y accesible.
+
+### 21. Reglas Anti-Solapamiento y Sistema de Alto Contraste en Modo Claro
+- **Normas de Disposición Tipográfica Anti-Solapamiento**:
+  - **Flexbox Bounded Children**: Todo bloque con hijos dinámicos adyacentes a botones de acción, iconos o importes monetarios debe implementar `min-w-0 flex-1 mr-2` en el contenedor de texto.
+  - **Truncado Asistido**: Propiedad `truncate block` en títulos, conceptos, nombres de fuentes bancarias y etiquetas de categorías para asegurar un recorte limpio con puntos suspensivos sin empujar ni deformar componentes vecinos en resoluciones ultraestrechas (<380px).
+  - **Inmutabilidad de Importes Numéricos**: Todos los valores de moneda, porcentajes y fechas relativas en el extremo derecho incorporan `flex-shrink-0 whitespace-nowrap text-right`, garantizando que jamás se dividan en múltiples líneas ni sean solapados por textos largos.
+- **Mapeo Universal de Contraste en Modo Claro (`src/index.css`)**:
+  - **Superficies Ahumadas Invertidas**: Elementos con `bg-slate-800/60`, `bg-slate-800/80`, `bg-slate-900/85`, `bg-slate-900/95` y `bg-slate-900` se transforman en cristal blanco perla (`rgba(255, 255, 255, 0.92-0.95)` con borde `rgba(203, 213, 225, 0.85)` y sombra suave `rgba(15, 23, 42, 0.08)`), eliminando parches oscuros y evitando texto oscuro sobre fondo oscuro en el botón de perfil o modal de ajustes.
+  - **Colores Semánticos Pilares Calibrados (WCAG AA/AAA > 5.5:1)**:
+    - *Ingresos*: `.text-emerald-400`, `.text-emerald-500` -> `#047857` (Emerald 700).
+    - *Gastos*: `.text-rose-400`, `.text-rose-500` -> `#BE123C` (Rose 700).
+    - *Inversión*: `.text-indigo-400`, `.text-indigo-500` -> `#4338CA` (Indigo 700).
+    - *Avisos / Alertas*: `.text-amber-400`, `.text-amber-500` -> `#B45309` (Amber 700).
+    - *Secundarios*: `.text-blue-400` -> `#1D4ED8`, `.text-purple-400` -> `#6D28D9`, `.text-teal-400` -> `#0F766E`.
+  - **Fondos de Insignias y Píldoras**: Mapeo sistemático de `[class*="bg-*-500/10"]`, `/15`, `/20` y `/25` a fondos tintados legibles con bordes a juego (`rgba(..., 0.12-0.14)`).
+  - **Filtro de Resplandores Neón**: Neutralización de `drop-shadow-[0_0_...]` en modo claro (`filter: none !important`), evitando que las sombras de halo oscuro manchen la tipografía sobre fondos blancos o perlados.
+  - **Indicadores de Diapositiva (`HeroBalance`)**: Cápsula exterior `light:bg-slate-200/80 light:border-slate-300` y puntos inactivos `light:bg-slate-400/50 hover:light:bg-slate-600/70` con contraste óptimo en modo claro.
 
 ---
 

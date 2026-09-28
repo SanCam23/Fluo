@@ -35,6 +35,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Onboarding Limpio a Cero (Zero-State)** | ✅ Completado | Estado inicial a 0 € para cuentas nuevas sin filtración de datos demo; empty states Liquid Glass en Home, Inversiones y Estadísticas |
 | **Centro de Control de Cuenta & Perfil** | ✅ Completado | Avatar flotante en cabecera, `ProfileSettingsModal`, gestión de PIN y WebAuthn, cambio de contraseña Supabase y borrado GDPR (`delete_user_account`) |
 | **Sistema Multicuenta & Carrusel de Fuentes** | ✅ Completado | Gestión de orígenes de dinero (bancos/efectivo), carrusel scroll-snap a 120fps en `HeroBalance.tsx`, onboarding obligatorio, vinculación `sourceId` y reordenación en ajustes |
+| **Importe Ahorrado & Evolución (/stats)** | ✅ Completado | Tarjeta destacada Liquid Glass con Ahorro Neto Real, Tasa, Ritmo Diario, Proyección Cierre, Gráfico de Área interactivo y reactividad multicuenta |
 
 ---
 
@@ -545,6 +546,73 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - 3 nuevos tests en [`sourceAccounts.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/sourceAccounts.test.ts) validando que `setUserId` no borre fuentes en el arranque en frío, preserve fuentes ante llamadas repetidas y solo purgue al cambiar entre usuarios distintos.
   - Suite global incrementada a **44 tests unitarios pasando al 100%**.
 - **Validación de Compilación**: `npx tsc -b` limpio (0 errores), `vitest run` (44/44 pasando) y build de producción optimizado (`npm run build`).
+
+### v0.9.4 (Módulo de Importe Ahorrado, Métricas Absolutas y Evolución Gráfica en Estadísticas)
+- **Tarjeta Maestra de Ahorro Neto Real ([`AnalyticsView.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/analytics/AnalyticsView.tsx))**:
+  - Contenedor interactivo Liquid Glass (`bg-slate-900/60 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 sm:p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]`) situado de forma prominente en la cabecera analítica tras los selectores.
+  - Reflector especular superior y orbe ambiental dinámico (`bg-emerald-500/15` para superávit, `bg-rose-500/15` para déficit).
+  - Insignia semántica Liquid Glass con iconos `TrendingUp` ("Superávit") o `TrendingDown` ("Déficit").
+  - Importe neto de alto impacto tipográfico (`text-3xl sm:text-4xl font-black`) con formato de divisa y resplandor neón esmeralda/coral.
+  - Desglose secundario en cuadrícula de 3 celdas:
+    - *Tasa de Ahorro*: Porcentaje relativo sobre los ingresos (`(netSavings / income) * 100`).
+    - *Ahorro Medio Diario*: Ritmo diario de acumulación según días transcurridos (`/d`).
+    - *Proyección de Cierre de Mes*: Estimación del ahorro final mensual al ritmo actual de gasto e ingreso.
+- **Gráfico de Evolución del Ahorro Acumulado**:
+  - Gráfico de área interactivo con spline `monotone`, gradiente esmeralda/coral `#savingsAreaGradient` (25% a 0%), `<ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />` y conmutador `[Acumulado | Neto]`.
+  - Tooltip Liquid Glass (`SavingsCustomTooltip`) con desenfoque `backdrop-blur-xl bg-[#0F1626]/95 border border-white/20`, viñeta semántica y desglose punto a punto de ingresos, gastos, ahorro neto puntual y ahorro acumulado.
+- **Motor Matemático de Ahorro ([`src/utils/finance.ts`](file:///c:/Users/Santino/Documents/Fluo/src/utils/finance.ts))**:
+  - `computeSavingsMetrics`: cálculo seguro y normalizado de superávit, déficit, ritmos diarios y proyecciones.
+  - `generateSavingsEvolution`: generador de series temporales continuas adaptable dinámicamente a todos los rangos (`this_month`, `last_month`, `last_3_months`, `last_6_months`, `this_year`, `all`).
+- **Aislamiento Multicuenta Total**:
+  - Reactividad instantánea al alternar entre el patrimonio consolidado o cuentas bancarias y de efectivo específicas.
+- **Pestaña "Ahorro" en Switcher Analítico**:
+  - Integrada la vista detallada de ahorro mensual comparativo en el conmutador de gráficos (`categories | comparison | savings | networth`).
+- **Suite de Tests Automatizados (Vitest)**:
+  - Creado [`src/utils/finance.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/utils/finance.test.ts) con 9 pruebas unitarias cubriendo cálculos de superávit, déficit, casos sin ingresos (-100% de déficit con ahorro negativo exacto al gasto), proyecciones y series temporales.
+  - Suite global incrementada a **53 tests unitarios pasando al 100%**.
+- **Validación de Compilación**: `npx tsc -b` limpio (0 errores) y build de producción optimizado (`npm run build`).
+
+### v0.9.5 (Optimización Ergonómica de Estadísticas y Compactación de Scroll)
+- **Unificación en Tarjeta Hero Compacta ([`AnalyticsView.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/analytics/AnalyticsView.tsx))**:
+  - Se fusionaron la tarjeta de ahorro y la fila separada de 3 KPIs en una sola **Tarjeta de Resumen y Balance** de ~160px de altura.
+  - Insignias de *Superávit/Déficit* y *Tasa de Ahorro %* en la cabecera.
+  - Tira integrada de 4 celdas micro-vítreas: *Ingresos*, *Gastos* (con media diaria), *Ritmo Diario de Ahorro* y *Proyección de Cierre de Mes*.
+- **Hub de Visualización con Switcher Inteligente**:
+  - Reubicado el gráfico de área interactivo de Evolución del Ahorro (`AreaChart` con spline `monotone`, toggle Acumulado/Neto, línea 0€ y resumen mensual en pastillas) en la pestaña `'savings'`, activa por defecto al abrir Estadísticas.
+  - Se eliminó la duplicidad de gráficos apilados y listas redundantes, permitiendo alternar fluidamente entre `Ahorro`, `Categorías`, `Flujo Mensual` y `Patrimonio`.
+  - Reducción de más de 650px de altura vertical total en la página (de ~1.550px a ~880px), eliminando el scroll infinito y adaptándose perfectamente a pantallas móviles.
+- **Validación & Pruebas**: 53 tests unitarios pasando al 100%, 0 errores de compilación (`npx tsc -b`) y build de producción verificado con éxito.
+
+### v0.9.6 (Revisión Exhaustiva Anti-Solapamiento Tipográfico & Contraste Modo Claro)
+- **Corrección Integral del Contraste en Modo Claro ("Blanco Perla iOS")**:
+  - **Botón de Perfil y Acciones de Cabecera ([`App.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/App.tsx))**:
+    - Se resolvió el problema del icono de perfil oscuro sobre fondo oscuro: añadido fondo perla explícito `light:bg-white/90`, borde sutil `light:border-slate-300/80`, sombra limpia y contraste tipográfico nítido (`light:text-indigo-600` para iniciales y `light:text-slate-700` para icono `User`).
+    - Borde del indicador de estado adaptado a `light:border-[#F1F5F9]`.
+    - Botón de bloqueo PIN y botón de simulador con variantes luminosas de alta visibilidad (`light:bg-white/90`, `light:text-slate-700`, `light:bg-indigo-50`, `light:border-indigo-200`).
+  - **Mapeo Global en [`src/index.css`](file:///c:/Users/Santino/Documents/Fluo/src/index.css)**:
+    - Adición de reglas para `.bg-slate-800/*` y `.bg-slate-900/*` en modo claro para que cualquier superficie ahumada se convierta automáticamente en cristal blanco translúcido (`rgba(255, 255, 255, 0.92-0.95)`).
+    - Calibración de colores semánticos con contraste WCAG AA/AAA (>5.5:1): `.text-emerald-400/500` -> `#047857`, `.text-rose-400/500` -> `#BE123C`, `.text-indigo-400/500` -> `#4338CA`, `.text-amber-400/500` -> `#B45309`, `.text-blue-400/500` -> `#1D4ED8`.
+    - Mapeo de fondos de insignias y píldoras con opacidad enriquecida y bordes a juego (`bg-*-500/10`, `/15`, `/20`, `/25`).
+    - Supresión de resplandores neón en tipografía clara con `html.light [class*="drop-shadow-[0_0_"] { filter: none !important; }`.
+    - Fondos de modales y hojas flotantes (`bg-slate-900/95`, `bg-[#0F1626]/95`) con fondo de cristal blanco y overlays con oscurecimiento suave (`rgba(15, 23, 42, 0.45)`).
+  - **Indicadores de Diapositiva en Carrusel ([`HeroBalance.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/HeroBalance.tsx))**:
+    - Contenedor con `light:bg-slate-200/80 light:border-slate-300` y puntos inactivos en `light:bg-slate-400/50 hover:light:bg-slate-600/70`, garantizando perfecta legibilidad en fondos blancos.
+- **Prevención Global de Superposiciones y Colisiones Tipográficas (Anti-Overlap)**:
+  - **Carrusel de Balance ([`HeroBalance.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/HeroBalance.tsx))**:
+    - `min-w-0` y `truncate` en todas las submétricas (Tasa de ahorro, Rendimiento, Gastos e Ingresos recurrentes, P&L de inversión, balance inicial y conteo de movimientos).
+    - Encabezados de cuenta con `min-w-0 flex-1 mr-2` para evitar colisiones con el botón de privacidad.
+  - **Pillars de Métricas ([`MetricPillars.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/MetricPillars.tsx))**:
+    - Inclusión de `min-w-0` en los 3 botones de cuadrícula y `truncate` en títulos, números y subtítulos para evitar desbordamientos en terminales móviles de 360px.
+  - **Estadísticas & Gráficos ([`AnalyticsView.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/analytics/AnalyticsView.tsx))**:
+    - `min-w-0 flex-1` y `truncate` en títulos de Evolución del Ahorro, Distribución de Gastos, Flujo Mensual Comparativo, Evolución de Patrimonio y Comercios & Marcas Top.
+    - Leyenda de dona y lista de marcas con `min-w-0 flex-1` en nombres y `flex-shrink-0 whitespace-nowrap` en importes monetarios.
+    - Cuadrícula de 5 meses con `min-w-0` y `truncate` en todas las pastillas mensuales de superávit/déficit.
+  - **Gestor de Cuentas ([`SourceAccountManager.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/profile/SourceAccountManager.tsx))**:
+    - Nombres de cuentas con `min-w-0 flex-1 mr-2`, truncado y `flex-shrink-0` en etiquetas de entidad.
+- **Validación de Calidad**:
+  - Compilación TypeScript: `npx tsc -b` (0 errores).
+  - Tests automatizados: 53 tests pasando en Vitest (6 suites).
+  - Build de producción: `npm run build` generado y optimizado con gzip y brotli.
 
 ---
 

@@ -225,19 +225,19 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
         {/* 1. Header Row & Close Button */}
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-500/30 via-indigo-600/20 to-emerald-500/20 border border-white/20 flex items-center justify-center text-xl font-black text-white shadow-inner">
-              {user ? userInitial : <User className="h-6 w-6 text-indigo-300" />}
+          <div className="flex items-center gap-3.5 min-w-0 flex-1 mr-2">
+            <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-500/30 via-indigo-600/20 to-emerald-500/20 light:from-indigo-100 light:via-indigo-50 light:to-emerald-50 border border-white/20 light:border-indigo-200 flex items-center justify-center text-xl font-black text-white light:text-indigo-700 shadow-inner flex-shrink-0">
+              {user ? userInitial : <User className="h-6 w-6 text-indigo-300 light:text-indigo-600" />}
               <span
-                className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
+                className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 light:border-white ${
                   user
                     ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
                     : 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
                 }`}
               />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-white tracking-tight">
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-white light:text-slate-900 tracking-tight truncate block">
                 {user ? user.email : 'Modo Demostración'}
               </span>
               <div className="mt-1">
@@ -259,7 +259,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+            className="p-2 rounded-full bg-white/[0.06] light:bg-slate-100 hover:bg-white/[0.12] hover:light:bg-slate-200 border border-white/10 light:border-slate-200 text-slate-400 light:text-slate-600 hover:text-white hover:light:text-slate-900 transition-all cursor-pointer flex-shrink-0"
             aria-label="Cerrar ventana"
           >
             <X className="h-4 w-4" />
@@ -308,14 +308,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
             Personaliza el entorno visual de Fluo. El modo claro utiliza la estética Blanco Perla iOS con cristal refractivo.
           </p>
 
-          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/10">
+          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/[0.04] light:bg-slate-100 border border-white/10 light:border-slate-200">
             <button
               type="button"
               onClick={() => setThemeMode('light')}
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'light'
-                  ? 'bg-white text-slate-900 shadow-md border border-white font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                  ? 'bg-white text-slate-900 shadow-md border border-white light:border-slate-200 font-bold'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
               }`}
             >
               <Sun className={`h-3.5 w-3.5 ${themeMode === 'light' ? 'text-amber-500' : ''}`} />
@@ -327,8 +327,8 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               onClick={() => setThemeMode('dark')}
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'dark'
-                  ? 'bg-white/15 text-white shadow-md border border-white/20 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                  ? 'bg-white/15 light:bg-white light:text-slate-900 text-white shadow-md border border-white/20 light:border-slate-200 font-bold'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
               }`}
             >
               <Moon className={`h-3.5 w-3.5 ${themeMode === 'dark' ? 'text-indigo-400' : ''}`} />
@@ -340,8 +340,8 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               onClick={() => setThemeMode('system')}
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'system'
-                  ? 'bg-white/15 text-white shadow-md border border-white/20 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                  ? 'bg-white/15 light:bg-white light:text-slate-900 text-white shadow-md border border-white/20 light:border-slate-200 font-bold'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
               }`}
             >
               <Monitor className={`h-3.5 w-3.5 ${themeMode === 'system' ? 'text-emerald-400' : ''}`} />

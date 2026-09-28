@@ -135,8 +135,8 @@ export default function App() {
   return (
     <MobileContainer activePillar={activeTab === 'home' ? selectedPillar : 'all'}>
       {/* Top Mobile Bar */}
-      <header className="flex items-center justify-between mb-5 px-1">
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between mb-5 px-1 gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <img
             src="/fluo-wordmark.png"
             alt="Fluo"
@@ -145,14 +145,14 @@ export default function App() {
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Cloud Sync indicator */}
           {isCloudLoading && (
             <div
-              className="flex items-center gap-1 text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 animate-pulse"
+              className="flex items-center gap-1 text-[11px] text-indigo-400 light:text-indigo-600 bg-indigo-500/10 light:bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-500/20 light:border-indigo-200 animate-pulse flex-shrink-0"
               title="Sincronizando con Supabase..."
             >
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
               <span className="hidden sm:inline">Sync</span>
             </div>
           )}
@@ -162,17 +162,17 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsSimulatorOpen(true)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md flex-shrink-0 ${
                 simulatedTimeOffsetDays > 0
-                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 light:bg-amber-50 light:border-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 light:text-indigo-700 light:bg-indigo-50 light:border-indigo-200 border-indigo-500/30'
               }`}
               title="Simulador de Tiempo y Recurrencias"
             >
-              <FastForward className="h-3 w-3" />
-              <span>Simular</span>
+              <FastForward className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">Simular</span>
               {simulatedTimeOffsetDays > 0 && (
-                <span className="text-[10px] font-bold text-amber-200">
+                <span className="text-[10px] font-bold text-amber-200 light:text-amber-900 flex-shrink-0">
                   +{simulatedTimeOffsetDays}d
                 </span>
               )}
@@ -191,16 +191,16 @@ export default function App() {
             }}
             className={`p-2 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
               hasPin
-                ? 'bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/12'
-                : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border-indigo-500/30'
+                ? 'bg-white/[0.08] light:bg-white/90 hover:bg-white/[0.14] hover:light:bg-white text-slate-300 light:text-slate-700 hover:text-white hover:light:text-slate-900 border-white/12 light:border-slate-300/80 shadow-sm'
+                : 'bg-indigo-500/15 light:bg-indigo-50 hover:bg-indigo-500/25 text-indigo-300 light:text-indigo-700 border-indigo-500/30 light:border-indigo-200'
             }`}
             title={hasPin ? 'Bloquear Fluo ahora' : 'Configurar PIN de seguridad (4 dígitos)'}
             aria-label={hasPin ? 'Bloquear Fluo' : 'Configurar PIN'}
           >
             {hasPin ? (
-              <Lock className="h-3.5 w-3.5 text-slate-300" />
+              <Lock className="h-3.5 w-3.5 text-slate-300 light:text-slate-700" />
             ) : (
-              <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+              <ShieldCheck className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600" />
             )}
           </button>
 
@@ -208,20 +208,20 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsProfileModalOpen(true)}
-            className="relative w-10 h-10 rounded-full bg-slate-800/60 backdrop-blur-xl border border-white/15 flex items-center justify-center hover:bg-slate-700/60 transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-95 group"
+            className="relative w-10 h-10 rounded-full bg-slate-800/60 light:bg-white/90 backdrop-blur-xl border border-white/15 light:border-slate-300/80 flex items-center justify-center hover:bg-slate-700/60 hover:light:bg-white transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] light:shadow-[0_2px_8px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 group"
             title={user ? `Cuenta: ${user.email} (Perfil y Seguridad)` : 'Modo Demostración — Perfil y Ajustes'}
             aria-label="Perfil y Ajustes de Cuenta"
           >
             {user?.email ? (
-              <span className="text-base sm:text-lg font-black text-white group-hover:text-indigo-200 transition-colors uppercase leading-none">
+              <span className="text-base sm:text-lg font-black text-white light:text-indigo-600 group-hover:text-indigo-200 group-hover:light:text-indigo-700 transition-colors uppercase leading-none">
                 {user.email.charAt(0)}
               </span>
             ) : (
-              <User className="h-5 w-5 text-slate-300 group-hover:text-white transition-colors" />
+              <User className="h-5 w-5 text-slate-300 light:text-slate-700 group-hover:text-white group-hover:light:text-indigo-600 transition-colors" />
             )}
             {/* Status dot indicator */}
             <span
-              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0B0F19] ${
+              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0B0F19] light:border-[#F1F5F9] ${
                 user
                   ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
                   : 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]'

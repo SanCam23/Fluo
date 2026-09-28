@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
   TrendingUp,
+  TrendingDown,
   Layers,
   ArrowUpRight,
   ArrowDownRight,
   PieChart as PieIcon,
   BarChart3,
   Flame,
+  PiggyBank,
 } from 'lucide-react';
 import {
   PieChart,
@@ -20,12 +22,18 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  ReferenceLine,
 } from 'recharts';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { TimeRangeFilter } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
 import { SourceAvatar } from '../common/SourceAvatar';
 import { formatCurrency, formatCompactCurrency } from '../../utils/currency';
+import {
+  computeSavingsMetrics,
+  generateSavingsEvolution,
+  type SavingsEvolutionPoint,
+} from '../../utils/finance';
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -41,8 +49,8 @@ interface CustomTooltipProps {
 const GlassTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-2xl bg-[#0F1626]/95 border border-white/20 p-3 shadow-2xl backdrop-blur-2xl text-xs flex flex-col gap-1.5 z-50">
-        {label && <span className="font-bold text-slate-300">{label}</span>}
+      <div className="rounded-2xl bg-[#0F1626]/95 light:bg-white/95 border border-white/20 light:border-slate-300/80 p-3 shadow-2xl backdrop-blur-2xl text-xs flex flex-col gap-1.5 z-50">
+        {label && <span className="font-bold text-slate-300 light:text-slate-800">{label}</span>}
         {payload.map((entry, idx) => (
           <div key={idx} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
@@ -50,11 +58,70 @@ const GlassTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) 
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: entry.color || entry.fill }}
               />
-              <span className="text-slate-300">{entry.name}:</span>
+              <span className="text-slate-300 light:text-slate-600">{entry.name}:</span>
             </div>
-            <span className="font-bold text-white">{formatCurrency(entry.value ?? 0)}</span>
+            <span className="font-bold text-white light:text-slate-900">{formatCurrency(entry.value ?? 0)}</span>
           </div>
         ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+interface SavingsCustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload?: SavingsEvolutionPoint;
+  }>;
+  label?: string;
+}
+
+const SavingsCustomTooltip: React.FC<SavingsCustomTooltipProps> = ({ active, payload }) => {
+  if (active && payload && payload.length && payload[0]?.payload) {
+    const data = payload[0].payload;
+    const isNetPositive = data.netSavings >= 0;
+    const isAccPositive = data.accumulatedSavings >= 0;
+
+    return (
+      <div className="rounded-2xl bg-[#0F1626]/95 light:bg-white/95 border border-white/20 light:border-slate-300/80 p-3 shadow-2xl backdrop-blur-2xl text-xs flex flex-col gap-2 z-50 min-w-[170px]">
+        <div className="flex items-center justify-between border-b border-white/10 light:border-slate-200 pb-1.5">
+          <span className="font-bold text-slate-200 light:text-slate-800">{data.label}</span>
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+              isNetPositive
+                ? 'bg-emerald-500/15 text-emerald-400 light:text-emerald-700 light:bg-emerald-50 light:border-emerald-200 border-emerald-500/30'
+                : 'bg-rose-500/15 text-rose-400 light:text-rose-700 light:bg-rose-50 light:border-rose-200 border-rose-500/30'
+            }`}
+          >
+            {isNetPositive ? 'Superávit' : 'Déficit'}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-1 text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 light:text-slate-600">Ingresos:</span>
+            <span className="font-semibold text-emerald-400 light:text-emerald-700">+{formatCurrency(data.income)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 light:text-slate-600">Gastos:</span>
+            <span className="font-semibold text-rose-400 light:text-rose-700">-{formatCurrency(data.expense)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-white/10 light:border-slate-200 pt-1">
+            <span className="text-slate-300 light:text-slate-700 font-medium">Ahorro Neto:</span>
+            <span className={`font-bold ${isNetPositive ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'}`}>
+              {data.netSavings >= 0 ? '+' : ''}
+              {formatCurrency(data.netSavings)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 light:text-slate-600">Acumulado:</span>
+            <span className={`font-bold ${isAccPositive ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'}`}>
+              {data.accumulatedSavings >= 0 ? '+' : ''}
+              {formatCurrency(data.accumulatedSavings)}
+            </span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -72,7 +139,8 @@ export const AnalyticsView: React.FC = () => {
   const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const setActiveSourceId = useFinanceStore((state) => state.setActiveSourceId);
 
-  const [activeChartSection, setActiveChartSection] = useState<'categories' | 'comparison' | 'networth'>('categories');
+  const [activeChartSection, setActiveChartSection] = useState<'savings' | 'categories' | 'comparison' | 'networth'>('savings');
+  const [savingsChartMode, setSavingsChartMode] = useState<'accumulated' | 'net'>('accumulated');
 
   const activeSource = useMemo(
     () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
@@ -99,7 +167,6 @@ export const AnalyticsView: React.FC = () => {
   const {
     periodIncome,
     periodExpense,
-    periodInvest,
     expensesByCategory,
     expensesByBrand,
     daysInPeriod,
@@ -187,9 +254,20 @@ export const AnalyticsView: React.FC = () => {
     };
   }, [sourceScopedTransactions, timeRange]);
 
+  // Dedicated Absolute Savings Metrics
+  const savingsMetrics = useMemo(
+    () => computeSavingsMetrics(periodIncome, periodExpense, daysInPeriod),
+    [periodIncome, periodExpense, daysInPeriod]
+  );
+
+  // Time-Series Savings Evolution for AreaChart
+  const savingsEvolutionData = useMemo(
+    () => generateSavingsEvolution(sourceScopedTransactions, timeRange),
+    [sourceScopedTransactions, timeRange]
+  );
+
   // KPI 1: Savings rate
-  const periodSavingsRate =
-    periodIncome > 0 ? Math.max(0, ((periodIncome - periodExpense) / periodIncome) * 100) : 0;
+  const periodSavingsRate = savingsMetrics.savingsRate;
 
   // KPI 2: Daily average spend
   const dailyAverageSpend = periodExpense / daysInPeriod;
@@ -332,11 +410,11 @@ export const AnalyticsView: React.FC = () => {
             onClick={() => setActiveSourceId(null)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
               activeSourceId === null
-                ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold'
-                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+                ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold light:bg-indigo-600 light:text-white light:border-indigo-600 light:shadow-sm'
+                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10 light:bg-white/90 light:text-slate-700 light:border-slate-300/80 hover:light:bg-white'
             }`}
           >
-            <Layers className="h-3 w-3 text-indigo-400" />
+            <Layers className="h-3 w-3 text-indigo-400 light:text-indigo-300" />
             <span>Patrimonio Total (Global)</span>
           </button>
 
@@ -349,8 +427,8 @@ export const AnalyticsView: React.FC = () => {
                 onClick={() => setActiveSourceId(s.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
                   isSelected
-                    ? 'bg-indigo-600/30 text-white border border-indigo-400/40 shadow-md font-bold'
-                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+                    ? 'bg-indigo-600/30 text-white border border-indigo-400/40 shadow-md font-bold light:bg-indigo-600 light:text-white light:border-indigo-600 light:shadow-sm'
+                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10 light:bg-white/90 light:text-slate-700 light:border-slate-300/80 hover:light:bg-white'
                 }`}
               >
                 <SourceAvatar source={s} size="xs" />
@@ -372,8 +450,8 @@ export const AnalyticsView: React.FC = () => {
               onClick={() => setTimeRange(opt.range)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
                 isSelected
-                  ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold'
-                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+                  ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold light:bg-indigo-600 light:text-white light:border-indigo-600 light:shadow-sm'
+                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10 light:bg-white/90 light:text-slate-700 light:border-slate-300/80 hover:light:bg-white'
               }`}
             >
               {opt.label}
@@ -382,76 +460,192 @@ export const AnalyticsView: React.FC = () => {
         })}
       </div>
 
-      {/* 2. Top KPI Cards Grid (Liquid Glass - Ingresos, Gastos, Inversiones) */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-        {/* 1. Ingresos */}
-        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-400 light:text-emerald-700">
-            <span>Ingresos</span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400 light:text-emerald-600 flex-shrink-0" />
-          </div>
-          <div className="mt-0.5">
-            <span className="text-[14px] sm:text-base font-extrabold text-emerald-400 light:text-emerald-700 block leading-tight tracking-tight whitespace-nowrap">
-              +{formatCompactCurrency(periodIncome)}
-            </span>
-            <span className="text-[10px] text-slate-400 light:text-slate-600 font-medium block truncate mt-0.5">
-              {periodSavingsRate.toFixed(0)}% ahorro
-            </span>
-          </div>
-        </div>
+      {/* 2. UNIFIED MASTER SAVINGS & BALANCE HERO CARD (Liquid Glass) */}
+      <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3.5 relative overflow-hidden transition-all duration-300">
+        {/* Specular Top Reflection */}
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 light:via-white/90 to-transparent" />
 
-        {/* 2. Gastos */}
-        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-rose-400 light:text-rose-700">
-            <span>Gastos</span>
-            <ArrowDownRight className="h-3.5 w-3.5 text-rose-400 light:text-rose-600 flex-shrink-0" />
-          </div>
-          <div className="mt-0.5">
-            <span className="text-[14px] sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight tracking-tight whitespace-nowrap">
-              -{formatCompactCurrency(periodExpense)}
-            </span>
-            <span className="text-[10px] text-slate-400 light:text-slate-600 font-medium block truncate mt-0.5">
-              {formatCompactCurrency(dailyAverageSpend)}/día
-            </span>
-          </div>
-        </div>
+        {/* Ambient Halo Glow */}
+        <div
+          className={`pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl transition-colors duration-500 ${
+            savingsMetrics.isPositive ? 'bg-emerald-500/15 light:bg-emerald-500/10' : 'bg-rose-500/15 light:bg-rose-500/10'
+          }`}
+        />
 
-        {/* 3. Inversiones */}
-        <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-400 light:text-indigo-700">
-            <span>{activeSource ? 'Aportado' : 'Inversiones'}</span>
-            <TrendingUp className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600 flex-shrink-0" />
-          </div>
-          <div className="mt-0.5">
-            <span className="text-[14px] sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight tracking-tight whitespace-nowrap">
-              {formatCompactCurrency(activeSource ? periodInvest : portfolioPerformance.portfolioMarketValue)}
-            </span>
-            <span
-              className={`text-[10px] font-semibold block truncate mt-0.5 ${
-                activeSource
-                  ? 'text-indigo-400 light:text-indigo-700'
-                  : portfolioPerformance.roi >= 0
-                  ? 'text-indigo-400 light:text-indigo-700'
-                  : 'text-rose-400 light:text-rose-700'
+        {/* Top Header: Account + Status Badges */}
+        <div className="flex items-center justify-between relative z-10 gap-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+            <div
+              className={`h-9 w-9 rounded-2xl flex items-center justify-center border shadow-inner transition-colors flex-shrink-0 ${
+                savingsMetrics.isPositive
+                  ? 'bg-emerald-500/20 light:bg-emerald-50 border-emerald-500/35 light:border-emerald-200 text-emerald-400 light:text-emerald-700'
+                  : 'bg-rose-500/20 light:bg-rose-50 border-rose-500/35 light:border-rose-200 text-rose-400 light:text-rose-700'
               }`}
             >
-              {activeSource
-                ? 'Salidas a inversión'
-                : `${portfolioPerformance.roi >= 0 ? '+' : ''}${portfolioPerformance.roi.toFixed(1)}% ROI`}
+              <PiggyBank className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 light:text-slate-500 uppercase tracking-widest block truncate">
+                Ahorro Neto Real
+              </span>
+              <span className="text-xs text-slate-200 light:text-slate-800 font-semibold truncate block">
+                {activeSource ? `Cuenta: ${activeSource.name}` : 'Patrimonio Consolidado'}
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic Status Badges (Superávit/Déficit + Savings Rate) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border backdrop-blur-md transition-all whitespace-nowrap ${
+                savingsMetrics.isPositive
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200'
+                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30 light:bg-rose-50 light:text-rose-700 light:border-rose-200'
+              }`}
+            >
+              {savingsMetrics.savingsRate >= 0 ? '+' : ''}
+              {savingsMetrics.savingsRate.toFixed(1)}% tasa
             </span>
+
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border backdrop-blur-md transition-all whitespace-nowrap ${
+                savingsMetrics.isPositive
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)] light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 light:shadow-none'
+                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)] light:bg-rose-50 light:text-rose-700 light:border-rose-200 light:shadow-none'
+              }`}
+            >
+              {savingsMetrics.isPositive ? (
+                <>
+                  <TrendingUp className="h-3 w-3" />
+                  <span>Superávit</span>
+                </>
+              ) : (
+                <>
+                  <TrendingDown className="h-3 w-3" />
+                  <span>Déficit</span>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Main Absolute Savings Amount */}
+        <div className="relative z-10">
+          <div
+            className={`text-3xl sm:text-4xl font-black tracking-tight leading-tight transition-colors ${
+              savingsMetrics.isPositive
+                ? 'text-emerald-400 light:text-emerald-600 drop-shadow-[0_0_24px_rgba(16,185,129,0.35)] light:drop-shadow-none'
+                : 'text-rose-400 light:text-rose-600 drop-shadow-[0_0_24px_rgba(244,63,94,0.35)] light:drop-shadow-none'
+            }`}
+          >
+            {savingsMetrics.netSavings >= 0 ? '+' : ''}
+            {formatCurrency(savingsMetrics.netSavings)}
+          </div>
+          <p className="text-[11px] text-slate-400 light:text-slate-500 mt-0.5">
+            {savingsMetrics.netSavings >= 0
+              ? 'Diferencia neta positiva retenida tras cubrir los gastos del periodo'
+              : 'Los gastos han superado a los ingresos registrados en este periodo'}
+          </p>
+        </div>
+
+        {/* Integrated 4-column metric strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-white/10 light:border-slate-200/80 relative z-10">
+          {/* 1. Ingresos */}
+          <div className="p-2.5 rounded-2xl bg-white/[0.04] light:bg-white/80 border border-white/10 light:border-slate-200/80 flex flex-col justify-between min-w-0">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 light:text-slate-500 font-medium">
+              <span className="truncate">Ingresos</span>
+              <ArrowUpRight className="h-3 w-3 text-emerald-400 light:text-emerald-600 flex-shrink-0" />
+            </div>
+            <div className="mt-1 min-w-0">
+              <span className="text-sm sm:text-base font-extrabold text-emerald-400 light:text-emerald-600 block leading-tight truncate">
+                +{formatCompactCurrency(periodIncome)}
+              </span>
+              <span className="text-[9px] text-slate-500 light:text-slate-500 font-medium block truncate mt-0.5">
+                en el periodo
+              </span>
+            </div>
+          </div>
+
+          {/* 2. Gastos */}
+          <div className="p-2.5 rounded-2xl bg-white/[0.04] light:bg-white/80 border border-white/10 light:border-slate-200/80 flex flex-col justify-between min-w-0">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 light:text-slate-500 font-medium">
+              <span className="truncate">Gastos</span>
+              <ArrowDownRight className="h-3 w-3 text-rose-400 light:text-rose-600 flex-shrink-0" />
+            </div>
+            <div className="mt-1 min-w-0">
+              <span className="text-sm sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight truncate">
+                -{formatCompactCurrency(periodExpense)}
+              </span>
+              <span className="text-[9px] text-slate-500 light:text-slate-500 font-medium block truncate mt-0.5">
+                {formatCompactCurrency(dailyAverageSpend)}/día
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Ritmo Diario */}
+          <div className="p-2.5 rounded-2xl bg-white/[0.04] light:bg-white/80 border border-white/10 light:border-slate-200/80 flex flex-col justify-between min-w-0">
+            <span className="text-[10px] text-slate-400 light:text-slate-500 font-medium block truncate">
+              Ritmo Ahorro
+            </span>
+            <div className="mt-1 min-w-0">
+              <span
+                className={`text-sm sm:text-base font-extrabold block leading-tight truncate ${
+                  savingsMetrics.dailyAverageSavings >= 0 ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
+                }`}
+              >
+                {savingsMetrics.dailyAverageSavings >= 0 ? '+' : ''}
+                {formatCompactCurrency(savingsMetrics.dailyAverageSavings)}/d
+              </span>
+              <span className="text-[9px] text-slate-500 light:text-slate-500 font-medium block truncate mt-0.5">
+                en {daysInPeriod} días
+              </span>
+            </div>
+          </div>
+
+          {/* 4. Proyección Cierre de Mes */}
+          <div className="p-2.5 rounded-2xl bg-white/[0.04] light:bg-white/80 border border-white/10 light:border-slate-200/80 flex flex-col justify-between min-w-0">
+            <span className="text-[10px] text-slate-400 light:text-slate-500 font-medium block truncate">
+              Cierre Mes (Est.)
+            </span>
+            <div className="mt-1 min-w-0">
+              <span
+                className={`text-sm sm:text-base font-extrabold block leading-tight truncate ${
+                  savingsMetrics.projectedMonthEndSavings >= 0 ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
+                }`}
+              >
+                {savingsMetrics.projectedMonthEndSavings >= 0 ? '+' : ''}
+                {formatCompactCurrency(savingsMetrics.projectedMonthEndSavings)}
+              </span>
+              <span className="text-[9px] text-slate-500 light:text-slate-500 font-medium block truncate mt-0.5">
+                al ritmo actual
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 3. Section Switcher: Tipos de Visualización */}
-      <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-2xl border border-white/10">
+      <div className="flex items-center gap-1 bg-white/[0.06] light:bg-slate-200/70 p-1 rounded-2xl border border-white/10 light:border-slate-300">
+        <button
+          type="button"
+          onClick={() => setActiveChartSection('savings')}
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
+            activeChartSection === 'savings'
+              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+          }`}
+        >
+          <PiggyBank className="h-3.5 w-3.5" />
+          <span>Ahorro</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveChartSection('categories')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
             activeChartSection === 'categories'
-              ? 'bg-white/20 text-white shadow-sm font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
           }`}
         >
           <PieIcon className="h-3.5 w-3.5" />
@@ -461,10 +655,10 @@ export const AnalyticsView: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveChartSection('comparison')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
             activeChartSection === 'comparison'
-              ? 'bg-white/20 text-white shadow-sm font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
           }`}
         >
           <BarChart3 className="h-3.5 w-3.5" />
@@ -474,10 +668,10 @@ export const AnalyticsView: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveChartSection('networth')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
             activeChartSection === 'networth'
-              ? 'bg-white/20 text-white shadow-sm font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
           }`}
         >
           <Layers className="h-3.5 w-3.5" />
@@ -485,23 +679,145 @@ export const AnalyticsView: React.FC = () => {
         </button>
       </div>
 
-      {/* 4. CHART SECTION 1: Donut de Categorías */}
+      {/* 4. CHART SECTION 1: Evolución del Ahorro */}
+      {activeChartSection === 'savings' && (
+        <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3 relative overflow-hidden transition-all duration-300">
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+          {/* Ambient Glow */}
+          <div
+            className={`pointer-events-none absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl transition-colors duration-500 ${
+              savingsMetrics.isPositive ? 'bg-emerald-500/10' : 'bg-rose-500/10'
+            }`}
+          />
+
+          <div className="flex items-center justify-between relative z-10 gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución del Ahorro</h3>
+              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">
+                {savingsChartMode === 'accumulated'
+                  ? 'Trayectoria acumulada a lo largo del tiempo'
+                  : 'Ahorro neto obtenido por cada corte del periodo'}
+              </p>
+            </div>
+
+            {/* Mode toggle */}
+            <div className="flex items-center bg-white/[0.06] light:bg-slate-200/70 p-0.5 rounded-xl border border-white/10 light:border-slate-300 text-[10px] flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setSavingsChartMode('accumulated')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  savingsChartMode === 'accumulated'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
+                    : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                Acumulado
+              </button>
+              <button
+                type="button"
+                onClick={() => setSavingsChartMode('net')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  savingsChartMode === 'net'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
+                    : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                Neto
+              </button>
+            </div>
+          </div>
+
+          {/* Area Chart Container */}
+          <div className="h-60 w-full pt-2 relative z-10">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={savingsEvolutionData}
+                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="savingsAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
+                      stopOpacity={0.0}
+                    />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="label"
+                  stroke="#94A3B8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <YAxis
+                  stroke="#94A3B8"
+                  fontSize={9}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => formatCompactCurrency(v)}
+                />
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                <Tooltip content={<SavingsCustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey={savingsChartMode === 'accumulated' ? 'accumulatedSavings' : 'netSavings'}
+                  name={savingsChartMode === 'accumulated' ? 'Ahorro Acumulado' : 'Ahorro Neto'}
+                  stroke={savingsMetrics.isPositive ? '#34D399' : '#FB7185'}
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#savingsAreaGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Quick Monthly Superávit/Déficit Row */}
+          <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center relative z-10">
+            {monthlyComparisonData.map((m) => {
+              const net = m.income - m.expense;
+              const isPositive = net >= 0;
+              return (
+                <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
+                  <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
+                  <span
+                    className={`text-[11px] font-bold block truncate ${
+                      isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
+                    }`}
+                  >
+                    {isPositive ? '+' : ''}
+                    {Math.round(net)}€
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 5. CHART SECTION 2: Donut de Categorías */}
       {activeChartSection === 'categories' && (
-        <div className="rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
+        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white">Distribución de Gastos</h3>
-              <p className="text-[11px] text-slate-400">Porcentaje por categoría en el periodo</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Distribución de Gastos</h3>
+              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Porcentaje por categoría en el periodo</p>
             </div>
-            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20">
+            <span className="text-xs font-bold text-rose-400 light:text-rose-600 bg-rose-500/10 light:bg-rose-50 px-2.5 py-1 rounded-full border border-rose-500/20 light:border-rose-200 flex-shrink-0 whitespace-nowrap">
               -{formatCurrency(periodExpense)}
             </span>
           </div>
 
           {categoryChartData.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-400">
+            <div className="py-12 text-center text-xs text-slate-400 light:text-slate-500">
               No hay gastos registrados en este periodo.
             </div>
           ) : (
@@ -531,34 +847,34 @@ export const AnalyticsView: React.FC = () => {
 
                 {/* Donut Center Display */}
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 light:text-slate-500">
                     Total Gastado
                   </span>
-                  <span className="text-lg font-black text-white leading-tight">
+                  <span className="text-lg font-black text-white light:text-slate-900 leading-tight">
                     {formatCurrency(periodExpense)}
                   </span>
                 </div>
               </div>
 
               {/* Interactive Category Chips Legend */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+              <div className="flex flex-col gap-2 pt-2 border-t border-white/10 light:border-slate-200/80">
                 {categoryChartData.map((cat) => (
                   <div
                     key={cat.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
+                    className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] light:bg-white/80 light:hover:bg-white border border-transparent light:border-slate-200/80 transition-colors"
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                       <span
                         className="h-3 w-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: cat.color }}
                       />
-                      <span className="text-xs font-semibold text-slate-200">{cat.name}</span>
+                      <span className="text-xs font-semibold text-slate-200 light:text-slate-800 truncate">{cat.name}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white">
+                    <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
+                      <span className="text-xs font-bold text-white light:text-slate-900">
                         {formatCurrency(cat.value)}
                       </span>
-                      <span className="text-[10px] font-semibold text-slate-400 bg-white/5 px-1.5 py-0.5 rounded-md">
+                      <span className="text-[10px] font-semibold text-slate-400 light:text-slate-600 bg-white/5 light:bg-slate-100 px-1.5 py-0.5 rounded-md">
                         {cat.percentage.toFixed(1)}%
                       </span>
                     </div>
@@ -570,25 +886,25 @@ export const AnalyticsView: React.FC = () => {
         </div>
       )}
 
-      {/* 5. CHART SECTION 2: Barras Comparativas Mensuales */}
+      {/* 6. CHART SECTION 3: Barras Comparativas Mensuales */}
       {activeChartSection === 'comparison' && (
-        <div className="rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
+        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white">Flujo Mensual Comparativo</h3>
-              <p className="text-[11px] text-slate-400">Ingresos vs Gastos vs Ahorro acumulado</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Flujo Mensual Comparativo</h3>
+              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Ingresos vs Gastos vs Ahorro acumulado</p>
             </div>
-            <div className="flex items-center gap-2 text-[10px]">
-              <span className="flex items-center gap-1 text-emerald-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Ingreso
+            <div className="flex items-center gap-2 text-[10px] flex-shrink-0 whitespace-nowrap">
+              <span className="flex items-center gap-1 text-emerald-400 light:text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 light:bg-emerald-600" /> Ingreso
               </span>
-              <span className="flex items-center gap-1 text-rose-400">
-                <span className="h-2 w-2 rounded-full bg-rose-400" /> Gasto
+              <span className="flex items-center gap-1 text-rose-400 light:text-rose-700">
+                <span className="h-2 w-2 rounded-full bg-rose-400 light:bg-rose-600" /> Gasto
               </span>
-              <span className="flex items-center gap-1 text-indigo-400">
-                <span className="h-2 w-2 rounded-full bg-indigo-400" /> Ahorro
+              <span className="flex items-center gap-1 text-indigo-400 light:text-indigo-700">
+                <span className="h-2 w-2 rounded-full bg-indigo-400 light:bg-indigo-600" /> Ahorro
               </span>
             </div>
           </div>
@@ -640,16 +956,16 @@ export const AnalyticsView: React.FC = () => {
           </div>
 
           {/* Quick Monthly Superávit/Déficit Row */}
-          <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 text-center">
+          <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center">
             {monthlyComparisonData.map((m) => {
               const net = m.income - m.expense;
               const isPositive = net >= 0;
               return (
-                <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03]">
-                  <span className="text-[10px] text-slate-400 block font-medium">{m.label}</span>
+                <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
+                  <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
                   <span
-                    className={`text-[11px] font-bold block ${
-                      isPositive ? 'text-emerald-400' : 'text-rose-400'
+                    className={`text-[11px] font-bold block truncate ${
+                      isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
                     }`}
                   >
                     {isPositive ? '+' : ''}
@@ -662,17 +978,17 @@ export const AnalyticsView: React.FC = () => {
         </div>
       )}
 
-      {/* 6. CHART SECTION 3: Evolución del Patrimonio Neto */}
+      {/* 7. CHART SECTION 4: Evolución del Patrimonio Neto */}
       {activeChartSection === 'networth' && (
-        <div className="rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
+        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white">Evolución de Patrimonio</h3>
-              <p className="text-[11px] text-slate-400">Balance acumulado + Cartera de inversión</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución de Patrimonio</h3>
+              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Balance acumulado + Cartera de inversión</p>
             </div>
-            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
+            <span className="text-xs font-bold text-indigo-400 light:text-indigo-700 bg-indigo-500/10 light:bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-500/20 light:border-indigo-200 flex-shrink-0 whitespace-nowrap">
               {formatCurrency(netWorthData[netWorthData.length - 1]?.netWorth || 0)}
             </span>
           </div>
@@ -720,23 +1036,23 @@ export const AnalyticsView: React.FC = () => {
       )}
 
       {/* 7. Ranking de Marcas Más Frecuentes (Gráfico Horizontal con Logos Reales) */}
-      <div className="rounded-3xl bg-white/[0.07] backdrop-blur-2xl border border-white/15 p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
+      <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+            <div className="h-7 w-7 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 light:text-rose-600 flex-shrink-0">
               <Flame className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Comercios & Marcas Top</h3>
-              <p className="text-[11px] text-slate-400">Mayor volumen de gasto en el periodo</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Comercios & Marcas Top</h3>
+              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Mayor volumen de gasto en el periodo</p>
             </div>
           </div>
         </div>
 
         {sortedBrands.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-400">
+          <div className="py-8 text-center text-xs text-slate-400 light:text-slate-500">
             No hay compras registradas en comercios durante este periodo.
           </div>
         ) : (
@@ -748,39 +1064,41 @@ export const AnalyticsView: React.FC = () => {
                 'from-slate-200 to-slate-400 text-slate-950 font-black', // 2nd
                 'from-amber-600 to-amber-700 text-white font-black',     // 3rd
               ];
-              const medal = medalColors[index] || 'bg-white/10 text-slate-300';
+              const medal = medalColors[index] || 'bg-white/10 text-slate-300 light:bg-slate-200 light:text-slate-700';
 
               return (
                 <div
                   key={b.id}
-                  className="p-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 flex flex-col gap-2 transition-all"
+                  className="p-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] light:bg-white/80 light:hover:bg-white border border-white/10 light:border-slate-200/80 flex flex-col gap-2 transition-all"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <span
-                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] shadow-sm bg-gradient-to-tr ${medal}`}
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] shadow-sm bg-gradient-to-tr ${medal} flex-shrink-0`}
                       >
                         {index + 1}
                       </span>
-                      <BrandAvatar brand={b.brand} fallbackText={b.name} size="sm" />
-                      <div>
-                        <span className="text-xs font-bold text-white block leading-tight">
+                      <div className="flex-shrink-0">
+                        <BrandAvatar brand={b.brand} fallbackText={b.name} size="sm" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-white light:text-slate-900 block leading-tight truncate">
                           {b.name}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-400 light:text-slate-500 block truncate mt-0.5">
                           {b.count} {b.count === 1 ? 'movimiento' : 'movimientos'} •{' '}
                           {b.percentage.toFixed(1)}% del gasto
                         </span>
                       </div>
                     </div>
 
-                    <span className="text-xs font-extrabold text-rose-400">
+                    <span className="text-xs font-extrabold text-rose-400 light:text-rose-600 flex-shrink-0 whitespace-nowrap">
                       -{formatCurrency(b.total)}
                     </span>
                   </div>
 
                   {/* Horizontal Bar Chart Progress */}
-                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-white/10 light:bg-slate-200 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-indigo-500 transition-all duration-500"
                       style={{ width: `${proportion}%` }}
@@ -794,16 +1112,16 @@ export const AnalyticsView: React.FC = () => {
       </div>
 
       {/* 8. Bottom Summary Insight Card */}
-      <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-xl flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+      <div className="p-4 rounded-2xl bg-indigo-500/10 light:bg-indigo-50/80 border border-indigo-500/20 light:border-indigo-200 backdrop-blur-xl flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 light:text-indigo-600 flex-shrink-0">
             <ArrowUpRight className="h-5 w-5" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-white block">
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-bold text-white light:text-slate-900 block truncate">
               Salud Financiera en el Periodo
             </span>
-            <span className="text-[11px] text-indigo-300">
+            <span className="text-[11px] text-indigo-300 light:text-indigo-700 block line-clamp-2">
               {periodSavingsRate >= 20
                 ? '¡Excelente! Estás ahorrando más del 20% de tus ingresos.'
                 : 'Controla los gastos discrecionales para elevar tu tasa de ahorro.'}
