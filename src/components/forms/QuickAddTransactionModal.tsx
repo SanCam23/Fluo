@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   Landmark,
   Pencil,
+  AlertTriangle,
+  DollarSign,
+  Hash,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -37,6 +40,16 @@ import { calculateFirstNextDueDate } from '../../services/recurringEngine';
 import { searchAssets, fetchCurrentPrice } from '../../services/marketDataService';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
 import { getTodayDateString, getYesterdayDateString } from '../../utils/dates';
+import {
+  normalizeDecimalInput,
+  parsePositiveNumber,
+  calculateSharesFromTotal,
+  calculateTotalFromShares,
+  calculateAverageBuyPrice,
+  isValidMarketPrice,
+} from '../../utils/investmentValidation';
+
+export type InvestInputMode = 'total' | 'shares';
 
 const ASSET_TYPE_OPTIONS: GlassSelectOption<AssetType>[] = [
   { value: 'stock', label: 'Acciones Bursátiles', icon: <LineChart className="h-3.5 w-3.5 text-indigo-400" /> },
@@ -151,6 +164,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const [brandId, setBrandId] = useState<string>('');
 
   // Investment-specific fields
+  const [investInputMode, setInvestInputMode] = useState<InvestInputMode>('total');
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
   const [assetSearchResults, setAssetSearchResults] = useState<MarketAssetItem[]>([]);
   const [isSearchingAssets, setIsSearchingAssets] = useState(false);
@@ -173,6 +187,8 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const [change24h, setChange24h] = useState<number | undefined>(undefined);
   const [isOfflineCached, setIsOfflineCached] = useState<boolean>(false);
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
+  const [quoteVerified, setQuoteVerified] = useState<boolean>(false);
+  const [investFormErrors, setInvestFormErrors] = useState<string[]>([]);
 
   // Recurrence granular configuration (Available for all pillars, including investment DCA)
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
@@ -262,12 +278,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     setChange24h(item.change24h);
     setIsAssetDropdownOpen(false);
     setAssetSearchQuery('');
+    setQuoteVerified(isValidMarketPrice(item.basePrice));
+    setInvestFormErrors([]);
 
     if (!averageBuyPrice) {
       setAverageBuyPrice(item.basePrice.toString());
-      const s = parseFloat(shares);
-      if (!isNaN(s) && s > 0) {
-        setTotalInvestedInput((s * item.basePrice).toFixed(2));
+      // Auto-calc shares in "by total" mode
+      const totalNum = parsePositiveNumber(totalInvestedInput);
+      if (investInputMode === 'total' && totalNum !== null && isValidMarketPrice(item.basePrice)) {
+        const calcShares = calculateSharesFromTotal(totalNum, item.basePrice);
+        if (calcShares !== null) setShares(calcShares.toString());
+      } else {
+        // "by shares" mode: recalculate total
+        const s = parsePositiveNumber(shares);
+        if (s !== null) {
+          const calcTotal = calculateTotalFromShares(s, item.basePrice);
+          if (calcTotal !== null) setTotalInvestedInput(calcTotal.toString());
+        }
       }
     }
 
@@ -279,45 +306,81 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       setCurrency(quote.currency);
       setChange24h(quote.change24h);
       setIsOfflineCached(quote.isOfflineCached);
-      if (!averageBuyPrice) {
+      setQuoteVerified(isValidMarketPrice(quote.price));
+      if (!averageBuyPrice || averageBuyPrice === item.basePrice.toString()) {
         setAverageBuyPrice(quote.price.toString());
-        const s = parseFloat(shares);
-        if (!isNaN(s) && s > 0) {
-          setTotalInvestedInput((s * quote.price).toFixed(2));
+        // Recalculate based on mode
+        if (investInputMode === 'total') {
+          const totalNum = parsePositiveNumber(totalInvestedInput);
+          if (totalNum !== null && isValidMarketPrice(quote.price)) {
+            const calcShares = calculateSharesFromTotal(totalNum, quote.price);
+            if (calcShares !== null) setShares(calcShares.toString());
+          }
+        } else {
+          const s = parsePositiveNumber(shares);
+          if (s !== null) {
+            const calcTotal = calculateTotalFromShares(s, quote.price);
+            if (calcTotal !== null) setTotalInvestedInput(calcTotal.toString());
+          }
         }
       }
     } catch {
-      // Ignored
+      setQuoteVerified(false);
     } finally {
       setIsFetchingQuote(false);
     }
   };
 
   // Bidirectional calculations: shares & unit price <-> total invested
-  const handleSharesChange = (val: string) => {
+  // Uses normalizeDecimalInput to support comma separators from mobile keyboards
+  const handleSharesChange = (rawVal: string) => {
+    const val = normalizeDecimalInput(rawVal);
     setShares(val);
-    const numShares = parseFloat(val);
-    const numUnit = parseFloat(averageBuyPrice);
-    if (!isNaN(numShares) && !isNaN(numUnit) && numShares > 0) {
-      setTotalInvestedInput((numShares * numUnit).toFixed(2));
+    const numShares = parsePositiveNumber(val);
+    const numUnit = parsePositiveNumber(averageBuyPrice);
+    if (numShares !== null && numUnit !== null) {
+      const total = calculateTotalFromShares(numShares, numUnit);
+      if (total !== null) setTotalInvestedInput(total.toString());
     }
   };
 
-  const handleUnitPriceChange = (val: string) => {
+  const handleUnitPriceChange = (rawVal: string) => {
+    const val = normalizeDecimalInput(rawVal);
     setAverageBuyPrice(val);
-    const numUnit = parseFloat(val);
-    const numShares = parseFloat(shares);
-    if (!isNaN(numUnit) && !isNaN(numShares) && numShares > 0) {
-      setTotalInvestedInput((numShares * numUnit).toFixed(2));
+    const numUnit = parsePositiveNumber(val);
+    if (investInputMode === 'total') {
+      // In total mode: recalculate shares from total and new price
+      const numTotal = parsePositiveNumber(totalInvestedInput);
+      if (numTotal !== null && numUnit !== null) {
+        const calcShares = calculateSharesFromTotal(numTotal, numUnit);
+        if (calcShares !== null) setShares(calcShares.toString());
+      }
+    } else {
+      // In shares mode: recalculate total
+      const numShares = parsePositiveNumber(shares);
+      if (numUnit !== null && numShares !== null) {
+        const total = calculateTotalFromShares(numShares, numUnit);
+        if (total !== null) setTotalInvestedInput(total.toString());
+      }
     }
   };
 
-  const handleTotalInvestedChange = (val: string) => {
+  const handleTotalInvestedChange = (rawVal: string) => {
+    const val = normalizeDecimalInput(rawVal);
     setTotalInvestedInput(val);
-    const numTotal = parseFloat(val);
-    const numShares = parseFloat(shares);
-    if (!isNaN(numTotal) && !isNaN(numShares) && numShares > 0) {
-      setAverageBuyPrice((numTotal / numShares).toFixed(4));
+    const numTotal = parsePositiveNumber(val);
+    const numUnit = parsePositiveNumber(averageBuyPrice);
+    if (numTotal !== null && numUnit !== null) {
+      // Calculate shares from total
+      const calcShares = calculateSharesFromTotal(numTotal, numUnit);
+      if (calcShares !== null) setShares(calcShares.toString());
+    } else if (numTotal !== null) {
+      // If no buy price yet, derive from shares
+      const numShares = parsePositiveNumber(shares);
+      if (numShares !== null) {
+        const avgP = calculateAverageBuyPrice(numTotal, numShares);
+        if (avgP !== null) setAverageBuyPrice(avgP.toString());
+      }
     }
   };
 
@@ -345,19 +408,48 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setInvestFormErrors([]);
 
     if (pillar === 'invest') {
-      const numShares = parseFloat(shares);
-      const numBuyPrice = parseFloat(averageBuyPrice);
-      const numCurrentPrice = parseFloat(currentPrice) || numBuyPrice;
-      const numFee = parseFloat(initialFee) || 0;
+      // --- Strict runtime validation ---
+      const errors: string[] = [];
 
-      if (!identifier.trim() || !assetName.trim() || isNaN(numShares) || isNaN(numBuyPrice) || numShares <= 0) {
+      if (!identifier.trim()) errors.push('El identificador del activo es obligatorio.');
+      if (!assetName.trim()) errors.push('El nombre del activo es obligatorio.');
+
+      const numBuyPrice = parsePositiveNumber(averageBuyPrice);
+      if (numBuyPrice === null) errors.push('El precio de compra por título debe ser un número positivo.');
+
+      let numShares = parsePositiveNumber(shares);
+      const numTotal = parsePositiveNumber(totalInvestedInput);
+
+      // In "by total" mode, auto-derive shares if not set
+      if (investInputMode === 'total') {
+        if (numTotal === null) {
+          errors.push('El importe total desembolsado debe ser un número positivo.');
+        } else if (numBuyPrice !== null && (numShares === null || numShares <= 0)) {
+          numShares = calculateSharesFromTotal(numTotal, numBuyPrice);
+          if (numShares !== null) setShares(numShares.toString());
+        }
+      }
+
+      if (numShares === null || numShares <= 0) {
+        errors.push('La cantidad de títulos debe ser un número positivo.');
+      }
+
+      if (errors.length > 0) {
+        setInvestFormErrors(errors);
         return;
       }
 
+      // At this point numShares and numBuyPrice are guaranteed valid
+      const safeShares = numShares!;
+      const safeBuyPrice = numBuyPrice!;
+      const numCurrentPrice = parsePositiveNumber(currentPrice) ?? safeBuyPrice;
+      const numFee = parsePositiveNumber(initialFee) ?? 0;
+
       const brokerBrand = getBrandById(brokerBrandId);
-      const totalAmount = numShares * numBuyPrice + numFee;
+      const totalAmount = safeShares * safeBuyPrice + numFee;
       const txDate = acquisitionDate ? new Date(`${acquisitionDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
       // 1. Register asset in portfolio
@@ -367,9 +459,9 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         ticker: ticker.trim().toUpperCase() || undefined,
         isin: isin.trim().toUpperCase() || undefined,
         assetType,
-        shares: numShares,
-        averageBuyPrice: numBuyPrice,
-        averagePrice: numBuyPrice,
+        shares: safeShares,
+        averageBuyPrice: safeBuyPrice,
+        averagePrice: safeBuyPrice,
         currentPrice: numCurrentPrice,
         currency,
         platform: brokerBrand ? brokerBrand.name : undefined,
@@ -821,64 +913,155 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 </div>
               </div>
 
-              {/* Shares / Decimal Units */}
-              <div>
-                <label className="text-xs font-semibold text-slate-300">
-                  Cantidad de Títulos / Participaciones (soporta decimales)
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.000001"
-                    required
-                    placeholder="Ej. 10, 12.5 o 0.045 BTC"
-                    value={shares}
-                    onChange={(e) => handleSharesChange(e.target.value)}
-                    className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                    unidades
-                  </span>
-                </div>
+              {/* ──── Investment Input Mode Selector (Liquid Glass Segmented Control) ──── */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setInvestInputMode('total')}
+                  className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                    investInputMode === 'total'
+                      ? 'bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                  }`}
+                >
+                  <DollarSign className="h-3.5 w-3.5" />
+                  Por Importe Total
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvestInputMode('shares')}
+                  className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                    investInputMode === 'shares'
+                      ? 'bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Hash className="h-3.5 w-3.5" />
+                  Por Nº de Títulos
+                </button>
               </div>
 
-              {/* Dual Input: Unit Buy Price vs Total Invested Capital */}
+              {/* ──── Primary Input: depends on active mode ──── */}
+              {investInputMode === 'total' ? (
+                <>
+                  {/* Total Amount Input (Primary in "by total" mode) */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">
+                      Importe Total Desembolsado ({currency})
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        required
+                        placeholder="Ej. 500, 1000, 2500.50"
+                        value={totalInvestedInput}
+                        onChange={(e) => handleTotalInvestedChange(e.target.value)}
+                        className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                        {currency}
+                      </span>
+                    </div>
+                    {/* Auto-calculated shares estimate */}
+                    {(() => {
+                      const numTotal = parsePositiveNumber(totalInvestedInput);
+                      const numPrice = parsePositiveNumber(averageBuyPrice);
+                      if (numTotal !== null && numPrice !== null) {
+                        const estShares = calculateSharesFromTotal(numTotal, numPrice);
+                        if (estShares !== null) {
+                          return (
+                            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-indigo-300/80 light:text-indigo-600 leading-snug">
+                              <Info className="h-3 w-3 mt-0.5 shrink-0 text-indigo-400/60" />
+                              A la cotización de {formatCurrency(numPrice, currency)}, compras aprox. <strong className="text-indigo-200 light:text-indigo-700">{estShares.toLocaleString('es-ES', { maximumFractionDigits: 6 })}</strong> títulos.
+                            </p>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Shares / Decimal Units (Primary in "by shares" mode) */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">
+                      Cantidad de Títulos / Participaciones (soporta decimales)
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        required
+                        placeholder="Ej. 10, 12.5 o 0.045 BTC"
+                        value={shares}
+                        onChange={(e) => handleSharesChange(e.target.value)}
+                        className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                        unidades
+                      </span>
+                    </div>
+                    {/* Auto-calculated total estimate */}
+                    {(() => {
+                      const numShares = parsePositiveNumber(shares);
+                      const numPrice = parsePositiveNumber(averageBuyPrice);
+                      if (numShares !== null && numPrice !== null) {
+                        const estTotal = calculateTotalFromShares(numShares, numPrice);
+                        if (estTotal !== null) {
+                          return (
+                            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-indigo-300/80 light:text-indigo-600 leading-snug">
+                              <Info className="h-3 w-3 mt-0.5 shrink-0 text-indigo-400/60" />
+                              Inversión total estimada: <strong className="text-indigo-200 light:text-indigo-700">{formatCurrency(estTotal, currency)}</strong>
+                            </p>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </>
+              )}
+
+              {/* ──── Unit Buy Price (always visible, editable) ──── */}
               <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col gap-2.5">
                 <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5 text-indigo-400" />
-                  Precio de Compra e Inversión Total (Cálculo bidireccional)
+                  Precio de Compra por Título ({currency})
                 </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  placeholder="Ej. 124.50"
+                  value={averageBuyPrice}
+                  onChange={(e) => handleUnitPriceChange(e.target.value)}
+                  className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
+                />
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Precio por Título ({currency})</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.0001"
-                      required
-                      placeholder="Ej. 124.50"
-                      value={averageBuyPrice}
-                      onChange={(e) => handleUnitPriceChange(e.target.value)}
-                      className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
-                    />
+                {/* Unverified quote warning */}
+                {identifier && !isFetchingQuote && !quoteVerified && (
+                  <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 text-amber-400 light:text-amber-800 text-[11px] leading-relaxed">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      No se pudo verificar la cotización real en tiempo real. Introduce el precio unitario de compra manualmente para continuar.
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Total Desembolsado ({currency})</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.01"
-                      placeholder="Ej. 1245.00"
-                      value={totalInvestedInput}
-                      onChange={(e) => handleTotalInvestedChange(e.target.value)}
-                      className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
+
+              {/* ──── Validation Errors Panel ──── */}
+              {investFormErrors.length > 0 && (
+                <div className="flex flex-col gap-1 p-3 rounded-2xl bg-rose-500/10 light:bg-rose-50 border border-rose-500/20 light:border-rose-200 animate-fadeIn">
+                  {investFormErrors.map((err, idx) => (
+                    <p key={idx} className="text-[11px] text-rose-400 light:text-rose-700 flex items-start gap-1.5">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      {err}
+                    </p>
+                  ))}
+                </div>
+              )}
 
               {/* Broker Selection using BrandPicker (Identical to New Movement) */}
               <BrandPicker

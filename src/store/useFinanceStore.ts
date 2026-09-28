@@ -60,6 +60,7 @@ interface FinanceState {
   lastSyncTimestamp?: string;
   userId: string | null;
   isCloudLoading: boolean;
+  hasHydratedFromCloud: boolean;
   cloudSyncError: string | null;
 
   // Actions
@@ -161,6 +162,7 @@ export const useFinanceStore = create<FinanceState>()(
       simulatedTimeOffsetDays: 0,
       userId: null,
       isCloudLoading: false,
+      hasHydratedFromCloud: false,
       cloudSyncError: null,
 
       setActiveSourceId: (activeSourceId) => set({ activeSourceId }),
@@ -178,7 +180,12 @@ export const useFinanceStore = create<FinanceState>()(
             recurrences: [],
             sources: [],
             activeSourceId: null,
+            isCloudLoading: true,
+            hasHydratedFromCloud: false,
           });
+        } else if (userId && !prevId) {
+          // Fresh login after logout: mark cloud loading immediately to prevent onboarding modal flash
+          set({ userId, isCloudLoading: true, hasHydratedFromCloud: false });
         } else {
           set({ userId });
         }
@@ -242,17 +249,20 @@ export const useFinanceStore = create<FinanceState>()(
               sources: [...finalSources].sort((a, b) => a.orderIndex - b.orderIndex),
               recurrences: [],
               isCloudLoading: false,
+              hasHydratedFromCloud: true,
               cloudSyncError: null,
             });
           } else {
             set({
               isCloudLoading: false,
+              hasHydratedFromCloud: true,
               cloudSyncError: result.error || 'Error al sincronizar con la nube',
             });
           }
         } catch (err: any) {
           set({
             isCloudLoading: false,
+            hasHydratedFromCloud: true,
             cloudSyncError: err?.message || 'Error inesperado al cargar datos de la nube',
           });
         }
@@ -625,6 +635,7 @@ export const useFinanceStore = create<FinanceState>()(
           activeSourceId: null,
           userId: null,
           isCloudLoading: false,
+          hasHydratedFromCloud: false,
           cloudSyncError: null,
           lastSyncTimestamp: undefined,
           timeRange: 'all',

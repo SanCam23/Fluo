@@ -19,6 +19,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Dashboard Home (Mobile-First)** | ✅ Completado | Hero Balance, 3 Pilares Liquid Glass y Movimientos Recientes con logos |
 | **Barra de Navegación Flotante** | ✅ Completado | Dock Liquid Glass ultra-refractivo: `saturate-200`, `blur-3xl`, cáustica subsuperficial, biselado 3D y cápsulas vítreas |
 | **Módulo de Inversiones & P&L Real** | ✅ Completado | Cartera completa con P&L dinámico, botón de sincronización oficial, cálculo de plusvalías y modal Liquid Glass |
+| **Entrada Flexible de Inversiones & Validaciones en Vivo** | ✅ Completado | Conmutador Segmented Control Liquid Glass (Total € vs Títulos), recálculo reactivo bidireccional, sanitización de comas y suite de 31 tests unitarios |
 | **Módulo de Estadísticas y Métricas (/stats)** | ✅ Completado | Visualización con Recharts: Donut con centro hueco, Barras comparativas, Área de Patrimonio Neto y Ranking de Marcas |
 | **Motor de Recurrencias & Catch-up** | ✅ Completado | Motor en cliente `recurringEngine.ts`, calendar clamping para meses cortos, generación histórica idempotente |
 | **Formulario Granular de Recurrencias** | ✅ Completado | Modal Liquid Glass con switch iOS, periodicidad semanal/quincenal/mensual/anual, días de semana/mes y auto-registro |
@@ -613,6 +614,44 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Compilación TypeScript: `npx tsc -b` (0 errores).
   - Tests automatizados: 53 tests pasando en Vitest (6 suites).
   - Build de producción: `npm run build` generado y optimizado con gzip y brotli.
+
+### v0.9.7 (Corrección Crítica: Persistencia de Fuentes al Re-Login)
+- **Bug Crítico Resuelto: Pérdida de Fuentes al Cerrar Sesión y Volver a Iniciar**:
+  - **Causa Raíz Identificada**: Race condition entre `purgeUserData()` (que borra `localStorage` y pone `sources: []` en memoria) y la carga asíncrona `loadCloudData()`. Entre el primer render tras `setUserId()` y la finalización de `loadCloudData()`, existía un gap donde `isCloudLoading === false` y `sources.length === 0`, provocando que el `InitialSourceModal` se mostrara falsamente.
+  - **Nuevo Estado `hasHydratedFromCloud`** ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+    - Boolean que se inicializa en `false` y cambia a `true` únicamente cuando `loadCloudData` completa (éxito o error).
+    - Se resetea a `false` en `purgeUserData()` y en `setUserId()` al detectar login fresco (`userId && !prevId`) o cambio de usuario.
+  - **Cierre de Gap Síncrono en `setUserId`**: Cuando se detecta un login fresco (`prevId === null`, `userId !== null`), se establece inmediatamente `isCloudLoading: true` y `hasHydratedFromCloud: false` para evitar que el primer render muestre el modal de onboarding.
+  - **Guardia Reforzada en `InitialSourceModal`** ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx)):
+    - Para usuarios autenticados, el modal solo se muestra si `hasHydratedFromCloud === true` Y `sources.length === 0`, asegurando que la decisión se tome DESPUÉS de haber consultado Supabase.
+    - Para modo demo, se mantiene el comportamiento inmediato ya que opera enteramente en local.
+- **Validación de Calidad**: Compilación TypeScript limpia (`npx tsc --noEmit`, 0 errores).
+
+### v0.9.8 (Entrada Flexible de Inversiones & Validaciones en Tiempo de Ejecución)
+- **Selector de Modo de Entrada (Segmented Control Liquid Glass)**:
+  - Implementación en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) del selector interactivo con dos pestañas vítreas:
+    1. **"Por Importe Total (€)"**: El usuario solo especifica el capital total desembolsado y la aplicación calcula automáticamente las participaciones correspondientes (`total / price`) a 6 decimales de precisión.
+    2. **"Por Cantidad de Títulos"**: Flujo clásico donde se indican las unidades o fracciones (ej. 0.045 BTC, 12.5 títulos) y se proyecta la inversión total resultante.
+  - Indicador activo flotante con resplandor índigo (`bg-indigo-500/25 border-indigo-400/40 shadow-indigo-500/20`), iconos dedicados (`DollarSign`, `Hash`) y microanimaciones suaves.
+- **Sincronización Bidireccional Reactiva**:
+  - Al alternar de modo o modificar el precio unitario, los campos dependientes se recalculan y adaptan en tiempo real sin perder datos ni entrar en bucles infinitos.
+  - Al obtener una cotización en vivo desde Yahoo Finance / CoinGecko / fallback (`marketDataService.ts`), si el modo activo es "Por Importe Total", se recalculan inmediatamente los títulos estimados.
+- **Módulo de Validaciones Estrictas y Aritmética Financiera**:
+  - Creación de [`src/utils/investmentValidation.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/investmentValidation.ts):
+    - `normalizeDecimalInput`: Reemplazo transparente de comas (`12,50`) por puntos (`12.50`) adaptado a teclados numéricos españoles y móviles.
+    - `parsePositiveNumber`: Validación estricta que descarta `NaN`, infinitos, ceros y negativos.
+    - `calculateSharesFromTotal` & `calculateTotalFromShares`: Cálculos seguros con precisión flotante acotada.
+    - `calculateAverageBuyPrice`: Deducción automática del coste base unitario medio.
+    - `isValidMarketPrice`: Guardián de tipo en tiempo de ejecución para cotizaciones de mercado.
+    - `validateInvestmentEntry`: Validador integral que recopila errores amigables antes del guardado.
+- **Panel de Advertencias y Errores Liquid Glass**:
+  - Alertas visuales con estilo `border-rose-500/20 bg-rose-500/10` para entradas inválidas.
+  - Aviso contextual `border-amber-500/20 bg-amber-500/10` si una cotización no pudo verificarse en vivo, solicitando confirmación manual del precio de compra.
+- **Suite de Pruebas Automatizadas (Vitest)**:
+  - Creación de [`src/utils/investmentValidation.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/investmentValidation.test.ts) con 31 tests exhaustivos cubriendo normalización de comas/puntos, división por cero, redondeo fraccionario, coherencia bidireccional y guardias de mercado. Total global: 84 tests unitarios pasando.
+- **Validación de Calidad**:
+  - Compilación TypeScript: `tsc -b` (0 errores).
+  - Build de producción: `vite build` completado y optimizado con gzip y brotli.
 
 ---
 

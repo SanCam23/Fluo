@@ -274,12 +274,23 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - **Filtro de Resplandores Neón**: Neutralización de `drop-shadow-[0_0_...]` en modo claro (`filter: none !important`), evitando que las sombras de halo oscuro manchen la tipografía sobre fondos blancos o perlados.
   - **Indicadores de Diapositiva (`HeroBalance`)**: Cápsula exterior `light:bg-slate-200/80 light:border-slate-300` y puntos inactivos `light:bg-slate-400/50 hover:light:bg-slate-600/70` con contraste óptimo en modo claro.
 
+### 22. Control Segmentado Liquid Glass (`Segmented Control`)
+- **Aplicación**: Conmutadores de modo en formularios, como el selector de entrada de inversiones (Importe Total vs Número de Títulos) en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx).
+- **Riel / Contenedor Base**:
+  - `p-1 rounded-2xl bg-white/[0.04] light:bg-slate-100 border border-white/10 light:border-slate-200 grid grid-cols-2 gap-1 backdrop-blur-xl`.
+- **Segmento Activo**:
+  - `bg-indigo-500/25 light:bg-indigo-50 border border-indigo-400/40 light:border-indigo-300 text-indigo-200 light:text-indigo-700 shadow-[0_2px_12px_rgba(99,102,241,0.2)] font-semibold transition-all duration-200`.
+- **Segmento Inactivo**:
+  - `text-slate-400 light:text-slate-500 hover:text-white light:hover:text-slate-900 hover:bg-white/[0.04] light:hover:bg-slate-200/60 border border-transparent font-medium transition-all duration-200`.
+- **Iconografía**: Glifo representativo del modo (`DollarSign` para total monetario, `Hash` para títulos numéricos) a la izquierda de la etiqueta.
+
 ---
 
 ## 4. Microinteracciones y Haptic Feedback Visual
 
 - **Active State**: Cada botón o tarjeta interactiva implementa `active:scale-[0.97]` con curva suave `cubic-bezier(0.16, 1, 0.3, 1)`.
 - **Luces Ambientales**: Tres orbes difusos de color en el fondo (`blur-3xl`) se sitúan detrás de la capa de interfaz, permitiendo que el efecto de cristal cobre vida al hacer scroll y refractar diferentes colores.
+
 
 
 

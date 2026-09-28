@@ -456,4 +456,39 @@ export interface SecurityLockHookResult {
   unlockWithBiometrics: () => Promise<boolean>;
   resetSecurity: () => void;
 }
+
+---
+
+## 8. Modelos y Utilidades de Entrada de Inversiones (`investmentValidation.ts`)
+
+Para permitir la entrada flexible de inversiones (por importe desembolsado o por número de títulos) y garantizar la integridad matemática de las posiciones:
+
+### Modos de Entrada (`InvestInputMode`)
+```typescript
+export type InvestInputMode = 'total' | 'shares';
+```
+- **`total`**: Entrada principal por importe total en euros/divisa. Las participaciones se calculan automáticamente dividiendo entre el precio de cotización (`total / price`, hasta 6 decimales).
+- **`shares`**: Entrada clásica por número de participaciones o títulos. El importe total se calcula multiplicando títulos por precio (`shares * price`, redondeado a 2 decimales).
+
+### Resultado de Validación de Inversión (`InvestmentValidationResult`)
+```typescript
+export interface InvestmentValidationResult {
+  isValid: boolean;
+  errors: string[];
+  shares: number | null;
+  averageBuyPrice: number | null;
+  totalInvested: number | null;
+  currentPrice: number | null;
+}
+```
+
+### Funciones Puras de Validación y Aritmética Financiera
+- `normalizeDecimalInput(raw: string | null | undefined): string`: Normaliza comas decimales a puntos y descarta espacios en blanco.
+- `parsePositiveNumber(raw: string | null | undefined): number | null`: Parsea números finitos estrictamente positivos (> 0).
+- `calculateSharesFromTotal(totalAmount: number, unitPrice: number): number | null`: Calcula participaciones a 6 decimales.
+- `calculateTotalFromShares(shares: number, unitPrice: number): number | null`: Calcula total invertido a 2 decimales.
+- `calculateAverageBuyPrice(totalAmount: number, shares: number): number | null`: Deduce el precio de compra unitario medio a 4 decimales.
+- `isValidMarketPrice(price: unknown): price is number`: Validador de tipo para cotizaciones de mercado en tiempo real.
+- `validateInvestmentEntry(fields: {...}): InvestmentValidationResult`: Validador integral de formulario antes del commit atómico.
+
 ```

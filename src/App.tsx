@@ -61,6 +61,7 @@ export default function App() {
   const setUserId = useFinanceStore((state) => state.setUserId);
   const loadCloudData = useFinanceStore((state) => state.loadCloudData);
   const isCloudLoading = useFinanceStore((state) => state.isCloudLoading);
+  const hasHydratedFromCloud = useFinanceStore((state) => state.hasHydratedFromCloud);
   const purgeUserData = useFinanceStore((state) => state.purgeUserData);
   const sources = useFinanceStore((state) => state.sources);
 
@@ -325,7 +326,12 @@ export default function App() {
       )}
 
       {/* Mandatory Initial Source Onboarding Modal (when 0 sources exist) */}
-      {Boolean((user || isDemoMode) && !isCloudLoading && sources.length === 0) && (
+      {Boolean(
+        (user || isDemoMode) &&
+        !isCloudLoading &&
+        sources.length === 0 &&
+        (isDemoMode || hasHydratedFromCloud)
+      ) && (
         <Suspense fallback={null}>
           <InitialSourceModal isOpen={true} />
         </Suspense>
