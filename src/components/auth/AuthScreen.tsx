@@ -83,7 +83,7 @@ export const AuthScreen: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 bg-[#0B0F19] text-white overflow-hidden selection:bg-indigo-500/30">
+    <main className="relative min-h-screen flex items-center justify-center p-4 bg-[#0B0F19] text-white overflow-hidden selection:bg-indigo-500/30">
       {/* Background Ambient Atmospheric Lighting Orbs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-[140px]" />
@@ -95,8 +95,11 @@ export const AuthScreen: React.FC = () => {
         {/* App Logo & Header */}
         <div className="flex flex-col items-center mb-6 text-center">
           <img
-            src="/fluo-wordmark.png"
+            src="/fluo-wordmark.webp"
             alt="Fluo"
+            width="194"
+            height="84"
+            fetchPriority="high"
             className="h-12 w-auto object-contain filter drop-shadow-[0_4px_20px_rgba(99,102,241,0.4)] select-none mb-1"
           />
 
@@ -203,7 +206,7 @@ export const AuthScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="absolute right-1.5 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -289,6 +292,6 @@ export const AuthScreen: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 };

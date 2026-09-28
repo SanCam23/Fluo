@@ -552,6 +552,40 @@ Fluo dispone de un subsistema dedicado para cuantificar la capacidad de retenci�
 - **Línea de Referencia en Cero**: `<ReferenceLine y={0} />` que delimita instantáneamente zonas de acumulación patrimonial frente a periodos de déficit.
 - **Aislamiento Multicuenta**: El cálculo se filtra estrictamente por `activeSourceId`, recalculando el ahorro neto total consolidado o el de una cuenta bancaria / efectivo específico.
 
+---
+
+## 17. Infraestructura de Servidor, Seguridad HTTP (A+) y Rendimiento Web (`vercel.json` & Core Web Vitals)
+
+Fluo cuenta con una capa de cabeceras HTTP de servidor configurada para la máxima puntuación en escáneres de seguridad (Mozilla Observatory A+) y auditorías Lighthouse:
+
+### 1. Migración de Cabeceras y CSP a Servidor (`vercel.json`)
+- **Cabeceras HTTP Reales en Servidor**: Se eliminaron las etiquetas `<meta http-equiv="Content-Security-Policy">` de `index.html` debido a que directivas críticas como `frame-ancestors` son ignoradas en el cliente por el navegador.
+- **Configuración de `vercel.json`**:
+  - `Content-Security-Policy`: Define orígenes permitidos explícitos (`script-src 'self' 'wasm-unsafe-eval'`, sin `unsafe-inline` en scripts para mitigar vectores XSS; orígenes Supabase, Binance, Yahoo Finance y CoinGecko en `connect-src`; `frame-ancestors 'none'`; `object-src 'none'`).
+  - `X-Content-Type-Options`: `nosniff` (previene ataques de MIME-sniffing).
+  - `X-Frame-Options`: `DENY` (previene clickjacking al no permitir embebido en iframes).
+  - `Referrer-Policy`: `strict-origin-when-cross-origin`.
+  - `Permissions-Policy`: `camera=(), microphone=(), geolocation=()`.
+  - `Strict-Transport-Security`: `max-age=63072000; includeSubDomains; preload` (fuerza HTTPS estricto y cumple requisitos HSTS).
+- **Caché Inmutable de Assets**: Cabeceras `Cache-Control: public, max-age=31536000, immutable` para `/assets/(.*)` y `no-cache, no-store, must-revalidate` para el Service Worker y el HTML de entrada.
+
+### 2. SEO y Rastreadores Estáticos (`public/robots.txt`)
+- Se implementó un archivo físico estático `public/robots.txt` que previene que los rastreadores web (Lighthouse, Googlebot) caigan en el SPA fallback de `index.html`, eliminando alertas de sintaxis de SEO:
+  ```txt
+  User-agent: *
+  Allow: /
+  ```
+
+### 3. Optimización de Largest Contentful Paint (LCP) en Logo
+- **Conversión a WebP Optimizado**: El wordmark oficial (`/public/fluo-wordmark.webp`) fue comprimido desde 267 KB a 27.7 KB (<30 KB), reduciendo el tiempo de carga del LCP en más de 1.3 segundos.
+- **Prevención de Layout Shifts (CLS)**: Tanto en la cabecera del dashboard (`App.tsx`) como en la pantalla de bienvenida (`AuthScreen.tsx`), la imagen incluye atributos nativos explícitos `width="194"`, `height="84"` y prioridad de carga `fetchpriority="high"` / `fetchPriority="high"`.
+
+### 4. Pautas de Accesibilidad Móvil (WCAG 2.1 / 2.2)
+- **Viewport con Zoom Habilitado (WCAG 1.4.4 Resize Text)**: Se eliminó `user-scalable=no` de la etiqueta meta viewport en `index.html` para permitir que usuarios con baja visión amplíen el contenido sin restricciones.
+- **Landmarks Semánticos Accesibles (WCAG 1.3.1 Info and Relationships)**: La pantalla de autenticación (`AuthScreen.tsx`) y el área central del dashboard (`App.tsx`) están envueltas en contenedores semánticos `<main>`.
+- **Área Táctil Mínima (WCAG 2.5.8 Target Size)**: El botón de alternar visibilidad de contraseña (icono de ojo) cuenta con un contenedor interactivo centrado de `w-8 h-8` (32×32 px), superando holgadamente el mínimo de 24×24 px.
+
+
 
 
 

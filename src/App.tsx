@@ -139,8 +139,11 @@ export default function App() {
       <header className="flex items-center justify-between mb-5 px-1 gap-2">
         <div className="flex items-center gap-2 flex-shrink-0">
           <img
-            src="/fluo-wordmark.png"
+            src="/fluo-wordmark.webp"
             alt="Fluo"
+            width="194"
+            height="84"
+            fetchPriority="high"
             className="h-9 sm:h-10 w-auto object-contain filter drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)] select-none"
           />
         </div>

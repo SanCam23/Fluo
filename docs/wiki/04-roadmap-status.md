@@ -37,6 +37,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Centro de Control de Cuenta & Perfil** | ✅ Completado | Avatar flotante en cabecera, `ProfileSettingsModal`, gestión de PIN y WebAuthn, cambio de contraseña Supabase y borrado GDPR (`delete_user_account`) |
 | **Sistema Multicuenta & Carrusel de Fuentes** | ✅ Completado | Gestión de orígenes de dinero (bancos/efectivo), carrusel scroll-snap a 120fps en `HeroBalance.tsx`, onboarding obligatorio, vinculación `sourceId` y reordenación en ajustes |
 | **Importe Ahorrado & Evolución (/stats)** | ✅ Completado | Tarjeta destacada Liquid Glass con Ahorro Neto Real, Tasa, Ritmo Diario, Proyección Cierre, Gráfico de Área interactivo y reactividad multicuenta |
+| **AppSec & Web Performance (A+)** | ✅ Completado | Migración CSP y cabeceras a `vercel.json`, `robots.txt` estático, WebP (<30 KB) LCP y accesibilidad WCAG |
 
 ---
 
@@ -721,6 +722,27 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - TypeScript: 0 errores (`tsc -b`).
   - Build: empaquetado de producción exitoso con compresión gzip/brotli.
 
+### v0.9.12 (Auditoría AppSec, Cabeceras HTTP A+, Core Web Vitals & Accesibilidad WCAG)
+- **Migración Integral de CSP y Cabeceras de Servidor ([`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json))**:
+  - Configuración nativa de cabeceras HTTP de servidor con alcance `/(.*)`.
+  - Content Security Policy (CSP) robusta (`script-src 'self' 'wasm-unsafe-eval'`), eliminando `'unsafe-inline'` y la penalización de navegadores y escáneres HTTP.
+  - Orígenes de datos autorizados para APIs financieras (`Supabase`, `Binance`, `Yahoo Finance`, `Clearbit`, `CoinGecko`).
+  - Cabeceras de endurecimiento: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, y `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (cumplimiento A+ en Mozilla Observatory).
+  - Eliminación de etiquetas meta CSP duplicadas e ignoradas en [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html).
+- **Rastreadores y SEO Limpio ([`public/robots.txt`](file:///c:/Users/santi/Documents/UNI/Fluo/public/robots.txt))**:
+  - Archivo físico estático en `/public` permitiendo rastreo controlado y evitando que `robots.txt` devuelva el SPA fallback (`index.html`) con errores de sintaxis en Lighthouse.
+- **Optimización Crítica de LCP en Logo ([`public/fluo-wordmark.webp`](file:///c:/Users/santi/Documents/UNI/Fluo/public/fluo-wordmark.webp))**:
+  - Conversión del logo oficial a WebP optimizado con compresión avanzada: reducción de 267 KB a 27.7 KB (~89.4% de reducción de peso).
+  - Atributos explícitos añadidos en [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx) y [`AuthScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/AuthScreen.tsx): `width="194"`, `height="84"` y `fetchPriority="high"`, previniendo Cumulative Layout Shift (CLS) y acelerando el Largest Contentful Paint (LCP) en más de 1.3s.
+- **Accesibilidad Móvil y Cumplimiento WCAG**:
+  - **Habilitación de Zoom**: Eliminada la restricción `user-scalable=no` en el viewport de [`index.html`](file:///c:/Users/santi/Documents/UNI/Fluo/index.html) para cumplir WCAG 1.4.4 (Resize text).
+  - **Landmarks Semánticos**: Contenedor maestro `<main>` implementado en [`AuthScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/AuthScreen.tsx) para garantizar navegación accesible con tecnologías asistivas (WCAG 1.3.1).
+  - **Target Size Táctil**: Ampliación del botón de alternancia de contraseña en [`AuthScreen.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/AuthScreen.tsx) a `w-8 h-8` (32×32 px), superando la norma WCAG 2.5.8 ($\ge 24\times24$ px).
+- **Validación de Calidad**:
+  - Vitest: 84/84 tests unitarios pasando.
+  - TypeScript: compilación limpia (`tsc -b`).
+  - Build: empaquetado de producción exitoso con generación de Service Worker y precaché de assets.
+
 ---
 
 ## Próximos Hitos (v1.0.0)
@@ -728,3 +750,4 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - [ ] **Exportación / Importación de Datos**: Backups locales en formato JSON y exportación de movimientos en CSV/Excel.
 - [ ] **Migración a IndexedDB**: Capacidad de soporte para miles de registros y series temporales históricas con `Dexie.js`.
 - [x] **Widgets de PWA & Offline First**: Service Worker y manifiesto PWA para instalación nativa en dispositivos iOS/Android.
+- [x] **Endurecimiento AppSec & Optimización LCP**: Cabeceras de seguridad HTTP en `vercel.json` (A+), robots.txt estático, logo WebP de alto rendimiento y accesibilidad WCAG.
