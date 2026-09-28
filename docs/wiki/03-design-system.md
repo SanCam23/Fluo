@@ -239,6 +239,11 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - Tarjetas compactas con botones de reordenación ordinal arriba/abajo, avatar oficial y saldo neto (eliminado el indicador de cantidad de movimientos para mantener máxima limpieza visual).
   - **Aislamiento en Portal DOM (`createPortal`)**: Modales de alta/edición y confirmación de borrado montados directamente en `document.body` con capa `z-[100]` y `bg-slate-950/80 backdrop-blur-xl`, garantizando que la sección del PIN de seguridad y elementos del perfil queden estrictamente por debajo sin superposiciones ni colisiones de apilamiento CSS.
 
+### 20. Modal de Onboarding de Primera Fuente (`InitialSourceModal`)
+- **Contención Vertical Dinámica (`max-h-[92dvh] overflow-y-auto`)**:
+  - Contenedor con soporte dinámico de viewport móvil (`max-h-[92dvh]`) y desplazamiento con inercia sin scrollbar visible (`no-scrollbar`), previniendo desbordamientos verticales en pantallas de teléfonos móviles (como el Honor Magic 6 Pro con barras de navegación activas) cuando se selecciona "Cuenta Bancaria" y emergen campos adicionales de entidad y botones de selección rápida.
+  - Ajuste ergonómico en proporciones de icono central, textos, inputs compactados y botón de envío principal siempre visible y accesible.
+
 ---
 
 ## 4. Microinteracciones y Haptic Feedback Visual

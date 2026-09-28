@@ -305,4 +305,70 @@ describe('Sistema Multicuenta (Fuentes / SourceAccounts)', () => {
       expect(useFinanceStore.getState().activeSourceId).toBeNull();
     });
   });
+
+  describe('Persistencia y resiliencia de fuentes al reiniciar sesión o app', () => {
+    it('no borra las fuentes al asignar userId por primera vez (prevId === null en arranque)', () => {
+      const { addSource, setUserId } = useFinanceStore.getState();
+
+      // Simulate source created locally
+      addSource({
+        name: 'BBVA Principal',
+        type: 'bank',
+        institution: 'BBVA',
+        initialBalance: 1200,
+        orderIndex: 0,
+      });
+
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+
+      // App starts and sets authenticated user
+      setUserId('user-uuid-1234');
+
+      // Sources must NOT be wiped
+      expect(useFinanceStore.getState().userId).toBe('user-uuid-1234');
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+      expect(useFinanceStore.getState().sources[0].name).toBe('BBVA Principal');
+    });
+
+    it('no borra las fuentes al invocar setUserId con el mismo usuario', () => {
+      const { addSource, setUserId } = useFinanceStore.getState();
+
+      setUserId('user-uuid-1234');
+      addSource({
+        name: 'Billetera Efectivo',
+        type: 'cash',
+        initialBalance: 60,
+        orderIndex: 0,
+      });
+
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+
+      // Re-trigger with same ID (e.g. tab re-focus or session token refresh)
+      setUserId('user-uuid-1234');
+
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+    });
+
+    it('limpia las fuentes si cambia genuinamente a otro usuario (prevId !== userId)', () => {
+      const { addSource, setUserId } = useFinanceStore.getState();
+
+      setUserId('user-alice');
+      addSource({
+        name: 'Cuenta de Alice',
+        type: 'bank',
+        initialBalance: 3000,
+        orderIndex: 0,
+      });
+
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+
+      // Switch account on same browser without purge
+      setUserId('user-bob');
+
+      // Bob should NOT see Alice's sources
+      expect(useFinanceStore.getState().userId).toBe('user-bob');
+      expect(useFinanceStore.getState().sources).toHaveLength(0);
+    });
+  });
 });
+

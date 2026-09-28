@@ -525,8 +525,26 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **Aislamiento de Modales de Fuentes en Perfil ([`SourceAccountManager.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/profile/SourceAccountManager.tsx))**:
   - Implementado `createPortal(..., document.body)` con capa `z-[100]` en los modales de alta, edición y eliminación de cuentas. Se erradica por completo la colisión con la sección de PIN de seguridad que se superponía al formulario.
   - Título del apartado renombrado estrictamente a **"Mis Fuentes"**.
-  - Supresión del indicador de movimientos (`{txCount} movs`) en cada fila de cuenta.
+- **Adaptabilidad Vertical en Onboarding Móvil ([`InitialSourceModal.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/common/InitialSourceModal.tsx))**:
+  - Implementada contención vertical dinámica con `max-h-[92dvh] overflow-y-auto no-scrollbar` y espaciado compacto. Resuelve el desbordamiento vertical en pantallas móviles (ej. Honor Magic 6 Pro) cuando se selecciona "Cuenta Bancaria" y se muestran los selectores de entidades, garantizando que el formulario y botón de acción siempre queden dentro de la pantalla y sean desplazables con suavidad.
 - **Validación & Tests**: `npx tsc -b` limpio (0 errores), 41 tests unitarios pasando al 100% y bundle de producción validado con `npm run build`.
+
+### v0.9.3 (Persistencia Resiliente de Fuentes, Reconciliación Offline-Cloud y Prevención de Purgas en Arranque)
+- **Persistencia de `userId` en `partialize` y `merge` ([`useFinanceStore.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/useFinanceStore.ts))**:
+  - Se añadió `userId` al middleware de persistencia en `localStorage` (`fluo_finance_storage_v3`).
+  - Previene que al reabrir la web app `userId` arranque en `null` antes de la inicialización de sesión de Supabase.
+- **Blindaje en Conmutación de Usuario (`setUserId`)**:
+  - Se modificó la condición de purga: únicamente resetea las colecciones si existe un cambio genuino entre dos usuarios autenticados distintos (`prevId && userId && prevId !== userId`).
+  - Elimina el borrado accidental del estado local que ocurría en cada recarga o reinicio de la aplicación cuando `prevId` era `null`.
+- **Reconciliación Inteligente en `loadCloudData`**:
+  - Si la nube retorna 0 fuentes (por ejemplo, si la tabla `source_accounts` aún no existe o el usuario configuró su cuenta offline), el store **preserva las fuentes locales** de `localStorage` y dispara una sincronización en segundo plano con `insertCloudSource`.
+  - Si la nube contiene fuentes, se fusionan inteligentemente preservando cualquier fuente local pendiente de sincronización.
+- **Tolerancia a Fallos en `fetchUserCloudData` ([`cloudSyncService.ts`](file:///c:/Users/Santino/Documents/Fluo/src/services/cloudSyncService.ts))**:
+  - Un error en la consulta a `source_accounts` (ej. tabla pendiente de crear en Supabase) ya no invalida el fetch global si `transactions` e `investments` cargan correctamente, evitando falsos positivos de error de sincronización.
+- **Suite de Tests Automatizados (Vitest)**:
+  - 3 nuevos tests en [`sourceAccounts.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/sourceAccounts.test.ts) validando que `setUserId` no borre fuentes en el arranque en frío, preserve fuentes ante llamadas repetidas y solo purgue al cambiar entre usuarios distintos.
+  - Suite global incrementada a **44 tests unitarios pasando al 100%**.
+- **Validación de Compilación**: `npx tsc -b` limpio (0 errores), `vitest run` (44/44 pasando) y build de producción optimizado (`npm run build`).
 
 ---
 

@@ -55,7 +55,7 @@ export async function fetchUserCloudData(userId: string): Promise<CloudFetchResu
       console.warn('[CloudSync] Error fetching investments:', assetsResponse.error.message);
     }
     if (sourcesResponse.error) {
-      console.warn('[CloudSync] Error fetching sources:', sourcesResponse.error.message);
+      console.warn('[CloudSync] Notice: sources query returned error (table source_accounts may need to be created in Supabase):', sourcesResponse.error.message);
     }
 
     const transactions: Transaction[] = (txResponse.data as DbTransaction[] || []).map(
@@ -70,12 +70,16 @@ export async function fetchUserCloudData(userId: string): Promise<CloudFetchResu
       mapDbSourceAccountToSource
     );
 
+    const hasCoreError = Boolean(txResponse.error || assetsResponse.error);
+
     return {
       transactions,
       assets,
       sources,
-      success: !txResponse.error && !assetsResponse.error && !sourcesResponse.error,
-      error: txResponse.error?.message || assetsResponse.error?.message || sourcesResponse.error?.message,
+      // If transactions and assets succeeded, treat fetch as successful so the app remains functional
+      // even if the source_accounts table is pending migration in Supabase
+      success: !hasCoreError,
+      error: txResponse.error?.message || assetsResponse.error?.message || (hasCoreError ? sourcesResponse.error?.message : undefined),
     };
   } catch (err: any) {
     console.error('[CloudSync] Unexpected error fetching user data:', err);

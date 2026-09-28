@@ -124,7 +124,10 @@ Fluo/
      ```
 2. **Capa de Persistencia Versionada (`fluo_finance_storage_v3`)**:
    - Serialización automática en `localStorage` con middleware `persist` de Zustand.
-   - Incluye estrategia de fusión (`merge`) personalizada que preserva metadatos nuevos como `domain`, `brandColor` y `logoUrl` e incluye automáticamente las marcas dinámicas creadas o buscadas por el usuario.
+   - Preservación integral de `userId`, `transactions`, `sources`, `categories`, `brands`, `assets` y `recurrences` en `partialize`.
+   - Estrategia de fusión (`merge`) personalizada que preserva `userId`, metadatos de marcas (`domain`, `brandColor`, `logoUrl`) e incluye automáticamente las marcas dinámicas creadas o buscadas por el usuario.
+   - **Conmutación Segura de Sesión (`setUserId`)**: Solo purga colecciones si ocurre un cambio genuino entre dos usuarios autenticados distintos (`prevId && userId && prevId !== userId`). Durante el arranque en frío o recargas de navegador (`prevId === null` o `prevId === userId`), el estado local hidratado nunca se borra.
+   - **Reconciliación Inteligente en `loadCloudData`**: Si la consulta a la nube devuelve 0 fuentes pero el almacenamiento local contiene fuentes configuradas (debido a trabajo offline, latencia de sincronización o migración de base de datos pendiente), el store preserva estrictamente las fuentes locales y dispara su subida automática a Supabase en segundo plano (`insertCloudSource`), garantizando que la fuente configurada no se pierda al reiniciar la aplicación.
    - Clave actual: `fluo_finance_storage_v3`.
 3. **Escudo de Resiliencia (`ErrorBoundary`)**:
    - Envuelve el árbol raíz de React en [`main.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/main.tsx).

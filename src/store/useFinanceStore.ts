@@ -168,8 +168,9 @@ export const useFinanceStore = create<FinanceState>()(
 
       setUserId: (userId) => {
         const prevId = get().userId;
-        if (userId && prevId !== userId) {
-          // Switching to authenticated user: wipe any local demo data immediately
+        // ONLY wipe state when genuinely switching from one authenticated user to ANOTHER authenticated user
+        if (prevId && userId && prevId !== userId) {
+          // Different user logged in on the same browser: wipe previous user's data
           set({
             userId,
             transactions: [],
@@ -207,10 +208,38 @@ export const useFinanceStore = create<FinanceState>()(
         try {
           const result = await fetchUserCloudData(userId);
           if (result.success) {
+            const currentSources = get().sources;
+            const cloudSources = result.sources || [];
+
+            // Intelligent source reconciliation:
+            // 1. If cloud returned 0 sources, but client already has local sources (e.g. offline, initial setup, or pending sync),
+            //    DO NOT erase local sources; keep them and trigger cloud upload.
+            // 2. If cloud returned sources, merge them with any local sources not yet in cloud.
+            let finalSources: SourceAccount[] = cloudSources;
+            if (cloudSources.length === 0 && currentSources.length > 0) {
+              finalSources = currentSources;
+              currentSources.forEach((s) => {
+                insertCloudSource(s, userId).catch((err) =>
+                  console.warn('[Store] Auto-sync local source to cloud failed:', err)
+                );
+              });
+            } else if (cloudSources.length > 0) {
+              const cloudIds = new Set(cloudSources.map((s) => s.id));
+              const unsynced = currentSources.filter((s) => !cloudIds.has(s.id));
+              finalSources = [...cloudSources, ...unsynced];
+              if (unsynced.length > 0) {
+                unsynced.forEach((s) => {
+                  insertCloudSource(s, userId).catch((err) =>
+                    console.warn('[Store] Auto-sync unsynced source to cloud failed:', err)
+                  );
+                });
+              }
+            }
+
             set({
               transactions: sortTransactionsDesc(result.transactions),
               assets: result.assets,
-              sources: (result.sources || []).sort((a, b) => a.orderIndex - b.orderIndex),
+              sources: [...finalSources].sort((a, b) => a.orderIndex - b.orderIndex),
               recurrences: [],
               isCloudLoading: false,
               cloudSyncError: null,
@@ -234,6 +263,7 @@ export const useFinanceStore = create<FinanceState>()(
         const newSource: SourceAccount = {
           ...sourceData,
           id: generateId('source'),
+          userId: userId || undefined,
           orderIndex: sourceData.orderIndex ?? sources.length,
           createdAt: new Date().toISOString(),
         };
@@ -654,6 +684,7 @@ export const useFinanceStore = create<FinanceState>()(
       name: 'fluo_finance_storage_v3',
       storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
+        userId: state.userId,
         transactions: state.transactions,
         categories: state.categories,
         brands: state.brands,
@@ -671,6 +702,7 @@ export const useFinanceStore = create<FinanceState>()(
         return {
           ...currentState,
           ...p,
+          userId: p.userId !== undefined ? p.userId : currentState.userId,
           themeMode: p.themeMode || currentState.themeMode || 'dark',
           transactions:
             Array.isArray(p.transactions)

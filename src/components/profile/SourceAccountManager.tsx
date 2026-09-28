@@ -265,8 +265,8 @@ export const SourceAccountManager: React.FC = () => {
       {isModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn">
-            <div className="relative w-full max-w-sm rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-white/20 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-4 text-white">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn overflow-y-auto">
+            <div className="relative w-full max-w-sm max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-white/20 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-4 text-white my-auto">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                   <Landmark className="h-4 w-4 text-indigo-400" />
@@ -406,8 +406,8 @@ export const SourceAccountManager: React.FC = () => {
       {deletingSource &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn">
-            <div className="relative w-full max-w-sm rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-rose-500/30 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-3.5 text-white">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn overflow-y-auto">
+            <div className="relative w-full max-w-sm max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-rose-500/30 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-3.5 text-white my-auto">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400">
                   <ShieldAlert className="h-6 w-6" />
