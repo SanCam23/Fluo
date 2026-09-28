@@ -181,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Fallback direct RLS cascade deletion
           await supabase.from('transactions').delete().eq('user_id', user.id);
           await supabase.from('investments').delete().eq('user_id', user.id);
+          await supabase.from('source_accounts').delete().eq('user_id', user.id);
         }
       }
       return { error: null };

@@ -653,6 +653,29 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Compilación TypeScript: `tsc -b` (0 errores).
   - Build de producción: `vite build` completado y optimizado con gzip y brotli.
 
+### v0.9.9 (Alineación Integral con el Esquema Real de Supabase & Persistencia Cloud Resiliente)
+- **Diagnóstico y Corrección de Discrepancias de Esquema en Supabase**:
+  - **Tabla `public.transactions`**: Adaptación estricta a las 11 columnas reales de la base de datos:
+    - Mapeo de `pillar` a `type` con respeto estricto al check `CHECK (type IN ('income', 'expense'))`.
+    - Mapeo de `categoryId` a `category`.
+    - Codificación transparente de `brandId` y `concept` dentro de la columna `brand` (`brandId::concept`).
+    - Eliminación de campos que causaban error 400 Bad Request en PostgREST (`concept`, `pillar`, `category_id`, `recurrence_id`, `is_recurring_generated`).
+  - **Tabla `public.investments`**: Adaptación a las 8 columnas reales de la base de datos:
+    - Mapeo de `identifier` / `ticker` / `isin` al campo canónico `symbol_or_isin`.
+    - Eliminación de columnas inexistentes que bloqueaban los inserts (`ticker`, `isin`, `current_price`, `currency`, `platform`, `brand_id`, `last_updated`, `change_24h`, `initial_fee`, `acquisition_date`).
+    - Resolución dinámica en tiempo real de cotizaciones desacoplada de la persistencia relacional.
+  - **Tabla `public.source_accounts`**: Integración verificada con `upsert(..., { onConflict: 'id' })` para eliminar colisiones de clave primaria (error 409) durante reconciliaciones y altas de cuentas.
+- **Generación Garantizada de UUIDs para PostgreSQL**:
+  - Implementación de `generateUuid()` y `ensureValidUuid()` con fallback RFC4122 v4 en [`supabaseClient.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/lib/supabaseClient.ts) para evitar errores de sintaxis de tipo UUID (`invalid input syntax for type uuid`).
+- **Resiliencia en Consulta Cloud (`fetchUserCloudData`)**:
+  - La respuesta de carga considera éxito si al menos una tabla responde correctamente (`!allFailed`), permitiendo la hidratación completa de fuentes aun si el usuario todavía no tiene transacciones o activos registrados.
+- **Sincronización de `schema.sql` y Políticas RLS**:
+  - Actualización de [`supabase/schema.sql`](file:///c:/Users/santi/Documents/UNI/Fluo/supabase/schema.sql) con las sentencias DDL exactas de producción y políticas completas de RLS para el rol `authenticated`.
+- **Validación de Calidad**:
+  - Vitest: 84/84 tests pasando (7 suites).
+  - TypeScript: `tsc -b` limpio (0 errores de tipos).
+  - Build: bundle de producción generado y comprimido con gzip y brotli.
+
 ---
 
 ## Próximos Hitos (v1.0.0)

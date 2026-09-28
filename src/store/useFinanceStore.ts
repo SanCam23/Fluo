@@ -37,12 +37,10 @@ import {
   reorderCloudSources,
   deleteCloudSource,
 } from '../services/cloudSyncService';
+import { generateUuid } from '../lib/supabaseClient';
 
-function generateId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+function generateId(_prefix?: string): string {
+  return generateUuid();
 }
 
 interface FinanceState {
@@ -243,10 +241,17 @@ export const useFinanceStore = create<FinanceState>()(
               }
             }
 
+            const currentActiveSourceId = get().activeSourceId;
+            const sortedFinalSources = [...finalSources].sort((a, b) => a.orderIndex - b.orderIndex);
+            const validActiveSourceId = sortedFinalSources.some((s) => s.id === currentActiveSourceId)
+              ? currentActiveSourceId
+              : (sortedFinalSources[0]?.id || null);
+
             set({
               transactions: sortTransactionsDesc(result.transactions),
               assets: result.assets,
-              sources: [...finalSources].sort((a, b) => a.orderIndex - b.orderIndex),
+              sources: sortedFinalSources,
+              activeSourceId: validActiveSourceId,
               recurrences: [],
               isCloudLoading: false,
               hasHydratedFromCloud: true,

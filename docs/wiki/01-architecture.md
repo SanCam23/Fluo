@@ -290,8 +290,11 @@ Fluo integra **Supabase** como backend oficial para autenticación y persistenci
 
 ### 1. Cliente Tipado y Aislamiento (`supabaseClient.ts`)
 - Configurado a partir de variables de entorno seguras (`VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`).
-- Esquema de base de datos tipado en TypeScript (`Database`) con soporte para tablas `transactions` e `investments`.
-- Funciones bidireccionales de mapeo que traducen de forma transparente entre la convención `camelCase` del frontend de Fluo y `snake_case` de PostgreSQL.
+- Esquema de base de datos tipado en TypeScript (`Database`) con soporte alineado para las tablas de producción:
+  - `public.transactions`: columnas `id` (UUID), `user_id`, `type` (`income` | `expense`), `amount`, `category`, `brand` (codificación bidireccional `brandId::concept`), `date`, `is_recurring`, `recurring_period`, `source_id`, `created_at`.
+  - `public.investments`: columnas `id` (UUID), `user_id`, `asset_type`, `name`, `symbol_or_isin`, `shares`, `average_buy_price`, `created_at`. Las cotizaciones en vivo se resuelven en runtime desacopladas del almacenamiento.
+  - `public.source_accounts`: columnas `id` (TEXT), `user_id` (UUID), `name`, `type` (`bank` | `cash`), `institution`, `brand_id`, `initial_balance`, `order_index`, `color`, `created_at`.
+- Funciones de mapeo bidireccional puras (`mapDbTransactionToTransaction`, `mapTransactionToDb`, `mapDbInvestmentToAsset`, `mapAssetToDbInvestment`, `mapDbSourceAccountToSource`, `mapSourceToDb`) y generador de UUIDs RFC4122 v4 garantizado (`generateUuid`, `ensureValidUuid`).
 
 ### 2. Ciclo de Vida de Autenticación (`AuthContext.tsx`)
 - Contexto centralizado que expone `user`, `session`, `loading`, `signInWithEmail`, `signUpWithEmail`, `signOut`, `enterDemoMode` y `exitDemoMode`.
@@ -303,10 +306,11 @@ Fluo integra **Supabase** como backend oficial para autenticación y persistenci
 - Destello especular cenital, alternador suave de cápsula para Login / Registro, soporte de visibilidad de contraseña y alertas translúcidas rojas (`bg-rose-500/10 border-rose-500/20 text-rose-300`).
 
 ### 4. Ciclo de Sincronización Reactiva (*Optimistic UI + Background Cloud Sync*)
-- **Lectura Inicial (`SELECT`)**: Al autenticarse el usuario, `loadCloudData(user.id)` consulta en paralelo las tablas `transactions` e `investments` filtrando por `user_id = user.id`.
-- **Escrituras Inmediatas (`INSERT / UPDATE / DELETE`)**:
-  - Toda adición, modificación o eliminación se aplica de inmediato al store de Zustand (`useFinanceStore`), garantizando una respuesta táctil instantánea a 60 FPS sin latencias de red.
-  - En segundo plano, `cloudSyncService.ts` ejecuta la mutación correspondiente en Supabase (`insertCloudTransaction`, `deleteCloudTransaction`, `insertCloudAsset`, etc.).
+- **Lectura Inicial (`SELECT`)**: Al autenticarse el usuario, `loadCloudData(user.id)` consulta en paralelo las tablas `transactions`, `investments` y `source_accounts` filtrando por `user_id = user.id`.
+- **Estrategia Resiliente de Inserción (`UPSERT`)**:
+  - Mutaciones optimistas instantáneas en UI a 60 FPS en el store de Zustand (`useFinanceStore`).
+  - Escrituras asíncronas con cláusula `.upsert(dbPayload, { onConflict: 'id' })` tanto para transacciones como para fuentes e inversiones, eliminando errores de clave duplicada (código 409) ante re-login o reconciliación de datos locales.
+- **Reconciliación Inteligente**: Si la consulta a la nube devuelve fuentes, se combinan con las locales y se activa `hasHydratedFromCloud: true`. Si la nube está vacía pero el cliente ya tiene cuentas creadas, se preservan localmente y se sincronizan automáticamente en segundo plano.
 - **Manejo de Errores y Caídas de Red**: Si Supabase no responde o la red cae, el estado local permanece activo y se registra una advertencia, evitando bloqueos en la interfaz.
 
 ### 5. Seguridad a Nivel de Fila (Row Level Security - RLS)

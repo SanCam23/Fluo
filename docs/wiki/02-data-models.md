@@ -153,21 +153,19 @@ export interface Transaction {
 
 ### Correspondencia con la Tabla SQL `public.transactions` en Supabase
 
-| Campo TypeScript (`Transaction`) | Columna SQL (`public.transactions`) | Tipo PostgreSQL | Restricciones / Índices |
+| Campo TypeScript (`Transaction`) | Columna SQL (`public.transactions`) | Tipo PostgreSQL | Restricciones / Mapeo |
 | :--- | :--- | :--- | :--- |
-| `id` | `id` | `TEXT` | `PRIMARY KEY` |
+| `id` | `id` | `UUID` | `PRIMARY KEY DEFAULT gen_random_uuid()` |
 | *(Auth Context)* | `user_id` | `UUID` | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` |
-| `amount` | `amount` | `NUMERIC(12, 2)` | `NOT NULL` |
-| `pillar` | `pillar` | `TEXT` | `CHECK (pillar IN ('income', 'expense', 'invest'))` |
-| `categoryId` | `category_id` | `TEXT` | `NOT NULL` |
-| `brandId` | `brand_id` | `TEXT` | `NULL` |
-| `sourceId` | `source_id` | `TEXT` | `NULL REFERENCES public.source_accounts(id) ON DELETE SET NULL` |
-| `concept` | `concept` | `TEXT` | `NOT NULL` |
-| `date` | `date` | `TIMESTAMPTZ` | `NOT NULL`, Índice `idx_transactions_user_date` |
+| `pillar` | `type` | `TEXT` | `NOT NULL CHECK (type IN ('income', 'expense'))` |
+| `amount` | `amount` | `NUMERIC` | `NOT NULL` |
+| `categoryId` | `category` | `TEXT` | `NOT NULL` |
+| `brandId` / `concept` | `brand` | `TEXT` | `NULL` (codificación transparente `brandId::concept` o texto) |
+| `date` | `date` | `TIMESTAMPTZ` | `NOT NULL DEFAULT now()`, Índice `idx_transactions_user_date` |
 | `isRecurring` | `is_recurring` | `BOOLEAN` | `DEFAULT FALSE` |
-| `isRecurringGenerated` | `is_recurring_generated` | `BOOLEAN` | `DEFAULT FALSE` |
-| `recurrenceId` | `recurrence_id` | `TEXT` | `NULL` |
-| `createdAt` | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
+| `recurrenceId` | `recurring_period` | `TEXT` | `CHECK (recurring_period IN ('weekly', 'biweekly', 'monthly', 'yearly'))` |
+| `createdAt` | `created_at` | `TIMESTAMPTZ` | `DEFAULT now()` |
+| `sourceId` | `source_id` | `TEXT` | `NULL` |
 
 ### Operaciones CRUD de Transacciones
 - **Alta (`addTransaction`)**: Inserta el registro local en Zustand preservando la fecha seleccionada (`date` en formato ISO 8601 `YYYY-MM-DDTHH:mm:ss.sssZ`), asignando el `sourceId` seleccionado, reordena la colección global cronológicamente en orden descendente e invoca en segundo plano `insertCloudTransaction` en Supabase.
@@ -280,26 +278,18 @@ export interface InvestmentAsset {
 
 ### Correspondencia con la Tabla SQL `public.investments` en Supabase
 
-| Campo TypeScript (`InvestmentAsset`) | Columna SQL (`public.investments`) | Tipo PostgreSQL | Restricciones / Índices |
+| Campo TypeScript (`InvestmentAsset`) | Columna SQL (`public.investments`) | Tipo PostgreSQL | Restricciones / Mapeo |
 | :--- | :--- | :--- | :--- |
-| `id` | `id` | `TEXT` | `PRIMARY KEY` |
+| `id` | `id` | `UUID` | `PRIMARY KEY DEFAULT gen_random_uuid()` |
 | *(Auth Context)* | `user_id` | `UUID` | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` |
+| `assetType` | `asset_type` | `TEXT` | `NOT NULL` |
 | `name` | `name` | `TEXT` | `NOT NULL`, Índice `idx_investments_user_name` |
-| `identifier` | `identifier` | `TEXT` | `NOT NULL`, Índice `idx_investments_identifier` |
-| `ticker` | `ticker` | `TEXT` | `NULL` |
-| `isin` | `isin` | `TEXT` | `NULL` |
-| `assetType` | `asset_type` | `TEXT` | `NOT NULL CHECK (asset_type IN (...))` |
-| `shares` | `shares` | `NUMERIC(16, 8)` | `NOT NULL` |
-| `averageBuyPrice` | `average_buy_price` | `NUMERIC(12, 4)` | `NOT NULL` |
-| `currentPrice` | `current_price` | `NUMERIC(12, 4)` | `NOT NULL` |
-| `currency` | `currency` | `TEXT` | `DEFAULT 'EUR' CHECK (currency IN ('EUR', 'USD'))` |
-| `platform` | `platform` | `TEXT` | `NULL` |
-| `brandId` | `brand_id` | `TEXT` | `NULL` |
-| `lastUpdated` | `last_updated` | `TEXT` | `DEFAULT 'Ahora mismo'` |
-| `change24h` | `change_24h` | `NUMERIC(8, 4)` | `NULL` |
-| `initialFee` | `initial_fee` | `NUMERIC(10, 2)` | `NULL` |
-| `acquisitionDate` | `acquisition_date` | `TEXT` | `NULL` |
-| *(Metadata)* | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
+| `identifier` / `ticker` / `isin` | `symbol_or_isin` | `TEXT` | `NOT NULL`, Índice `idx_investments_symbol` |
+| `shares` | `shares` | `NUMERIC` | `NOT NULL` |
+| `averageBuyPrice` | `average_buy_price` | `NUMERIC` | `NOT NULL` |
+| *(Metadata)* | `created_at` | `TIMESTAMPTZ` | `DEFAULT now()` |
+
+> **Nota Arquitectónica**: `current_price`, `currency`, `last_updated` y `change_24h` se resuelven reactivamente en tiempo real en el frontend mediante `marketDataService.ts`, manteniendo el esquema de base de datos ultraligero y desacoplado de fluctuaciones intradiarias.
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
 Gestiona el catálogo de activos financieros, resolución de símbolos y fallback resiliente:

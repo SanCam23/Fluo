@@ -1,55 +1,46 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Transaction, InvestmentAsset, PillarType, AssetType, SourceAccount, SourceType } from '../types/finance';
 
-// Database Schema interfaces for Supabase
-export interface DbTransaction {
-  id: string;
-  user_id: string;
-  amount: number;
-  pillar: PillarType;
-  category_id: string;
-  brand_id: string | null;
-  source_id: string | null;
-  concept: string;
-  date: string;
-  is_recurring: boolean;
-  is_recurring_generated: boolean;
-  recurrence_id: string | null;
-  created_at: string | number;
-}
+// ==============================================================================
+// Database Schema Interfaces matching exact Supabase PostgreSQL tables
+// ==============================================================================
 
-export interface DbSourceAccount {
-  id: string;
-  user_id: string;
-  name: string;
-  type: SourceType;
-  institution: string | null;
-  brand_id: string | null;
-  initial_balance: number | null;
-  order_index: number;
-  color: string | null;
-  created_at: string;
+export interface DbTransaction {
+  id: string; // UUID NOT NULL DEFAULT gen_random_uuid()
+  user_id: string; // UUID NOT NULL DEFAULT auth.uid()
+  type: 'income' | 'expense'; // CHECK (type IN ('income', 'expense'))
+  amount: number; // NUMERIC NOT NULL
+  category: string; // TEXT NOT NULL
+  brand: string | null; // TEXT
+  date: string; // TIMESTAMPTZ NOT NULL DEFAULT now()
+  is_recurring: boolean; // BOOLEAN DEFAULT false
+  recurring_period: 'weekly' | 'biweekly' | 'monthly' | 'yearly' | null;
+  created_at: string; // TIMESTAMPTZ DEFAULT now()
+  source_id: string | null; // TEXT
 }
 
 export interface DbInvestment {
-  id: string;
-  user_id: string;
-  name: string;
-  identifier: string;
-  ticker: string | null;
-  isin: string | null;
-  asset_type: AssetType;
-  shares: number;
-  average_buy_price: number;
-  current_price: number;
-  currency: 'EUR' | 'USD';
-  platform: string | null;
-  brand_id: string | null;
-  last_updated: string;
-  change_24h: number | null;
-  initial_fee: number | null;
-  acquisition_date: string | null;
-  created_at?: string;
+  id: string; // UUID NOT NULL DEFAULT gen_random_uuid()
+  user_id: string; // UUID NOT NULL DEFAULT auth.uid()
+  asset_type: string; // TEXT NOT NULL
+  name: string; // TEXT NOT NULL
+  symbol_or_isin: string; // TEXT NOT NULL
+  shares: number; // NUMERIC NOT NULL
+  average_buy_price: number; // NUMERIC NOT NULL
+  created_at: string; // TIMESTAMPTZ DEFAULT now()
+}
+
+export interface DbSourceAccount {
+  id: string; // TEXT NOT NULL PRIMARY KEY
+  user_id: string; // UUID NOT NULL
+  name: string; // TEXT NOT NULL
+  type: SourceType; // CHECK (type IN ('bank', 'cash'))
+  institution: string | null; // TEXT
+  brand_id: string | null; // TEXT
+  initial_balance: number | null; // NUMERIC DEFAULT 0.00
+  order_index: number; // INTEGER NOT NULL DEFAULT 0
+  color: string | null; // TEXT
+  created_at: string; // TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
 }
 
 export interface Database {
@@ -102,42 +93,178 @@ export const supabase = createClient<Database>(clientUrl, clientKey, {
   },
 });
 
-// Mapping Utilities: DB (snake_case) <-> Frontend (camelCase)
-export function mapDbTransactionToTransaction(row: DbTransaction): Transaction {
+// UUID Helpers to ensure valid UUIDs for PostgreSQL tables with UUID primary keys
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export function ensureValidUuid(id?: string): string {
+  if (id && UUID_REGEX.test(id)) {
+    return id;
+  }
+  return generateUuid();
+}
+
+// ==============================================================================
+// Mapping Utilities: DB (PostgreSQL / Supabase) <-> Frontend (Fluo Types)
+// ==============================================================================
+
+/**
+ * Maps a row from `public.transactions` to the frontend `Transaction` type.
+ * Handles both the current schema (`type`, `category`, `brand`) and backwards-compat fields.
+ */
+export function mapDbTransactionToTransaction(row: any): Transaction {
+  const cat = String(row.category || row.category_id || '').toLowerCase();
+  const isInvestCategory =
+    cat.startsWith('cat-etf') ||
+    cat.startsWith('cat-stock') ||
+    cat.startsWith('cat-crypto') ||
+    cat.startsWith('cat-fixed') ||
+    cat.startsWith('cat-deposit') ||
+    cat === 'invest';
+
+  let pillar: PillarType = 'expense';
+  if (row.pillar === 'income' || row.pillar === 'expense' || row.pillar === 'invest') {
+    pillar = row.pillar;
+  } else if (row.type === 'income') {
+    pillar = 'income';
+  } else if (isInvestCategory) {
+    pillar = 'invest';
+  }
+
+  // Parse brand and concept from the `brand` column (supports 'brandId::concept' or single string)
+  let brandId: string | undefined = undefined;
+  let concept: string = 'Transacción';
+
+  const rawBrand = row.brand || row.concept || null;
+  if (rawBrand) {
+    if (rawBrand.includes('::')) {
+      const parts = rawBrand.split('::');
+      brandId = parts[0] || undefined;
+      concept = parts.slice(1).join('::') || parts[0];
+    } else {
+      brandId = rawBrand;
+      concept = rawBrand;
+    }
+  } else if (row.concept) {
+    concept = row.concept;
+  }
+
+  const categoryId = row.category || row.category_id || (
+    pillar === 'income' ? 'cat-salary' : (pillar === 'invest' ? 'cat-etf' : 'cat-groceries')
+  );
+
   return {
     id: row.id,
     amount: Number(row.amount),
-    pillar: row.pillar,
-    categoryId: row.category_id,
-    brandId: row.brand_id || undefined,
+    pillar,
+    categoryId,
+    brandId,
     sourceId: row.source_id || undefined,
-    concept: row.concept,
-    date: row.date,
+    concept,
+    date: row.date || new Date().toISOString(),
     isRecurring: Boolean(row.is_recurring),
     isRecurringGenerated: Boolean(row.is_recurring_generated),
-    recurrenceId: row.recurrence_id || undefined,
-    createdAt: typeof row.created_at === 'number' ? row.created_at : new Date(row.created_at).getTime() || Date.now(),
+    recurrenceId: row.recurring_period || row.recurrence_id || undefined,
+    createdAt: row.created_at
+      ? (typeof row.created_at === 'number' ? row.created_at : new Date(row.created_at).getTime())
+      : Date.now(),
   };
 }
 
+/**
+ * Maps a frontend `Transaction` to a payload strictly conforming to `public.transactions`.
+ */
 export function mapTransactionToDb(tx: Transaction, userId: string): DbTransaction {
+  // DB CHECK constraint restricts `type` to 'income' or 'expense'
+  const dbType: 'income' | 'expense' = tx.pillar === 'income' ? 'income' : 'expense';
+
+  // Encode brandId and concept if distinct
+  let brandValue: string | null = null;
+  if (tx.brandId && tx.concept && tx.brandId !== tx.concept) {
+    brandValue = `${tx.brandId}::${tx.concept}`;
+  } else {
+    brandValue = tx.brandId || tx.concept || null;
+  }
+
+  let recurringPeriod: 'weekly' | 'biweekly' | 'monthly' | 'yearly' | null = null;
+  if (tx.isRecurring) {
+    recurringPeriod = 'monthly';
+  }
+
   return {
-    id: tx.id,
+    id: ensureValidUuid(tx.id),
     user_id: userId,
+    type: dbType,
     amount: Number(tx.amount),
-    pillar: tx.pillar,
-    category_id: tx.categoryId,
-    brand_id: tx.brandId || null,
-    source_id: tx.sourceId || null,
-    concept: tx.concept,
-    date: tx.date,
+    category: tx.categoryId,
+    brand: brandValue,
+    date: tx.date || new Date().toISOString(),
     is_recurring: Boolean(tx.isRecurring),
-    is_recurring_generated: Boolean(tx.isRecurringGenerated),
-    recurrence_id: tx.recurrenceId || null,
+    recurring_period: recurringPeriod,
     created_at: new Date(tx.createdAt || Date.now()).toISOString(),
+    source_id: tx.sourceId || null,
   };
 }
 
+/**
+ * Maps a row from `public.investments` to the frontend `InvestmentAsset` type.
+ */
+export function mapDbInvestmentToAsset(row: any): InvestmentAsset {
+  const symbol = row.symbol_or_isin || row.identifier || 'ASSET';
+  const avgPrice = Number(row.average_buy_price) || 0;
+  const currentPrice = row.current_price !== undefined && row.current_price !== null
+    ? Number(row.current_price)
+    : avgPrice;
+
+  return {
+    id: row.id,
+    name: row.name,
+    identifier: symbol,
+    ticker: row.ticker || symbol,
+    isin: row.isin || (symbol.length === 12 ? symbol : undefined),
+    assetType: (row.asset_type || 'stock') as AssetType,
+    shares: Number(row.shares),
+    averageBuyPrice: avgPrice,
+    currentPrice: currentPrice > 0 ? currentPrice : avgPrice,
+    currency: row.currency || 'EUR',
+    platform: row.platform || undefined,
+    brandId: row.brand_id || undefined,
+    lastUpdated: row.last_updated || 'Ahora mismo',
+    change24h: row.change_24h !== null && row.change_24h !== undefined ? Number(row.change_24h) : undefined,
+    initialFee: row.initial_fee !== null && row.initial_fee !== undefined ? Number(row.initial_fee) : undefined,
+    acquisitionDate: row.acquisition_date || (row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : undefined),
+  };
+}
+
+/**
+ * Maps a frontend `InvestmentAsset` to a payload strictly conforming to `public.investments`.
+ */
+export function mapAssetToDbInvestment(asset: InvestmentAsset, userId: string): DbInvestment {
+  return {
+    id: ensureValidUuid(asset.id),
+    user_id: userId,
+    asset_type: asset.assetType,
+    name: asset.name,
+    symbol_or_isin: asset.identifier || asset.ticker || asset.isin || 'ASSET',
+    shares: Number(asset.shares),
+    average_buy_price: Number(asset.averageBuyPrice),
+    created_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Maps a row from `public.source_accounts` to the frontend `SourceAccount` type.
+ */
 export function mapDbSourceAccountToSource(row: DbSourceAccount): SourceAccount {
   return {
     id: row.id,
@@ -153,6 +280,9 @@ export function mapDbSourceAccountToSource(row: DbSourceAccount): SourceAccount 
   };
 }
 
+/**
+ * Maps a frontend `SourceAccount` to a payload strictly conforming to `public.source_accounts`.
+ */
 export function mapSourceToDb(source: SourceAccount, userId: string): DbSourceAccount {
   return {
     id: source.id,
@@ -161,52 +291,10 @@ export function mapSourceToDb(source: SourceAccount, userId: string): DbSourceAc
     type: source.type,
     institution: source.institution || null,
     brand_id: source.brandId || null,
-    initial_balance: source.initialBalance !== undefined ? Number(source.initialBalance) : 0,
-    order_index: source.orderIndex ?? 0,
+    initial_balance: Number(source.initialBalance ?? 0),
+    order_index: Number(source.orderIndex ?? 0),
     color: source.color || null,
     created_at: source.createdAt || new Date().toISOString(),
   };
 }
 
-export function mapDbInvestmentToAsset(row: DbInvestment): InvestmentAsset {
-  return {
-    id: row.id,
-    name: row.name,
-    identifier: row.identifier,
-    ticker: row.ticker || undefined,
-    isin: row.isin || undefined,
-    assetType: row.asset_type,
-    shares: Number(row.shares),
-    averageBuyPrice: Number(row.average_buy_price),
-    currentPrice: Number(row.current_price),
-    currency: row.currency,
-    platform: row.platform || undefined,
-    brandId: row.brand_id || undefined,
-    lastUpdated: row.last_updated,
-    change24h: row.change_24h !== null ? Number(row.change_24h) : undefined,
-    initialFee: row.initial_fee !== null ? Number(row.initial_fee) : undefined,
-    acquisitionDate: row.acquisition_date || undefined,
-  };
-}
-
-export function mapAssetToDbInvestment(asset: InvestmentAsset, userId: string): DbInvestment {
-  return {
-    id: asset.id,
-    user_id: userId,
-    name: asset.name,
-    identifier: asset.identifier,
-    ticker: asset.ticker || null,
-    isin: asset.isin || null,
-    asset_type: asset.assetType,
-    shares: Number(asset.shares),
-    average_buy_price: Number(asset.averageBuyPrice),
-    current_price: Number(asset.currentPrice),
-    currency: asset.currency,
-    platform: asset.platform || null,
-    brand_id: asset.brandId || null,
-    last_updated: asset.lastUpdated,
-    change_24h: asset.change24h !== undefined ? Number(asset.change24h) : null,
-    initial_fee: asset.initialFee !== undefined ? Number(asset.initialFee) : null,
-    acquisition_date: asset.acquisitionDate || null,
-  };
-}
