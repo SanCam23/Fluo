@@ -284,6 +284,57 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - `text-slate-400 light:text-slate-500 hover:text-white light:hover:text-slate-900 hover:bg-white/[0.04] light:hover:bg-slate-200/60 border border-transparent font-medium transition-all duration-200`.
 - **Iconografía**: Glifo representativo del modo (`DollarSign` para total monetario, `Hash` para títulos numéricos) a la izquierda de la etiqueta.
 
+### 23. Calibración Óptica de Sombras y Paridad con Estadísticas (`HeroBalance` & `AnalyticsView`)
+- **Evaluación Causa Raíz de las Sombras Cuadradas**:
+  1. **Regla invasiva en CSS Global**: `index.css` forzaba `box-shadow: 0 12px 32px -4px rgba(15,23,42,0.08) !important` sobre cualquier selector que contuviera `bg-white/[0.08]`. El desplazamiento vertical desmedido de 12px proyectaba una base oscura muy pronunciada.
+  2. **Recorte Rectangular por Desbordamiento (`overflow-x: auto`)**: Por especificación del W3C, un contenedor con desplazamiento horizontal establece automáticamente una caja de recorte (*clipping boundary*) en ambos ejes. Con un padding vertical insuficiente (`py-3.5` = 14px), la sombra difusa de 32px se truncaba en una línea horizontal plana en la parte inferior y líneas rectas a los lados, creando la silueta de un rectángulo o cuadrado.
+  3. **Capa GPU Aislada (`transform-gpu`)**: Forzaba la rasterización del contenedor en una textura fija, haciendo que los bordes de recorte de la sombra fueran cortantes en lugar de degradarse suavemente.
+  4. **Contraste con Estadísticas (`AnalyticsView`)**: En `AnalyticsView`, la tarjeta no está dentro de un contenedor `overflow`, usa `bg-slate-900/60 light:bg-white/85` y su sombra es `shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)]`, permitiendo que el desenfoque redondeado siga orgánicamente el contorno de `rounded-3xl`.
+- **Solución y Paridad Absoluta con `AnalyticsView`**:
+  - **Superficie y Borde**: Homogeneizado a `bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80` (con variantes semánticas según pilar).
+  - **Sombra Suave No Invasiva**: `shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)]`.
+  - **Margen de Difusión Óptico**: `py-6 -my-6` en el contenedor `scrollRef` (24px de respiro vertical) sin `transform-gpu`, garantizando que la sombra de 24px de radio decaiga hasta opacidad 0 antes de tocar cualquier límite de recorte.
+  - **Centrado Perfecto y Diapositivas Simétricas**: Cada diapositiva utiliza `w-full shrink-0 snap-center`, garantizando que la tarjeta activa quede 100% centrada en pantalla en cualquier resolución móvil o escritorio, alineada con el resto de componentes del dashboard.
+
+### 23.1. Barra de Navegación Flotante en Modo Claro (`FloatingNavbar`)
+- **Dock Flotante Liquid Glass Perlado**:
+  - En modo claro, la barra de navegación flotante [`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx) implementa el material vítreo translúcido de alta gama:
+    - Sustrato: `background-color: rgba(255, 255, 255, 0.48) !important;` con `backdrop-filter: blur(28px) saturate(210%)`.
+    - Borde especular: `border-color: rgba(255, 255, 255, 0.8)` con resalte interior `inset 0 1.5px 1px 0 #FFFFFF` y destello superior `light:via-white/90`.
+    - Sombras suaves multicapa: `0 16px 40px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06)`.
+    - Aura atmosférica subsuperficial: `light:bg-indigo-500/25 blur-xl`.
+- **Pestañas y Acciones Interiores**:
+  - Pestaña activa: Única con recuadro y cáustica vítrea perlada `light:text-indigo-600 light:bg-white/75 border light:border-white shadow-[0_2px_8px_rgba(15,23,42,0.07),inset_0_1px_1px_rgba(255,255,255,0.9)] font-bold`.
+  - Pestañas inactivas: Estrictamente transparentes (`background-color: transparent !important; border-color: transparent !important; box-shadow: none !important`), sin recuadro ni contorno hasta que el cursor interactúa (`light:text-slate-600 light:hover:text-slate-900 light:hover:bg-white/40`).
+  - Botón de Acción (+): Joya translúcida degradada con sombra de acento índigo `light:shadow-[0_4px_16px_rgba(99,102,241,0.45),inset_0_1px_1px_rgba(255,255,255,0.6)]` y bisel `light:border-white/40`.
+
+### 23.2. Aislamiento Estricto de Selectores de Modo y Pestañas Segmentadas
+- **Eliminación de Conflictos de Subcadena en CSS**:
+  - Los selectores comodín `[class*="bg-white/[0.0X]"]` colisionaban con pseudo-clases `hover:bg-white/[0.0X]` de elementos inactivos, provocando que botones no seleccionados (en barra flotante y selector de tema en ajustes) quedaran envueltos permanentemente en recuadros blancos.
+  - Se sustituyeron por selectores exactos de clase `.bg-white\/\[0\.0X\]` y selectores de palabra completa `[class~="bg-white/[0.0X]"]`, blindando los estados de reposo.
+  - Regla de salvaguarda universal para botones no activos en modo claro: `html.light button.border-transparent:not([class*="light:bg-white"]):not([class*="bg-white"]):not(:hover)`, garantizando que únicamente la opción seleccionada proyecte un recuadro elevado.
+
+### 24. Identidad y Nombre de Usuario Limpio
+- **Extracción de Nombre de Usuario**: Para usuarios registrados con cuenta de correo (`xxx@dominio.com`), la interfaz extrae y presenta prioritariamente el alias principal `user.email.split('@')[0]` (`xxx`) como nombre de cabecera en [`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx) y en el tooltip del botón de perfil en [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx), manteniendo la dirección de correo completa en tipografía secundaria (`text-xs text-slate-400 light:text-slate-500`).
+
+### 25. Acciones y Limpieza de Fuentes Financieras (`SourceAccountManager`)
+- **Presentación Minimalista de Título**:
+  - Eliminación de la etiqueta redundante "Banco" / "Efectivo" en cada fila, conservando únicamente el nombre de la cuenta (`source.name`) para una jerarquía tipográfica mucho más limpia y despejada.
+- **Flechas de Prioridad (Subir / Bajar)**:
+  - Cápsulas Liquid Glass táctiles (`p-1.5 rounded-lg bg-white/[0.08] light:bg-slate-100 border border-white/15 light:border-slate-300`).
+  - Iconos `ChevronUp` y `ChevronDown` reforzados a `h-3.5 w-3.5 stroke-[2.5]` en `text-slate-200 light:text-slate-700 hover:light:text-indigo-600` para visibilidad inmediata tanto en fondos claros como oscuros.
+- **Botón de Eliminación (Papelera)**:
+  - Cápsula prominente en rojo coral `p-2 rounded-xl bg-rose-500/20 light:bg-rose-50 hover:bg-rose-500/30 light:hover:bg-rose-100 border border-rose-500/40 light:border-rose-300 text-rose-400 light:text-rose-600 shadow-[0_0_12px_rgba(244,63,94,0.15)] light:shadow-sm`.
+  - Icono `Trash2` con trazo `stroke-[2.2]`, resolviendo la falta de contraste sobre sustratos de cristal claro.
+
+### 26. Supresión Universal de Barras de Desplazamiento (`.no-scrollbar`)
+- **Regla Global en `src/index.css`**:
+  - Implementación de la utilidad `.no-scrollbar` y `[class*="no-scrollbar"]` con soporte cruzado total:
+    - WebKit (Chrome, Safari, iOS, Opera, Edge): `::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }`.
+    - Firefox: `scrollbar-width: none !important;`.
+    - Internet Explorer / Edge clásico: `-ms-overflow-style: none !important;`.
+  - Elimina las barras de desplazamiento antiestéticas en carruseles horizontales, modales y listas de chips sin impedir el gesto de desplazamiento táctil ni la interacción de rueda con inercia.
+
 ---
 
 ## 4. Microinteracciones y Haptic Feedback Visual

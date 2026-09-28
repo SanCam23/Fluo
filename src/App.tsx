@@ -210,7 +210,7 @@ export default function App() {
             type="button"
             onClick={() => setIsProfileModalOpen(true)}
             className="relative w-10 h-10 rounded-full bg-slate-800/60 light:bg-white/90 backdrop-blur-xl border border-white/15 light:border-slate-300/80 flex items-center justify-center hover:bg-slate-700/60 hover:light:bg-white transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] light:shadow-[0_2px_8px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 group"
-            title={user ? `Cuenta: ${user.email} (Perfil y Seguridad)` : 'Modo Demostración — Perfil y Ajustes'}
+            title={user?.email ? `Cuenta: ${user.email.split('@')[0]} (${user.email})` : 'Modo Demostración — Perfil y Ajustes'}
             aria-label="Perfil y Ajustes de Cuenta"
           >
             {user?.email ? (

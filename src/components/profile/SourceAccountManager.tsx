@@ -166,42 +166,41 @@ export const SourceAccountManager: React.FC = () => {
         ) : (
           sortedSources.map((source, index) => {
             const balanceInfo = computeSourceBalance(source, transactions);
-            const isBank = source.type === 'bank';
 
             return (
               <div
                 key={source.id}
-                className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/[0.06] hover:bg-white/[0.09] border border-white/10 transition-all group"
+                className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/[0.06] light:bg-white/90 hover:bg-white/[0.1] light:hover:bg-white border border-white/12 light:border-slate-200 shadow-sm transition-all group"
               >
-                {/* Left: Reorder buttons */}
-                <div className="flex flex-col gap-0.5 flex-shrink-0">
+                {/* Left: Reorder priority buttons (High visibility Liquid Glass capsules) */}
+                <div className="flex flex-col gap-1 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => handleMoveUp(index)}
                     disabled={index === 0}
-                    className={`p-1 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-lg border transition-all ${
                       index === 0
-                        ? 'opacity-20 cursor-not-allowed text-slate-500'
-                        : 'text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer'
+                        ? 'opacity-20 cursor-not-allowed border-transparent text-slate-600 light:text-slate-400'
+                        : 'bg-white/[0.08] light:bg-slate-100 hover:bg-white/[0.18] light:hover:bg-slate-200 border-white/15 light:border-slate-300 text-slate-200 light:text-slate-700 hover:text-white light:hover:text-indigo-600 shadow-sm cursor-pointer active:scale-90'
                     }`}
-                    title="Mover arriba"
+                    title="Mover arriba en prioridad"
                     aria-label={`Mover ${source.name} arriba`}
                   >
-                    <ChevronUp className="h-3 w-3" />
+                    <ChevronUp className="h-3.5 w-3.5 stroke-[2.5]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleMoveDown(index)}
                     disabled={index === sortedSources.length - 1}
-                    className={`p-1 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-lg border transition-all ${
                       index === sortedSources.length - 1
-                        ? 'opacity-20 cursor-not-allowed text-slate-500'
-                        : 'text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer'
+                        ? 'opacity-20 cursor-not-allowed border-transparent text-slate-600 light:text-slate-400'
+                        : 'bg-white/[0.08] light:bg-slate-100 hover:bg-white/[0.18] light:hover:bg-slate-200 border-white/15 light:border-slate-300 text-slate-200 light:text-slate-700 hover:text-white light:hover:text-indigo-600 shadow-sm cursor-pointer active:scale-90'
                     }`}
-                    title="Mover abajo"
+                    title="Mover abajo en prioridad"
                     aria-label={`Mover ${source.name} abajo`}
                   >
-                    <ChevronDown className="h-3 w-3" />
+                    <ChevronDown className="h-3.5 w-3.5 stroke-[2.5]" />
                   </button>
                 </div>
 
@@ -209,39 +208,34 @@ export const SourceAccountManager: React.FC = () => {
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                   <SourceAvatar source={source} size="sm" />
                   <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs font-bold text-white truncate">
-                        {source.name}
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded-md bg-white/[0.08] text-[9px] font-semibold text-slate-400 uppercase flex-shrink-0">
-                        {source.institution || (isBank ? 'Banco' : 'Efectivo')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 truncate">
-                      <span className="truncate">Saldo: <strong className="text-white font-medium">{formatCurrency(balanceInfo.netBalance)}</strong></span>
+                    <span className="text-xs font-bold text-white light:text-slate-900 truncate">
+                      {source.name}
+                    </span>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 light:text-slate-500 mt-0.5 truncate">
+                      <span className="truncate">Saldo: <strong className="text-white light:text-slate-800 font-semibold">{formatCurrency(balanceInfo.netBalance)}</strong></span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(source)}
-                    className="p-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.12] text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-white/[0.06] light:bg-slate-100 hover:bg-white/[0.16] light:hover:bg-slate-200 text-slate-200 light:text-slate-700 hover:text-white light:hover:text-slate-900 border border-white/12 light:border-slate-300 shadow-sm transition-all cursor-pointer active:scale-95"
                     title="Editar fuente"
                     aria-label={`Editar ${source.name}`}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    <Pencil className="h-3.5 w-3.5 stroke-[2.2]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeletingSource(source)}
                     disabled={sortedSources.length <= 1}
-                    className={`p-1.5 rounded-xl border transition-colors ${
+                    className={`p-2 rounded-xl border transition-all ${
                       sortedSources.length <= 1
-                        ? 'opacity-20 cursor-not-allowed border-transparent text-slate-600'
-                        : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/25 cursor-pointer'
+                        ? 'opacity-20 cursor-not-allowed border-transparent text-slate-600 light:text-slate-400'
+                        : 'bg-rose-500/20 light:bg-rose-50 hover:bg-rose-500/30 light:hover:bg-rose-100 text-rose-400 light:text-rose-600 border-rose-500/40 light:border-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.15)] light:shadow-sm cursor-pointer active:scale-95'
                     }`}
                     title={
                       sortedSources.length <= 1
@@ -250,7 +244,7 @@ export const SourceAccountManager: React.FC = () => {
                     }
                     aria-label={`Eliminar ${source.name}`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5 stroke-[2.2]" />
                   </button>
                 </div>
               </div>

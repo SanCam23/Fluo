@@ -676,6 +676,51 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - TypeScript: `tsc -b` limpio (0 errores de tipos).
   - Build: bundle de producción generado y comprimido con gzip y brotli.
 
+### v0.9.10 (Refinamiento Estético Liquid Glass: Separación Lateral de Tarjetas, Eliminación de Barras de Scroll y Limpieza de Fuentes)
+- **Centrado Perfecto, Separación Lateral de Tarjetas & Aislamiento de Sombras (`HeroBalance`)**:
+  - Corrección de descentrado: Se eliminaron los márgenes negativos horizontales (`-mx-1`) que desplazaban la tarjeta respecto a la columna de contenido, y se restauró `snap-center` con `w-full` en cada diapositiva.
+  - El contenedor ahora tiene `position: relative`, haciendo que `targetSlide.offsetLeft` sea una coordenada relativa directa y precisa (0px en Slide 0, exactamente el ancho + `gap-4` en las siguientes).
+  - Separación elástica con `gap-4` (16px) entre tarjetas, aislando completamente las sombras difusas para evitar manchas oscuras sin alterar el centrado en pantalla.
+  - Recalibración de sombras volumétricas suaves `shadow-[0_10px_28px_-6px_rgba(0,0,0,0.35)]` (eliminando definitivamente el excesivo `shadow-2xl shadow-black/50`).
+- **Supresión Universal de Barras de Desplazamiento (`.no-scrollbar`)**:
+  - Incorporación en [`src/index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css) de la clase `.no-scrollbar` y selector universal `[class*="no-scrollbar"]` con soporte cruzado: `::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }`, `scrollbar-width: none !important;` y `-ms-overflow-style: none !important;`.
+  - Oculta todas las barras de scroll visibles en elementos horizontales (carrusel de tarjetas, listas de filtros, accesos rápidos de marcas y modales) manteniendo el desplazamiento táctil intacto.
+- **Presentación Minimalista de Fuentes Financieras (`SourceAccountManager`)**:
+  - Eliminación de la etiqueta de subtítulo "Banco" / "Efectivo" en el listado de fuentes en ajustes, conservando únicamente el nombre de la fuente (`source.name`) para máxima sobriedad y limpieza visual.
+- **Identidad de Usuario Limpia (Extracción de Alias desde el Correo)**:
+  - Formateo del nombre de usuario para mostrar únicamente el identificador antes del arroba (`user.email.split('@')[0]`, ej. `xxx` para `xxx@gmail.com`).
+  - Implementado en la cabecera de [`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx) (con el correo completo como subtítulo discreto) y en el tooltip del avatar flotante en [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx).
+- **Alto Contraste en Gestión de Fuentes (`SourceAccountManager`)**:
+  - **Flechas de Prioridad**: Rediseño a cápsulas táctiles Liquid Glass con `bg-white/[0.08] light:bg-slate-100`, bordes claros definidos `light:border-slate-300`, glifos `ChevronUp` / `ChevronDown` con trazo `stroke-[2.5]` en `text-slate-200 light:text-slate-700 hover:light:text-indigo-600`.
+  - **Icono de Papelera**: Sustitución del tono tenue por una cápsula vítrea en rojo coral de alto contraste (`bg-rose-500/20 light:bg-rose-50 text-rose-400 light:text-rose-600 border border-rose-500/40 light:border-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.15)]`), con glifo `Trash2` reforzado (`stroke-[2.2]`).
+- **Validación de Calidad**:
+  - Vitest: 84/84 tests unitarios pasando.
+  - TypeScript: compilación limpia (`tsc -b`).
+  - Build: empaquetado de producción exitoso.
+
+### v0.9.11 (Paridad Visual con Estadísticas & Restauración de Barra de Navegación Flotante)
+- **Evaluación y Solución Definitiva de Sombras Cuadradas (`HeroBalance`)**:
+  - **Diagnóstico de Raíz**:
+    1. `src/index.css` sobreescribía de forma invasiva cualquier selector con `[class*="bg-white/[0.08]"]` imponiendo `box-shadow: 0 12px 32px -4px rgba(15,23,42,0.08) !important`, forzando un desplazamiento vertical excesivo.
+    2. El carrusel `scrollRef` con `overflow-x: auto` establecía por especificación CSS un límite de recorte (*overflow clipping box*). Con un padding vertical exiguo (`py-3.5` = 14px), la sombra difusa de 32px quedaba truncada con un corte recto en la base y en los laterales.
+    3. La clase `transform-gpu` rasterizaba el carrusel en una capa de textura de hardware estricta, acentuando el corte de la sombra en un contorno plano.
+  - **Alineación con el Estándar de Estadísticas (`AnalyticsView`)**:
+    - Superficie Liquid Glass de tarjeta unificada: `bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80`.
+    - Sombra idéntica a `AnalyticsView`: `shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)]` (con variantes semánticas según pilar).
+    - Espacio de difusión vertical: `py-6 -my-6` sin `transform-gpu`, garantizando que la sombra redondeada decaiga suavemente a opacidad 0 sin cortarse.
+    - Centrado perfecto: Se mantienen diapositivas simétricas con `w-full shrink-0 snap-center`, garantizando que cada tarjeta quede centrada milimétricamente en pantalla.
+- **Barra de Navegación Flotante en Modo Claro (`FloatingNavbar`)**:
+  - Restauración completa y milimétrica del estado del commit anterior (`abd4470`):
+    - Componente [`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx) restaurado directamente a su versión oficial con clases translúcidas `light:text-indigo-600`, `light:bg-white/75`, `light:border-white` y sombras internas perladas.
+    - En [`src/index.css`](file:///c:/Users/santi/Documents/UNI/Fluo/src/index.css), restitución de la regla `html.light .bg-slate-900\/40` con sustrato translúcido `rgba(255, 255, 255, 0.48)`, desenfoque `blur(28px) saturate(210%)`, borde `rgba(255, 255, 255, 0.8)` y doble resalte especular `#FFFFFF`.
+- **Eliminación del Conflicto de Recuadros en Opciones No Seleccionadas**:
+  - Corrección de los selectores comodín `[class*="bg-white/..."]` en `src/index.css` que forzaban fondos y bordes permanentes sobre elementos con `hover:bg-white/...`.
+  - Ahora las pestañas inactivas de [`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx) y los botones inactivos del selector de tema en [`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx) son 100% transparentes, mostrando el recuadro único y exclusivo en la opción seleccionada.
+- **Validación de Calidad**:
+  - Vitest: 84/84 tests pasando (7 suites).
+  - TypeScript: 0 errores (`tsc -b`).
+  - Build: empaquetado de producción exitoso con compresión gzip/brotli.
+
 ---
 
 ## Próximos Hitos (v1.0.0)

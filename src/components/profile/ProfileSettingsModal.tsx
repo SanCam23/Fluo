@@ -215,6 +215,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   };
 
   const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'U';
+  const userName = user?.email ? user.email.split('@')[0] : 'Modo Demostración';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xl animate-fadeIn">
@@ -237,9 +238,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-white light:text-slate-900 tracking-tight truncate block">
-                {user ? user.email : 'Modo Demostración'}
+              <span className="text-base font-bold text-white light:text-slate-900 tracking-tight truncate block">
+                {userName}
               </span>
+              {user?.email && (
+                <span className="text-xs text-slate-400 light:text-slate-500 truncate block mt-0.5">
+                  {user.email}
+                </span>
+              )}
               <div className="mt-1">
                 {user ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-semibold">
@@ -315,7 +321,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'light'
                   ? 'bg-white text-slate-900 shadow-md border border-white light:border-slate-200 font-bold'
-                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50 border border-transparent'
               }`}
             >
               <Sun className={`h-3.5 w-3.5 ${themeMode === 'light' ? 'text-amber-500' : ''}`} />
@@ -328,7 +334,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'dark'
                   ? 'bg-white/15 light:bg-white light:text-slate-900 text-white shadow-md border border-white/20 light:border-slate-200 font-bold'
-                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50 border border-transparent'
               }`}
             >
               <Moon className={`h-3.5 w-3.5 ${themeMode === 'dark' ? 'text-indigo-400' : ''}`} />
@@ -341,7 +347,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 themeMode === 'system'
                   ? 'bg-white/15 light:bg-white light:text-slate-900 text-white shadow-md border border-white/20 light:border-slate-200 font-bold'
-                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50'
+                  : 'text-slate-400 light:text-slate-600 hover:text-slate-200 light:hover:text-slate-900 hover:bg-white/[0.06] hover:light:bg-white/50 border border-transparent'
               }`}
             >
               <Monitor className={`h-3.5 w-3.5 ${themeMode === 'system' ? 'text-emerald-400' : ''}`} />
