@@ -40,6 +40,9 @@ const ProfileSettingsModal = lazy(() =>
     default: m.ProfileSettingsModal,
   }))
 );
+const InitialSourceModal = lazy(() =>
+  import('./components/common/InitialSourceModal').then((m) => ({ default: m.InitialSourceModal }))
+);
 
 const ViewSkeletonFallback = () => (
   <div className="flex flex-col gap-4 animate-pulse p-1">
@@ -59,6 +62,7 @@ export default function App() {
   const loadCloudData = useFinanceStore((state) => state.loadCloudData);
   const isCloudLoading = useFinanceStore((state) => state.isCloudLoading);
   const purgeUserData = useFinanceStore((state) => state.purgeUserData);
+  const sources = useFinanceStore((state) => state.sources);
 
   const {
     isLocked,
@@ -317,6 +321,13 @@ export default function App() {
             userEmail={user?.email}
             isLoggingOut={isLoggingOut}
           />
+        </Suspense>
+      )}
+
+      {/* Mandatory Initial Source Onboarding Modal (when 0 sources exist) */}
+      {Boolean((user || isDemoMode) && !isCloudLoading && sources.length === 0) && (
+        <Suspense fallback={null}>
+          <InitialSourceModal isOpen={true} />
         </Suspense>
       )}
 

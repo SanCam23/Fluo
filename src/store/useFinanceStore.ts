@@ -10,16 +10,20 @@ import type {
   FinancialSummary,
   TimeRangeFilter,
   ThemeMode,
+  SourceAccount,
 } from '../types/finance';
 import { INITIAL_CATEGORIES, INITIAL_BRANDS } from '../data/categoriesAndBrands';
 import {
   INITIAL_TRANSACTIONS,
   INITIAL_INVESTMENT_ASSETS,
   INITIAL_RECURRENCE_RULES,
+  INITIAL_SOURCE_ACCOUNTS,
 } from '../data/initialMockData';
 import { batchUpdateMarketQuotes } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
-import { computeFinancialSummary } from '../utils/finance';
+import { computeFinancialSummary, computeSourceBalance } from '../utils/finance';
+import type { SourceBalanceInfo } from '../utils/finance';
+import { sortTransactionsDesc } from '../utils/dates';
 import {
   fetchUserCloudData,
   insertCloudTransaction,
@@ -28,6 +32,10 @@ import {
   insertCloudAsset,
   deleteCloudAsset,
   updateCloudAssetPrice,
+  insertCloudSource,
+  updateCloudSource,
+  reorderCloudSources,
+  deleteCloudSource,
 } from '../services/cloudSyncService';
 
 function generateId(prefix: string): string {
@@ -43,6 +51,8 @@ interface FinanceState {
   brands: Brand[];
   assets: InvestmentAsset[];
   recurrences: RecurrenceRule[];
+  sources: SourceAccount[];
+  activeSourceId: string | null;
   timeRange: TimeRangeFilter;
   themeMode: ThemeMode;
   activeTab: 'home' | 'stats' | 'invest' | 'add';
@@ -53,11 +63,13 @@ interface FinanceState {
   cloudSyncError: string | null;
 
   // Actions
+  setActiveSourceId: (id: string | null) => void;
   setUserId: (userId: string | null) => void;
   setThemeMode: (mode: ThemeMode) => void;
   loadCloudData: (userId: string) => Promise<void>;
   setTransactions: (transactions: Transaction[]) => void;
   setAssets: (assets: InvestmentAsset[]) => void;
+  setSources: (sources: SourceAccount[]) => void;
   addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
   updateTransaction: (id: string, updatedFields: Partial<Omit<Transaction, 'id' | 'createdAt'>>) => void;
   deleteTransaction: (id: string) => void;
@@ -78,12 +90,59 @@ interface FinanceState {
   loadDemoData: () => void;
   purgeUserData: () => void;
 
+  // Source Actions
+  addSource: (source: Omit<SourceAccount, 'id' | 'createdAt'>) => SourceAccount;
+  updateSource: (id: string, updatedFields: Partial<Omit<SourceAccount, 'id' | 'createdAt'>>) => void;
+  deleteSource: (id: string) => void;
+  reorderSources: (sourceIdsInOrder: string[]) => void;
+  getSourceById: (id?: string) => SourceAccount | undefined;
+  getSourceBalance: (sourceId: string) => SourceBalanceInfo | undefined;
+  ensureDefaultSource: () => SourceAccount;
+
   // Methods
   getFinancialSummary: () => FinancialSummary;
   getFilteredTransactions: () => Transaction[];
   getCategoryById: (id: string) => Category | undefined;
   getBrandById: (id?: string) => Brand | undefined;
 }
+
+const memoryStorageMap = new Map<string, string>();
+const safeStorage = {
+  getItem: (name: string): string | null => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        return window.localStorage.getItem(name);
+      } catch {
+        return memoryStorageMap.get(name) || null;
+      }
+    }
+    return memoryStorageMap.get(name) || null;
+  },
+  setItem: (name: string, value: string): void => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(name, value);
+        return;
+      } catch {
+        memoryStorageMap.set(name, value);
+        return;
+      }
+    }
+    memoryStorageMap.set(name, value);
+  },
+  removeItem: (name: string): void => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(name);
+        return;
+      } catch {
+        memoryStorageMap.delete(name);
+        return;
+      }
+    }
+    memoryStorageMap.delete(name);
+  },
+};
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
@@ -93,6 +152,8 @@ export const useFinanceStore = create<FinanceState>()(
       brands: INITIAL_BRANDS,
       assets: [],
       recurrences: [],
+      sources: [],
+      activeSourceId: null,
       timeRange: 'all',
       themeMode: 'dark',
       activeTab: 'home',
@@ -102,6 +163,7 @@ export const useFinanceStore = create<FinanceState>()(
       isCloudLoading: false,
       cloudSyncError: null,
 
+      setActiveSourceId: (activeSourceId) => set({ activeSourceId }),
       setThemeMode: (themeMode) => set({ themeMode }),
 
       setUserId: (userId) => {
@@ -113,21 +175,29 @@ export const useFinanceStore = create<FinanceState>()(
             transactions: [],
             assets: [],
             recurrences: [],
+            sources: [],
+            activeSourceId: null,
           });
         } else {
           set({ userId });
         }
       },
 
-      setTransactions: (transactions) => set({ transactions }),
+      setTransactions: (transactions) => set({ transactions: sortTransactionsDesc(transactions) }),
 
       setAssets: (assets) => set({ assets }),
 
+      setSources: (sources) => {
+        const sorted = [...sources].sort((a, b) => a.orderIndex - b.orderIndex);
+        set({ sources: sorted });
+      },
+
       loadDemoData: () => {
         set({
-          transactions: INITIAL_TRANSACTIONS,
+          transactions: sortTransactionsDesc(INITIAL_TRANSACTIONS),
           assets: INITIAL_INVESTMENT_ASSETS,
           recurrences: INITIAL_RECURRENCE_RULES,
+          sources: [...INITIAL_SOURCE_ACCOUNTS].sort((a, b) => a.orderIndex - b.orderIndex),
         });
       },
 
@@ -138,8 +208,9 @@ export const useFinanceStore = create<FinanceState>()(
           const result = await fetchUserCloudData(userId);
           if (result.success) {
             set({
-              transactions: result.transactions,
+              transactions: sortTransactionsDesc(result.transactions),
               assets: result.assets,
+              sources: (result.sources || []).sort((a, b) => a.orderIndex - b.orderIndex),
               recurrences: [],
               isCloudLoading: false,
               cloudSyncError: null,
@@ -158,6 +229,106 @@ export const useFinanceStore = create<FinanceState>()(
         }
       },
 
+      addSource: (sourceData) => {
+        const { sources, userId } = get();
+        const newSource: SourceAccount = {
+          ...sourceData,
+          id: generateId('source'),
+          orderIndex: sourceData.orderIndex ?? sources.length,
+          createdAt: new Date().toISOString(),
+        };
+        const updated = [...sources, newSource].sort((a, b) => a.orderIndex - b.orderIndex);
+        set({ sources: updated });
+
+        if (userId) {
+          insertCloudSource(newSource, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for addSource:', err)
+          );
+        }
+        return newSource;
+      },
+
+      updateSource: (id, updatedFields) => {
+        const { userId } = get();
+        set((state) => ({
+          sources: state.sources
+            .map((s) => (s.id === id ? { ...s, ...updatedFields } : s))
+            .sort((a, b) => a.orderIndex - b.orderIndex),
+        }));
+
+        if (userId) {
+          updateCloudSource(id, updatedFields, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for updateSource:', err)
+          );
+        }
+      },
+
+      deleteSource: (id) => {
+        const { userId, activeSourceId } = get();
+        set((state) => {
+          const filtered = state.sources.filter((s) => s.id !== id);
+          const reindexed = filtered.map((s, idx) => ({ ...s, orderIndex: idx }));
+          return {
+            sources: reindexed,
+            activeSourceId: activeSourceId === id ? null : state.activeSourceId,
+          };
+        });
+
+        if (userId) {
+          deleteCloudSource(id, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for deleteSource:', err)
+          );
+        }
+      },
+
+      reorderSources: (sourceIdsInOrder) => {
+        const { sources, userId } = get();
+        const sourceMap = new Map(sources.map((s) => [s.id, s]));
+        const reordered: SourceAccount[] = [];
+        sourceIdsInOrder.forEach((id, index) => {
+          const s = sourceMap.get(id);
+          if (s) {
+            reordered.push({ ...s, orderIndex: index });
+            sourceMap.delete(id);
+          }
+        });
+        Array.from(sourceMap.values()).forEach((s) => {
+          reordered.push({ ...s, orderIndex: reordered.length });
+        });
+
+        set({ sources: reordered });
+
+        if (userId) {
+          reorderCloudSources(reordered, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for reorderSources:', err)
+          );
+        }
+      },
+
+      getSourceById: (id) => {
+        if (!id) return undefined;
+        return get().sources.find((s) => s.id === id);
+      },
+
+      getSourceBalance: (sourceId) => {
+        const source = get().sources.find((s) => s.id === sourceId);
+        if (!source) return undefined;
+        return computeSourceBalance(source, get().transactions);
+      },
+
+      ensureDefaultSource: () => {
+        const { sources, addSource } = get();
+        if (sources.length > 0) return sources[0];
+        return addSource({
+          name: 'Cuenta Principal',
+          type: 'bank',
+          institution: 'Principal',
+          initialBalance: 0,
+          orderIndex: 0,
+          color: '#004481',
+        });
+      },
+
       addTransaction: (txData) => {
         const newTx: Transaction = {
           ...txData,
@@ -165,7 +336,7 @@ export const useFinanceStore = create<FinanceState>()(
           createdAt: Date.now(),
         };
         set((state) => ({
-          transactions: [newTx, ...state.transactions],
+          transactions: sortTransactionsDesc([newTx, ...state.transactions]),
         }));
 
         const { userId } = get();
@@ -179,8 +350,10 @@ export const useFinanceStore = create<FinanceState>()(
       updateTransaction: (id, updatedFields) => {
         const { userId } = get();
         set((state) => ({
-          transactions: state.transactions.map((tx) =>
-            tx.id === id ? { ...tx, ...updatedFields } : tx
+          transactions: sortTransactionsDesc(
+            state.transactions.map((tx) =>
+              tx.id === id ? { ...tx, ...updatedFields } : tx
+            )
           ),
         }));
 
@@ -314,7 +487,7 @@ export const useFinanceStore = create<FinanceState>()(
 
         if (generatedTransactions.length > 0) {
           set((state) => ({
-            transactions: [...generatedTransactions, ...state.transactions],
+            transactions: sortTransactionsDesc([...generatedTransactions, ...state.transactions]),
             recurrences: updatedRules,
           }));
         } else {
@@ -391,11 +564,13 @@ export const useFinanceStore = create<FinanceState>()(
           console.warn('Error clearing localStorage:', e);
         }
         set({
-          transactions: INITIAL_TRANSACTIONS,
+          transactions: sortTransactionsDesc(INITIAL_TRANSACTIONS),
           categories: INITIAL_CATEGORIES,
           brands: INITIAL_BRANDS,
           assets: INITIAL_INVESTMENT_ASSETS,
           recurrences: INITIAL_RECURRENCE_RULES,
+          sources: [...INITIAL_SOURCE_ACCOUNTS].sort((a, b) => a.orderIndex - b.orderIndex),
+          activeSourceId: null,
           timeRange: 'all',
           activeTab: 'home',
         });
@@ -416,6 +591,8 @@ export const useFinanceStore = create<FinanceState>()(
           transactions: [],
           assets: [],
           recurrences: [],
+          sources: [],
+          activeSourceId: null,
           userId: null,
           isCloudLoading: false,
           cloudSyncError: null,
@@ -426,8 +603,8 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       getFinancialSummary: () => {
-        const { transactions, assets } = get();
-        return computeFinancialSummary(transactions, assets);
+        const { transactions, assets, sources } = get();
+        return computeFinancialSummary(transactions, assets, sources);
       },
 
       getFilteredTransactions: () => {
@@ -475,13 +652,14 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: 'fluo_finance_storage_v3',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
         transactions: state.transactions,
         categories: state.categories,
         brands: state.brands,
         assets: state.assets,
         recurrences: state.recurrences,
+        sources: state.sources,
         timeRange: state.timeRange,
         themeMode: state.themeMode,
       }),
@@ -496,7 +674,7 @@ export const useFinanceStore = create<FinanceState>()(
           themeMode: p.themeMode || currentState.themeMode || 'dark',
           transactions:
             Array.isArray(p.transactions)
-              ? p.transactions
+              ? sortTransactionsDesc(p.transactions)
               : currentState.transactions,
           categories: (() => {
             const initialMap = new Map(INITIAL_CATEGORIES.map((c) => [c.id, c]));
@@ -548,6 +726,10 @@ export const useFinanceStore = create<FinanceState>()(
             Array.isArray(p.recurrences)
               ? p.recurrences
               : currentState.recurrences,
+          sources:
+            Array.isArray(p.sources)
+              ? [...p.sources].sort((a, b) => a.orderIndex - b.orderIndex)
+              : currentState.sources,
         };
       },
     }
@@ -561,8 +743,9 @@ export const useFinanceStore = create<FinanceState>()(
 export function useFinancialSummary(): FinancialSummary {
   const transactions = useFinanceStore((state) => state.transactions);
   const assets = useFinanceStore((state) => state.assets);
+  const sources = useFinanceStore((state) => state.sources);
 
   return useMemo(() => {
-    return computeFinancialSummary(transactions, assets);
-  }, [transactions, assets]);
+    return computeFinancialSummary(transactions, assets, sources);
+  }, [transactions, assets, sources]);
 }

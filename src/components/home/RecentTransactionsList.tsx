@@ -21,20 +21,34 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
   // Memoized shallow store selectors to avoid re-renders when unrelated store slices update
-  const { transactions, deleteTransaction, getCategoryById, getBrandById } = useFinanceStore(
-    useShallow((state) => ({
-      transactions: state.transactions,
-      deleteTransaction: state.deleteTransaction,
-      getCategoryById: state.getCategoryById,
-      getBrandById: state.getBrandById,
-    }))
+  const { transactions, sources, activeSourceId, deleteTransaction, getCategoryById, getBrandById } =
+    useFinanceStore(
+      useShallow((state) => ({
+        transactions: state.transactions,
+        sources: state.sources,
+        activeSourceId: state.activeSourceId,
+        deleteTransaction: state.deleteTransaction,
+        getCategoryById: state.getCategoryById,
+        getBrandById: state.getBrandById,
+      }))
+    );
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
+    [sources, activeSourceId]
   );
+
+  // Isolate transactions to active source account, or show global if activeSourceId is null
+  const sourceScopedTransactions = useMemo(() => {
+    if (!activeSourceId) return transactions;
+    return transactions.filter((tx) => tx.sourceId === activeSourceId);
+  }, [transactions, activeSourceId]);
 
   // Filter transactions according to selected pillar (memoized)
   const filteredTransactions = useMemo(() => {
-    if (selectedPillar === 'all') return transactions;
-    return transactions.filter((tx) => tx.pillar === selectedPillar);
-  }, [transactions, selectedPillar]);
+    if (selectedPillar === 'all') return sourceScopedTransactions;
+    return sourceScopedTransactions.filter((tx) => tx.pillar === selectedPillar);
+  }, [sourceScopedTransactions, selectedPillar]);
 
   // Windowed visible slice for sub-second layout and instant 60/120fps scrolling
   const visibleTransactions = useMemo(() => {
@@ -52,11 +66,11 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
     <div className="flex flex-col gap-3">
       {/* Header and Filter Pills */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-white tracking-wide">
-          Movimientos Recientes
+        <h2 className="text-sm font-bold text-white tracking-wide truncate">
+          {activeSource ? `Movimientos de ${activeSource.name}` : 'Movimientos Recientes'}
         </h2>
-        <span className="text-xs text-slate-400">
-          {filteredTransactions.length} registros
+        <span className="text-xs text-slate-400 flex-shrink-0">
+          {filteredTransactions.length} {activeSource ? 'movs' : 'registros (Global)'}
         </span>
       </div>
 
@@ -90,21 +104,27 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
 
       {/* List of items with Swipe-to-Delete and GPU viewport skipping (cv-auto) */}
       <div className="flex flex-col gap-2.5">
-        {transactions.length === 0 ? (
+        {sourceScopedTransactions.length === 0 ? (
           <div className="py-10 px-5 text-center rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 flex flex-col items-center justify-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-400 shadow-inner">
               <Receipt className="h-6 w-6 text-slate-400 opacity-70" />
             </div>
             <div className="flex flex-col gap-1 max-w-xs">
-              <p className="text-sm font-semibold text-white">Sin movimientos registrados aún</p>
+              <p className="text-sm font-semibold text-white">
+                {activeSource
+                  ? `Sin movimientos en ${activeSource.name}`
+                  : 'Sin movimientos registrados aún'}
+              </p>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Pulsa el botón central <strong className="text-indigo-300 font-bold">(+)</strong> para registrar tu primer ingreso o gasto.
+                {activeSource
+                  ? 'Los movimientos asociados a esta cuenta aparecerán aquí al registrarlos con el botón (+).'
+                  : 'Pulsa el botón central (+) para registrar tu primer ingreso o gasto.'}
               </p>
             </div>
           </div>
         ) : filteredTransactions.length === 0 ? (
           <div className="py-8 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs">
-            No hay movimientos registrados en este filtro.
+            No hay movimientos de tipo {selectedPillar} en esta cuenta.
           </div>
         ) : (
           visibleTransactions.map((tx) => {

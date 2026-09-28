@@ -55,8 +55,43 @@ const HIGH_RES_BRAND_LOGOS: Record<string, string[]> = {
   traderepublic: ['https://unavatar.io/traderepublic.com?fallback=false'],
   myinvestor: ['https://unavatar.io/myinvestor.es?fallback=false'],
   revolut: ['https://cdn.simpleicons.org/revolut/white'],
-  bbva: ['https://unavatar.io/bbva.es?fallback=false'],
-  santander: ['https://unavatar.io/santander.com?fallback=false'],
+  bbva: [
+    'https://unavatar.io/bbva.es?fallback=false',
+    'https://www.google.com/s2/favicons?domain=bbva.es&sz=128',
+  ],
+  santander: [
+    'https://unavatar.io/santander.com?fallback=false',
+    'https://www.google.com/s2/favicons?domain=santander.com&sz=128',
+  ],
+  caixabank: [
+    'https://unavatar.io/caixabank.es?fallback=false',
+    'https://www.google.com/s2/favicons?domain=caixabank.es&sz=128',
+  ],
+  sabadell: [
+    'https://unavatar.io/bancsabadell.com?fallback=false',
+    'https://www.google.com/s2/favicons?domain=bancsabadell.com&sz=128',
+  ],
+  ing: [
+    'https://cdn.simpleicons.org/ing',
+    'https://unavatar.io/ing.es?fallback=false',
+    'https://www.google.com/s2/favicons?domain=ing.es&sz=128',
+  ],
+  n26: [
+    'https://cdn.simpleicons.org/n26',
+    'https://unavatar.io/n26.com?fallback=false',
+  ],
+  openbank: [
+    'https://unavatar.io/openbank.es?fallback=false',
+    'https://www.google.com/s2/favicons?domain=openbank.es&sz=128',
+  ],
+  bankinter: [
+    'https://unavatar.io/bankinter.com?fallback=false',
+    'https://www.google.com/s2/favicons?domain=bankinter.com&sz=128',
+  ],
+  wise: [
+    'https://cdn.simpleicons.org/wise',
+    'https://unavatar.io/wise.com?fallback=false',
+  ],
   binance: ['https://cdn.simpleicons.org/binance'],
   coinbase: ['https://cdn.simpleicons.org/coinbase'],
   kraken: ['https://unavatar.io/kraken.com?fallback=false'],
@@ -108,6 +143,13 @@ const BRAND_DOMAIN_MAP: Record<string, string> = {
   'revolut': 'revolut.com',
   'bbva': 'bbva.es',
   'santander': 'santander.com',
+  'caixabank': 'caixabank.es',
+  'sabadell': 'bancsabadell.com',
+  'ing': 'ing.es',
+  'n26': 'n26.com',
+  'openbank': 'openbank.es',
+  'bankinter': 'bankinter.com',
+  'wise': 'wise.com',
   'binance': 'binance.com',
   'coinbase': 'coinbase.com',
   'kraken': 'kraken.com',
@@ -146,5 +188,96 @@ export function getBrandLogoSources(brand?: Brand): string[] {
   }
 
   return [...new Set(sources.filter(Boolean))];
+}
+
+/**
+ * Resolves high-definition logo URLs for bank and financial institution sources
+ */
+export function getSourceLogoUrls(source: { institution?: string; name?: string; type?: string }): string[] {
+  if (source.type === 'cash') return [];
+
+  const text = `${source.institution || ''} ${source.name || ''}`.toLowerCase();
+
+  if (text.includes('bbva')) {
+    return [
+      'https://unavatar.io/bbva.es?fallback=false',
+      'https://www.google.com/s2/favicons?domain=bbva.es&sz=128',
+    ];
+  }
+  if (text.includes('santander')) {
+    return [
+      'https://unavatar.io/santander.com?fallback=false',
+      'https://www.google.com/s2/favicons?domain=santander.com&sz=128',
+    ];
+  }
+  if (text.includes('revolut')) {
+    return [
+      'https://cdn.simpleicons.org/revolut/white',
+      'https://unavatar.io/revolut.com?fallback=false',
+      'https://www.google.com/s2/favicons?domain=revolut.com&sz=128',
+    ];
+  }
+  if (text.includes('caixa')) {
+    return [
+      'https://unavatar.io/caixabank.es?fallback=false',
+      'https://www.google.com/s2/favicons?domain=caixabank.es&sz=128',
+    ];
+  }
+  if (text.includes('sabadell')) {
+    return [
+      'https://unavatar.io/bancsabadell.com?fallback=false',
+      'https://www.google.com/s2/favicons?domain=bancsabadell.com&sz=128',
+    ];
+  }
+  if (text.includes('ing')) {
+    return [
+      'https://cdn.simpleicons.org/ing',
+      'https://unavatar.io/ing.es?fallback=false',
+      'https://www.google.com/s2/favicons?domain=ing.es&sz=128',
+    ];
+  }
+  if (text.includes('n26')) {
+    return [
+      'https://cdn.simpleicons.org/n26',
+      'https://unavatar.io/n26.com?fallback=false',
+    ];
+  }
+  if (text.includes('openbank')) {
+    return [
+      'https://unavatar.io/openbank.es?fallback=false',
+      'https://www.google.com/s2/favicons?domain=openbank.es&sz=128',
+    ];
+  }
+  if (text.includes('bankinter')) {
+    return [
+      'https://unavatar.io/bankinter.com?fallback=false',
+      'https://www.google.com/s2/favicons?domain=bankinter.com&sz=128',
+    ];
+  }
+  if (text.includes('wise')) {
+    return [
+      'https://cdn.simpleicons.org/wise',
+      'https://unavatar.io/wise.com?fallback=false',
+    ];
+  }
+  if (text.includes('trade republic') || text.includes('traderepublic')) {
+    return ['https://unavatar.io/traderepublic.com?fallback=false'];
+  }
+  if (text.includes('myinvestor')) {
+    return ['https://unavatar.io/myinvestor.es?fallback=false'];
+  }
+
+  const inst = source.institution?.trim();
+  if (inst && inst !== 'Efectivo') {
+    const clean = inst.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const domain = inst.includes('.') ? inst : `${clean}.com`;
+    return [
+      `https://unavatar.io/${domain}?fallback=false`,
+      `https://cdn.simpleicons.org/${clean}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    ];
+  }
+
+  return [];
 }
 

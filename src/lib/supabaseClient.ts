@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Transaction, InvestmentAsset, PillarType, AssetType } from '../types/finance';
+import type { Transaction, InvestmentAsset, PillarType, AssetType, SourceAccount, SourceType } from '../types/finance';
 
 // Database Schema interfaces for Supabase
 export interface DbTransaction {
@@ -9,12 +9,26 @@ export interface DbTransaction {
   pillar: PillarType;
   category_id: string;
   brand_id: string | null;
+  source_id: string | null;
   concept: string;
   date: string;
   is_recurring: boolean;
   is_recurring_generated: boolean;
   recurrence_id: string | null;
   created_at: string | number;
+}
+
+export interface DbSourceAccount {
+  id: string;
+  user_id: string;
+  name: string;
+  type: SourceType;
+  institution: string | null;
+  brand_id: string | null;
+  initial_balance: number | null;
+  order_index: number;
+  color: string | null;
+  created_at: string;
 }
 
 export interface DbInvestment {
@@ -45,6 +59,12 @@ export interface Database {
         Row: DbTransaction;
         Insert: Partial<DbTransaction>;
         Update: Partial<DbTransaction>;
+        Relationships: [];
+      };
+      source_accounts: {
+        Row: DbSourceAccount;
+        Insert: Partial<DbSourceAccount>;
+        Update: Partial<DbSourceAccount>;
         Relationships: [];
       };
       investments: {
@@ -90,6 +110,7 @@ export function mapDbTransactionToTransaction(row: DbTransaction): Transaction {
     pillar: row.pillar,
     categoryId: row.category_id,
     brandId: row.brand_id || undefined,
+    sourceId: row.source_id || undefined,
     concept: row.concept,
     date: row.date,
     isRecurring: Boolean(row.is_recurring),
@@ -107,12 +128,43 @@ export function mapTransactionToDb(tx: Transaction, userId: string): DbTransacti
     pillar: tx.pillar,
     category_id: tx.categoryId,
     brand_id: tx.brandId || null,
+    source_id: tx.sourceId || null,
     concept: tx.concept,
     date: tx.date,
     is_recurring: Boolean(tx.isRecurring),
     is_recurring_generated: Boolean(tx.isRecurringGenerated),
     recurrence_id: tx.recurrenceId || null,
     created_at: new Date(tx.createdAt || Date.now()).toISOString(),
+  };
+}
+
+export function mapDbSourceAccountToSource(row: DbSourceAccount): SourceAccount {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    type: row.type,
+    institution: row.institution || undefined,
+    brandId: row.brand_id || undefined,
+    initialBalance: row.initial_balance !== null && row.initial_balance !== undefined ? Number(row.initial_balance) : 0,
+    orderIndex: Number(row.order_index ?? 0),
+    color: row.color || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+export function mapSourceToDb(source: SourceAccount, userId: string): DbSourceAccount {
+  return {
+    id: source.id,
+    user_id: userId,
+    name: source.name,
+    type: source.type,
+    institution: source.institution || null,
+    brand_id: source.brandId || null,
+    initial_balance: source.initialBalance !== undefined ? Number(source.initialBalance) : 0,
+    order_index: source.orderIndex ?? 0,
+    color: source.color || null,
+    created_at: source.createdAt || new Date().toISOString(),
   };
 }
 

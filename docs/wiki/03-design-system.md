@@ -209,14 +209,35 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
   - Sustitución de tonos pastel claros (`*-300`, `*-200`) por variantes saturadas de alta legibilidad (`light:text-indigo-700`, `light:text-blue-700`, `light:text-purple-700`, `light:text-amber-800`, `light:text-emerald-700`, `light:text-teal-700`).
   - Fondos de cápsula calibrados a `12-15%` de opacidad con bordes definidos (`light:border-indigo-200`, `light:bg-indigo-50`), garantizando ratios de contraste superiores a 6:1 (AAA/AA) sobre cristal perlado y fondos claros en carteles como `ETF`, `Acción`, `Cripto`, `Fondo Indexado`, `ISIN/Ticker` y `P&L`.
 
-### 16. Calibración de Contraste y Distribución Espacial de Movimientos
-- **Contraste de Recuadros en Modo Oscuro**:
-  - `border-white/10` elevado a `rgba(255, 255, 255, 0.16)` y `border-white/12` a `rgba(255, 255, 255, 0.18)`.
-  - Fondos de tarjetas secundarias y submétricas: `bg-white/[0.06] - bg-white/[0.08]` con relieve volumétrico `shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_2px_8px_rgba(0,0,0,0.3)]`.
-- **Estructura Optimizada de la Fila de Transacción (`SwipeableTransactionItem`)**:
-  - **Alineación a Extremos**: Padding perimetral `py-3 pl-3 pr-2.5 sm:pr-3` con el importe y fecha situados pegados al borde derecho (`text-right whitespace-nowrap`).
-  - **Ampliación del Título del Concepto**: Margen del avatar ajustado a `mr-2.5`, separación central reducida a `mr-2` y supresión de límites artificiales de ancho (`max-w-[180px]`), otorgando entre 25px y 35px adicionales al nombre del comercio o movimiento antes de truncar.
-  - **Adaptabilidad Móvil**: Botones de acción de escritorio (`Pencil`, `Trash2`) encapsulados con `hidden sm:flex` para no robar espacio horizontal en pantallas compactas.
+### 17. Carrusel Deslizante de Balance Liquid Glass (`HeroBalance`)
+- **Contenedor Deslizable Snap Horizontal**:
+  - `flex items-stretch overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth w-full transform-gpu`.
+  - Aceleración por hardware para deslizamiento táctil a 60/120 fps en iOS y Android.
+  - Cada tarjeta ocupa el ancho completo `w-full shrink-0 snap-center flex flex-col`.
+  - **Paridad Dimensional Estricta**: Todas las tarjetas (Slide 0 consolidado y Slides 1..N individuales) implementan `h-full flex flex-col justify-between flex-1 min-h-[240px] p-5 sm:p-6`, eliminando saltos de altura y desajustes de fondo entre diapositivas.
+- **Estructura de Diapositivas**:
+  - **Slide 0**: Tarjeta Consolidada ("Patrimonio Neto Total" o Pilar Activo) con luz cenital especular y submétricas dinámicas en cuadrícula simétrica de 2 columnas con 3 líneas por celda.
+  - **Slides 1..N**: Tarjetas individuales de cada `SourceAccount` con logotipo oficial bancario o billetera (`SourceAvatar`), nombre de cuenta, balance neto específico y métricas de actividad (movimientos vinculados y balance inicial).
+- **Indicador de Paginación en Esquina Inferior Derecha**:
+  - Ubicado en la esquina inferior derecha de cada tarjeta en una fila de pie alineada al extremo: `flex items-center justify-end mt-2.5`.
+  - Cápsula Liquid Glass: `rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md px-2 py-0.5`.
+  - Cápsula inactiva: esfera sutil de 6px `w-1.5 h-1.5 bg-white/30 hover:bg-white/50`.
+  - Cápsula activa: píldora expandida con resplandor neón `w-4 h-1.5 bg-gradient-to-r from-indigo-400 to-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]`.
+
+### 18. Avatar Oficial de Fuente Financiera (`SourceAvatar`)
+- **Resolución Vectorial Multi-CDN de Logotipos Bancarios**:
+  - Mapeo automático de entidades españolas e internacionales (BBVA, Santander, Revolut, CaixaBank, Sabadell, ING, N26, Openbank, Bankinter, Wise, Trade Republic, MyInvestor) con cascada HD vector/SVG libre de bordes blancos.
+  - Cuentas de tipo `cash` (Efectivo): Glifo Lucide `Wallet` esmeralda sobre cristal translúcido `bg-emerald-500/10 border-emerald-500/25 text-emerald-400`.
+  - Fallback bancario: Glifo `Landmark` con el color corporativo asignado a la cuenta.
+
+### 19. Selector y Gestor de Fuentes (`GlassSelect`, `SourceAccountManager`)
+- **Selector Desplegable Líquido (`GlassSelect`)**:
+  - Menú modal/dropdown con desenfoque de fondo `backdrop-blur-2xl bg-[#0E1526]/95 border border-white/15`.
+  - Opciones enriquecidas con `SourceAvatar` de entidad, nombre de cuenta y subtítulo (`Banco` o `Efectivo`).
+- **Gestor de Cuentas en Perfil (`SourceAccountManager`)**:
+  - Título depurado y unificado a **"Mis Fuentes"**.
+  - Tarjetas compactas con botones de reordenación ordinal arriba/abajo, avatar oficial y saldo neto (eliminado el indicador de cantidad de movimientos para mantener máxima limpieza visual).
+  - **Aislamiento en Portal DOM (`createPortal`)**: Modales de alta/edición y confirmación de borrado montados directamente en `document.body` con capa `z-[100]` y `bg-slate-950/80 backdrop-blur-xl`, garantizando que la sección del PIN de seguridad y elementos del perfil queden estrictamente por debajo sin superposiciones ni colisiones de apilamiento CSS.
 
 ---
 
@@ -224,6 +245,7 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 
 - **Active State**: Cada botón o tarjeta interactiva implementa `active:scale-[0.97]` con curva suave `cubic-bezier(0.16, 1, 0.3, 1)`.
 - **Luces Ambientales**: Tres orbes difusos de color en el fondo (`blur-3xl`) se sitúan detrás de la capa de interfaz, permitiendo que el efecto de cristal cobre vida al hacer scroll y refractar diferentes colores.
+
 
 
 

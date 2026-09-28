@@ -140,6 +140,7 @@ export interface Transaction {
   pillar: PillarType;                 // 'income' | 'expense' | 'invest'
   categoryId: string;                 // Relación con Category
   brandId?: string;                   // Relación opcional con Brand
+  sourceId?: string;                  // Relación opcional con SourceAccount (origen de fondos)
   concept: string;                    // Descripción o nota (ej. 'Compra semanal')
   date: string;                       // ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)
   isRecurring?: boolean;              // Indica si proviene de una recurrencia
@@ -160,6 +161,7 @@ export interface Transaction {
 | `pillar` | `pillar` | `TEXT` | `CHECK (pillar IN ('income', 'expense', 'invest'))` |
 | `categoryId` | `category_id` | `TEXT` | `NOT NULL` |
 | `brandId` | `brand_id` | `TEXT` | `NULL` |
+| `sourceId` | `source_id` | `TEXT` | `NULL REFERENCES public.source_accounts(id) ON DELETE SET NULL` |
 | `concept` | `concept` | `TEXT` | `NOT NULL` |
 | `date` | `date` | `TIMESTAMPTZ` | `NOT NULL`, Índice `idx_transactions_user_date` |
 | `isRecurring` | `is_recurring` | `BOOLEAN` | `DEFAULT FALSE` |
@@ -168,9 +170,72 @@ export interface Transaction {
 | `createdAt` | `created_at` | `TIMESTAMPTZ` | `DEFAULT timezone('utc'::text, now()) NOT NULL` |
 
 ### Operaciones CRUD de Transacciones
-- **Alta (`addTransaction`)**: Inserta el registro local en Zustand e invoca en segundo plano `insertCloudTransaction` en Supabase.
-- **Edición (`updateTransaction`)**: Actualiza selectivamente los campos modificados (`amount`, `concept`, `pillar`, `categoryId`, `brandId`, `date`) en memoria y sincroniza vía `updateCloudTransaction(id, updatedFields, userId)`.
+- **Alta (`addTransaction`)**: Inserta el registro local en Zustand preservando la fecha seleccionada (`date` en formato ISO 8601 `YYYY-MM-DDTHH:mm:ss.sssZ`), asignando el `sourceId` seleccionado, reordena la colección global cronológicamente en orden descendente e invoca en segundo plano `insertCloudTransaction` en Supabase.
+- **Edición (`updateTransaction`)**: Actualiza selectivamente los campos modificados (`amount`, `concept`, `pillar`, `categoryId`, `brandId`, `sourceId`, `date`) en memoria, preserva o reordena cronológicamente y sincroniza vía `updateCloudTransaction(id, updatedFields, userId)`.
 - **Baja (`deleteTransaction`)**: Elimina el registro del estado reactivo y envía la petición de borrado a Supabase vía `deleteCloudTransaction`.
+- **Ordenación Cronológica Garantizada**: Todas las mutaciones de transacciones aplican `sortTransactionsDesc` para garantizar que movimientos con fechas pasadas o futuras se sitúen exactamente en su posición cronológica correspondiente en el historial, estadísticas y gráficos.
+
+---
+
+## 3.5. Fuentes de Dinero y Cuentas (`SourceAccount`)
+
+Modela los orígenes de dinero independientes (bancos o efectivo) que componen el patrimonio líquido del usuario:
+
+```typescript
+export type SourceType = 'bank' | 'cash';
+
+export interface SourceAccount {
+  id: string;
+  userId?: string;
+  name: string;                       // Ej. "Cuenta Nómina", "Ahorro", "Billetera"
+  type: SourceType;                   // 'bank' | 'cash'
+  institution?: string;               // Ej. "BBVA", "Santander", "Revolut", "Efectivo"
+  brandId?: string;                   // Relación opcional con catálogo Brand
+  initialBalance?: number;            // Balance inicial de apertura
+  orderIndex: number;                 // Orden ordinal para carrusel y selectores (0..N)
+  color?: string;                     // Color semántico o hexadecimal
+  createdAt: string;                  // ISO 8601
+}
+
+export interface SourceBalanceInfo {
+  sourceId: string;
+  name: string;
+  initialBalance: number;
+  income: number;
+  expense: number;
+  investExpense: number;
+  netBalance: number;
+  transactionCount: number;
+}
+
+// Estado de aislamiento de cuenta en el store global:
+// activeSourceId: string | null (null = Patrimonio Neto Total / Consolidado)
+// setActiveSourceId: (id: string | null) => void;
+```
+
+### Correspondencia con la Tabla SQL `public.source_accounts` en Supabase
+
+```sql
+CREATE TABLE IF NOT EXISTS public.source_accounts (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('bank', 'cash')),
+  institution TEXT,
+  brand_id TEXT,
+  initial_balance NUMERIC(12, 2) DEFAULT 0.00 NOT NULL,
+  order_index INTEGER DEFAULT 0 NOT NULL,
+  color TEXT,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_accounts_user_order 
+  ON public.source_accounts(user_id, order_index ASC);
+```
+
+Políticas RLS aplicadas:
+- `ENABLE ROW LEVEL SECURITY;`
+- Lectura, Inserción, Actualización y Borrado restringidos a `auth.uid() = user_id`.
 
 ---
 

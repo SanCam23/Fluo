@@ -20,12 +20,28 @@ export interface Brand {
   isPopular?: boolean;
 }
 
+export type SourceType = 'bank' | 'cash';
+
+export interface SourceAccount {
+  id: string;
+  userId?: string;
+  name: string;
+  type: SourceType;
+  institution?: string;
+  brandId?: string;
+  initialBalance?: number;
+  orderIndex: number;
+  color?: string;
+  createdAt: string;
+}
+
 export interface Transaction {
   id: string;
   amount: number;
   pillar: PillarType;
   categoryId: string;
   brandId?: string;
+  sourceId?: string;
   concept: string;
   date: string; // ISO 8601 string
   isRecurring?: boolean;

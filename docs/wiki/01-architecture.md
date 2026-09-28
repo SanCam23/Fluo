@@ -55,13 +55,19 @@ Fluo/
 │   │   │   ├── ErrorBoundary.tsx   # Escudo contra errores de renderizado
 │   │   │   ├── GlassButton.tsx     # Botón háptico con material translúcido
 │   │   │   ├── GlassCard.tsx       # Contenedor refractante con luz perimetral
+│   │   │   ├── GlassSelect.tsx     # Selector dropdown modal Liquid Glass
+│   │   │   ├── InitialSourceModal.tsx # Onboarding guiado obligatorio de primera cuenta
 │   │   │   ├── PillarBadge.tsx     # Insignia semántica de pilar financiero
-│   │   │   └── PWAInstallPrompt.tsx # Banner inteligente de instalación PWA (Android / iOS)
+│   │   │   ├── PWAInstallPrompt.tsx # Banner inteligente de instalación PWA (Android / iOS)
+│   │   │   └── SourceAvatar.tsx    # Avatar Liquid Glass para fuentes con logo bancario o billetera
+│   │   ├── profile/                # Centro de control de usuario y ajustes
+│   │   │   ├── ProfileSettingsModal.tsx # Modal principal de ajustes y seguridad
+│   │   │   └── SourceAccountManager.tsx # Gestor y reordenador reactivo de fuentes de dinero
 │   │   ├── layout/                 # Estructura del dispositivo móvil
 │   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante simétrica Liquid Glass (grid 4-cols)
 │   │   │   └── MobileContainer.tsx # Contenedor responsive max-w-md
 │   │   ├── home/                   # Vista de Inicio
-│   │   │   ├── HeroBalance.tsx     # Tarjeta principal con balance neto y tasa de ahorro
+│   │   │   ├── HeroBalance.tsx     # Carrusel deslizable Liquid Glass (Consolidado + Cuentas)
 │   │   │   ├── MetricPillars.tsx   # Los 3 pilares (Ingresos, Gastos, Inversión)
 │   │   │   ├── RecentTransactionsList.tsx # Listado de últimos movimientos filtrable con modal de edición
 │   │   │   ├── SwipeableTransactionItem.tsx # Elemento deslizable bidireccional (derecha: editar, izquierda: eliminar)
@@ -465,6 +471,53 @@ Fluo está optimizada para garantizar una tasa de refresco constante de 60/120 f
 - **Deduplicación de Peticiones y SWR (`marketDataService.ts`)**:
   - Registro de promesas en vuelo `inFlightQuotePromises = new Map<string, Promise<MarketQuoteResult>>()`, unificando consultas concurrentes hacia el mismo ticker.
   - Estrategia *Stale-While-Revalidate* con ventana de frescura de 25 segundos (`SWR_FRESH_WINDOW_MS`), devolviendo cotizaciones cacheadas en 0ms y revalidando en segundo plano.
+
+---
+
+## 15. Arquitectura Multicuenta ("Fuentes" / "Accounts") y Balance Consolidado
+
+Fluo permite a los usuarios gestionar múltiples orígenes de dinero (cuentas bancarias o billeteras de efectivo) y navegar entre ellos fluidamente:
+
+### 1. Entidad `SourceAccount` y Persistencia
+- Modela cada origen de dinero con identificador único UUID, tipo (`bank` o `cash`), institución (ej. "BBVA", "Santander", "Revolut", "Efectivo"), saldo inicial (`initialBalance`), posición ordinal (`orderIndex`) y color de marca.
+- Persistencia dual en PostgreSQL Supabase (`public.source_accounts`) con políticas Row Level Security (RLS) aisladas por `user_id = auth.uid()` y en LocalStorage (`fluo_finance_storage_v3`).
+
+### 2. Formulación de Balances: Individual vs. Consolidado
+- **Balance Neto Individual de una Fuente (`computeSourceBalance`)**:
+  $$\text{NetBalance}_{\text{fuente}} = \text{InitialBalance} + \sum \text{Ingresos}_{\text{fuente}} - \sum \text{Gastos}_{\text{fuente}} - \sum \text{Inversiones Salientes}_{\text{fuente}}$$
+- **Balance Global Consolidado / Patrimonio Neto Total (`computeFinancialSummary`)**:
+  $$\text{Efectivo Consolidado} = \sum \text{InitialBalances} + \sum \text{Ingresos Totales} - \sum \text{Gastos Totales} - \sum \text{Inversiones Salientes}$$
+  $$\text{Patrimonio Neto Total} = \text{Efectivo Consolidado} + \text{Valor de Mercado de la Cartera de Inversiones}$$
+  Esto garantiza que el patrimonio total reconcilie matemáticamente al céntimo con la suma de las fuentes individuales más los activos bursátiles.
+
+### 3. Carrusel Deslizante de Balance (`HeroBalance.tsx`)
+- Implementado mediante CSS horizontal scroll-snap acelerado por hardware (`snap-x snap-mandatory transform-gpu` a 60/120 fps).
+- **Tarjeta 0 (Fija al inicio)**: "Patrimonio Neto Total" consolidado (o desglose del pilar activo) con tasa de ahorro y rendimiento de cartera (`activeSourceId: null`).
+- **Tarjetas 1..N**: Cada una de las fuentes ordenadas rigurosamente según `orderIndex`:
+  - Logotipo oficial de la entidad bancaria o billetera de efectivo (`SourceAvatar`).
+  - Balance neto específico de la cuenta.
+  - Recuento de transacciones vinculadas y flujo neto.
+- **Indicador de Posición en Esquina Superior Derecha**: Cápsula translúcida Liquid Glass (`rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md`) situada dentro de la tarjeta en la esquina superior derecha, permitiendo conocer de un vistazo la diapositiva activa o saltar a cualquiera de ellas con un toque sin barras externas inferiores.
+
+### 4. Aislamiento Reactivo por Cuenta (`activeSourceId`)
+- El store central gestiona `activeSourceId: string | null` sincronizado bidireccionalmente con el deslizamiento del carrusel:
+  - **Modo Consolidado (`null`)**: Activo en Slide 0 (Patrimonio Neto Total). Las estadísticas de los 3 pilares (`MetricPillars`), el listado de movimientos (`RecentTransactionsList`) y la vista de análisis (`AnalyticsView`) reflejan los datos globales combinados.
+  - **Modo Cuenta Específica (`UUID`)**: Al posicionarse en la tarjeta de una cuenta (o seleccionarla desde el selector de analítica), la interfaz aísla de forma estricta los datos:
+    - `MetricPillars`: Ingresos, gastos y salidas a inversión limitados a los movimientos de esa cuenta.
+    - `RecentTransactionsList`: Muestra exclusivamente los movimientos de la cuenta seleccionada con título `Movimientos de {Cuenta}` y avatar oficial.
+    - `AnalyticsView`: Gráficos, métricas KPI y flujo mensual acotados a los flujos de esa cuenta.
+    - `QuickAddTransactionModal`: Preselecciona automáticamente la cuenta activa como origen de fondos al registrar nuevos gastos o inversiones.
+
+### 5. Onboarding de Fuente Inicial Obligatoria (`InitialSourceModal.tsx`)
+- Detecta automáticamente si una cuenta de usuario no posee fuentes registradas (`sources.length === 0`).
+- Modal Liquid Glass que guía la creación de su primera fuente ("Cuenta Principal", tipo banco o efectivo, balance inicial opcional).
+- Garantiza que el usuario siempre disponga de una experiencia inicial dual: Patrimonio Neto Total + Primera Fuente.
+
+### 6. Reordenación y Gestión en Perfil (`SourceAccountManager.tsx`)
+- Vista accesible en ajustes del perfil con tarjetas compactas de cada fuente renderizando su `SourceAvatar` oficial.
+- Botones de reordenación táctil arriba/abajo que actualizan reactivamente `orderIndex` en el store Zustand y mediante actualización por lotes en Supabase.
+- Modificación de nombre y balance inicial, alta modal de nuevas fuentes y borrado con validación preventiva si existen transacciones asociadas.
+
 
 
 

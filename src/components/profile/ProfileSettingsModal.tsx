@@ -23,6 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSecurityLock } from '../../hooks/useSecurityLock';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useTheme } from '../../hooks/useTheme';
+import { SourceAccountManager } from './SourceAccountManager';
 
 interface ProfileSettingsModalProps {
   isOpen: boolean;
@@ -348,6 +349,9 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* 1.8. Financial Sources / Accounts Management (Liquid Glass) */}
+        <SourceAccountManager />
 
         {/* 2. Security Section (PIN & Biometrics) */}
         <div className="rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 p-4 flex flex-col gap-3.5">

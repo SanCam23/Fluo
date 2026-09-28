@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import {
   X,
@@ -26,14 +26,17 @@ import type {
   AssetType,
   MarketAssetItem,
   Transaction,
+  SourceAccount,
 } from '../../types/finance';
 import { BrandPicker } from './BrandPicker';
 import { GlassSelect } from '../common/GlassSelect';
 import type { GlassSelectOption } from '../common/GlassSelect';
 import { CategoryIcon } from '../common/CategoryIcon';
+import { SourceAvatar } from '../common/SourceAvatar';
 import { calculateFirstNextDueDate } from '../../services/recurringEngine';
 import { searchAssets, fetchCurrentPrice } from '../../services/marketDataService';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
+import { getTodayDateString, getYesterdayDateString } from '../../utils/dates';
 
 const ASSET_TYPE_OPTIONS: GlassSelectOption<AssetType>[] = [
   { value: 'stock', label: 'Acciones Bursátiles', icon: <LineChart className="h-3.5 w-3.5 text-indigo-400" /> },
@@ -69,6 +72,13 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const addAsset = useFinanceStore((state) => state.addAsset);
   const getBrandById = useFinanceStore((state) => state.getBrandById);
   const activeTab = useFinanceStore((state) => state.activeTab);
+  const sources = useFinanceStore((state) => state.sources);
+  const activeSourceId = useFinanceStore((state) => state.activeSourceId);
+
+  const sortedSources = useMemo(
+    () => [...sources].sort((a, b) => a.orderIndex - b.orderIndex),
+    [sources]
+  );
 
   // Pillar selection
   const [pillar, setPillar] = useState<PillarType>(() => {
@@ -77,6 +87,19 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     if (activeTab === 'invest') return 'invest';
     return 'expense';
   });
+
+  // Source selection state (defaults to activeSourceId or first source by orderIndex)
+  const [selectedSourceId, setSelectedSourceId] = useState<string>(() => {
+    if (editingTransaction?.sourceId) return editingTransaction.sourceId;
+    return activeSourceId || sortedSources[0]?.id || '';
+  });
+
+  // Movement date selection state
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const todayStr = getTodayDateString();
+  const yesterdayStr = getYesterdayDateString();
 
   // Whenever modal opens or activeTab/editingTransaction changes, auto-align state
   useEffect(() => {
@@ -87,12 +110,21 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         setConcept(editingTransaction.concept);
         setCategoryId(editingTransaction.categoryId);
         setBrandId(editingTransaction.brandId || '');
-        setStartDate(editingTransaction.date ? editingTransaction.date.substring(0, 10) : '');
+        setSelectedSourceId(editingTransaction.sourceId || activeSourceId || sortedSources[0]?.id || '');
+        const txDateStr = editingTransaction.date
+          ? editingTransaction.date.substring(0, 10)
+          : getTodayDateString();
+        setSelectedDate(txDateStr);
+        setStartDate(txDateStr);
         setIsRecurring(!!editingTransaction.isRecurring);
       } else {
         setAssetSearchQuery('');
         setAssetSearchResults([]);
         setIsAssetDropdownOpen(false);
+        const today = getTodayDateString();
+        setSelectedDate(today);
+        setStartDate(today);
+        setSelectedSourceId(activeSourceId || sortedSources[0]?.id || '');
         if (initialPillar) {
           setPillar(initialPillar);
         } else if (activeTab === 'invest') {
@@ -100,7 +132,17 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         }
       }
     }
-  }, [isOpen, initialPillar, activeTab, editingTransaction]);
+  }, [isOpen, initialPillar, activeTab, editingTransaction, sortedSources, activeSourceId]);
+
+  // Source Options for Liquid Glass Select
+  const sourceOptions: GlassSelectOption<string>[] = useMemo(() => {
+    return sortedSources.map((source: SourceAccount) => ({
+      value: source.id,
+      label: source.name,
+      subtitle: source.institution || (source.type === 'bank' ? 'Banco' : 'Efectivo'),
+      icon: <SourceAvatar source={source} size="xs" />,
+    }));
+  }, [sortedSources]);
 
   // Standard movement fields (Expense / Income)
   const [amount, setAmount] = useState<string>('');
@@ -126,7 +168,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const [currentPrice, setCurrentPrice] = useState('');
   const [currency, setCurrency] = useState<'EUR' | 'USD'>('EUR');
   const [brokerBrandId, setBrokerBrandId] = useState('');
-  const [acquisitionDate, setAcquisitionDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [acquisitionDate, setAcquisitionDate] = useState(() => getTodayDateString());
   const [initialFee, setInitialFee] = useState('');
   const [change24h, setChange24h] = useState<number | undefined>(undefined);
   const [isOfflineCached, setIsOfflineCached] = useState<boolean>(false);
@@ -137,7 +179,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(() => new Date().getDate());
-  const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().substring(0, 10));
+  const [startDate, setStartDate] = useState<string>(() => getTodayDateString());
   const [endDate, setEndDate] = useState<string>('');
   const [autoCharge, setAutoCharge] = useState<boolean>(true);
 
@@ -283,6 +325,9 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     setAmount('');
     setConcept('');
     setBrandId('');
+    const today = getTodayDateString();
+    setSelectedDate(today);
+    setStartDate(today);
     setAssetName('');
     setIdentifier('');
     setTicker('');
@@ -341,6 +386,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         pillar: 'invest',
         categoryId: selectedCatId || 'cat-etf',
         brandId: brokerBrandId || undefined,
+        sourceId: selectedSourceId || sortedSources[0]?.id || undefined,
         concept: `Inversión en ${assetName.trim()} (${identifier.trim().toUpperCase()})`,
         date: txDate,
         isRecurring,
@@ -384,15 +430,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       if (isNaN(numAmount) || numAmount <= 0) return;
       if (!concept.trim()) return;
 
-      const txDate = startDate
-        ? new Date(`${startDate}T12:00:00.000Z`).toISOString()
-        : editingTransaction.date;
+      let txDate: string;
+      if (selectedDate) {
+        if (editingTransaction.date && editingTransaction.date.substring(0, 10) === selectedDate) {
+          txDate = editingTransaction.date;
+        } else {
+          txDate = new Date(`${selectedDate}T12:00:00.000Z`).toISOString();
+        }
+      } else {
+        txDate = editingTransaction.date;
+      }
 
       updateTransaction(editingTransaction.id, {
         amount: numAmount,
         pillar,
         categoryId: selectedCatId,
         brandId: brandId || undefined,
+        sourceId: selectedSourceId || sortedSources[0]?.id || undefined,
         concept: concept.trim(),
         date: txDate,
       });
@@ -407,13 +461,22 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     if (isNaN(numAmount) || numAmount <= 0) return;
     if (!concept.trim()) return;
 
-    const txDate = startDate ? new Date(`${startDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
+    const today = getTodayDateString();
+    let txDate: string;
+    if (selectedDate === today) {
+      txDate = new Date().toISOString();
+    } else if (selectedDate) {
+      txDate = new Date(`${selectedDate}T12:00:00.000Z`).toISOString();
+    } else {
+      txDate = new Date().toISOString();
+    }
 
     addTransaction({
       amount: numAmount,
       pillar,
       categoryId: selectedCatId,
       brandId: brandId || undefined,
+      sourceId: selectedSourceId || sortedSources[0]?.id || undefined,
       concept: concept.trim(),
       date: txDate,
       isRecurring,
@@ -826,6 +889,19 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 placeholder="Busca tu broker (MyInvestor, Trade Republic, Degiro, Kraken...)"
               />
 
+              {/* Source Account Selector for Investment Outflow */}
+              {sourceOptions.length > 0 && (
+                <div>
+                  <GlassSelect
+                    label="Cuenta o Fuente de Cargo"
+                    value={selectedSourceId}
+                    onChange={(val) => setSelectedSourceId(val)}
+                    options={sourceOptions}
+                    placeholder="Selecciona cuenta de origen..."
+                  />
+                </div>
+              )}
+
               {/* Date & Initial Fee */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
@@ -893,6 +969,83 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 />
               </div>
 
+              {/* Fecha del movimiento (Liquid Glass Date Selector) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                    Fecha del movimiento
+                  </label>
+                  {/* Quick Pills */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(todayStr);
+                        setStartDate(todayStr);
+                      }}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                        selectedDate === todayStr
+                          ? pillar === 'income'
+                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                      }`}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(yesterdayStr);
+                        setStartDate(yesterdayStr);
+                      }}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                        selectedDate === yesterdayStr
+                          ? pillar === 'income'
+                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                      }`}
+                    >
+                      Ayer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dateInputRef.current?.showPicker?.();
+                        dateInputRef.current?.focus();
+                      }}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                        selectedDate !== todayStr && selectedDate !== yesterdayStr
+                          ? pillar === 'income'
+                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                      }`}
+                    >
+                      Elegir fecha
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    required
+                    value={selectedDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedDate(val);
+                      if (val) setStartDate(val);
+                    }}
+                    className="w-full rounded-2xl bg-white/5 backdrop-blur-md border border-white/15 pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-400/50 transition-colors [color-scheme:dark] cursor-pointer"
+                  />
+                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
               {/* Category Selector */}
               <div>
                 <GlassSelect
@@ -902,6 +1055,19 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                   options={categoryOptions}
                 />
               </div>
+
+              {/* Source Account Selector (Liquid Glass) */}
+              {sourceOptions.length > 0 && (
+                <div>
+                  <GlassSelect
+                    label="Cuenta o Fuente de Dinero"
+                    value={selectedSourceId}
+                    onChange={(val) => setSelectedSourceId(val)}
+                    options={sourceOptions}
+                    placeholder="Selecciona la cuenta o billetera..."
+                  />
+                </div>
+              )}
 
               {/* Brand Picker with Search */}
               <BrandPicker

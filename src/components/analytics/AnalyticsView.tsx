@@ -24,6 +24,7 @@ import {
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { TimeRangeFilter } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
+import { SourceAvatar } from '../common/SourceAvatar';
 import { formatCurrency, formatCompactCurrency } from '../../utils/currency';
 
 interface CustomTooltipProps {
@@ -67,8 +68,22 @@ export const AnalyticsView: React.FC = () => {
   const categories = useFinanceStore((state) => state.categories);
   const brands = useFinanceStore((state) => state.brands);
   const assets = useFinanceStore((state) => state.assets);
+  const sources = useFinanceStore((state) => state.sources);
+  const activeSourceId = useFinanceStore((state) => state.activeSourceId);
+  const setActiveSourceId = useFinanceStore((state) => state.setActiveSourceId);
 
   const [activeChartSection, setActiveChartSection] = useState<'categories' | 'comparison' | 'networth'>('categories');
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
+    [sources, activeSourceId]
+  );
+
+  // Isolate transactions to selected source account or show global if null
+  const sourceScopedTransactions = useMemo(() => {
+    if (!activeSourceId) return transactions;
+    return transactions.filter((tx) => tx.sourceId === activeSourceId);
+  }, [transactions, activeSourceId]);
 
   // Filter options
   const timeRangeOptions: { range: TimeRangeFilter; label: string }[] = [
@@ -84,6 +99,7 @@ export const AnalyticsView: React.FC = () => {
   const {
     periodIncome,
     periodExpense,
+    periodInvest,
     expensesByCategory,
     expensesByBrand,
     daysInPeriod,
@@ -95,7 +111,7 @@ export const AnalyticsView: React.FC = () => {
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
     const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
 
-    const filtered = transactions.filter((tx) => {
+    const filtered = sourceScopedTransactions.filter((tx) => {
       if (!tx || !tx.date) return false;
       const txTime = new Date(tx.date).getTime();
       switch (timeRange) {
@@ -117,6 +133,7 @@ export const AnalyticsView: React.FC = () => {
 
     let inc = 0;
     let exp = 0;
+    let inv = 0;
     const byCat: Record<string, number> = {};
     const byBrand: Record<string, { total: number; count: number }> = {};
 
@@ -134,6 +151,8 @@ export const AnalyticsView: React.FC = () => {
           byBrand[tx.brandId].total += tx.amount;
           byBrand[tx.brandId].count += 1;
         }
+      } else if (tx.pillar === 'invest') {
+        inv += tx.amount;
       }
     });
 
@@ -161,11 +180,12 @@ export const AnalyticsView: React.FC = () => {
     return {
       periodIncome: inc,
       periodExpense: exp,
+      periodInvest: inv,
       expensesByCategory: byCat,
       expensesByBrand: byBrand,
       daysInPeriod: days,
     };
-  }, [transactions, timeRange]);
+  }, [sourceScopedTransactions, timeRange]);
 
   // KPI 1: Savings rate
   const periodSavingsRate =
@@ -222,7 +242,7 @@ export const AnalyticsView: React.FC = () => {
       };
     }
 
-    transactions.forEach((tx) => {
+    sourceScopedTransactions.forEach((tx) => {
       if (!tx || !tx.date) return;
       const d = new Date(tx.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -241,12 +261,14 @@ export const AnalyticsView: React.FC = () => {
         ...b,
         savings: Math.max(0, b.income - b.expense),
       }));
-  }, [transactions]);
+  }, [sourceScopedTransactions]);
 
   // Area Chart data: Net worth evolution
   const netWorthData = useMemo(() => {
-    let balance = 14200; // Base starting assets / liquid capital
-    const baseAssetsValue = portfolioPerformance.portfolioMarketValue;
+    let balance = activeSource
+      ? (typeof activeSource.initialBalance === 'number' ? activeSource.initialBalance : 0)
+      : 14200;
+    const baseAssetsValue = activeSource ? 0 : portfolioPerformance.portfolioMarketValue;
     const result: Array<{ month: string; netWorth: number }> = [];
 
     for (const m of monthlyComparisonData) {
@@ -259,7 +281,7 @@ export const AnalyticsView: React.FC = () => {
     }
 
     return result;
-  }, [monthlyComparisonData, portfolioPerformance.portfolioMarketValue]);
+  }, [monthlyComparisonData, portfolioPerformance.portfolioMarketValue, activeSource]);
 
   // Sorted brands ranking
   const sortedBrands = useMemo(() => {
@@ -302,6 +324,43 @@ export const AnalyticsView: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5 pb-16">
+      {/* 0. Account Isolation Selector */}
+      {sources.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            type="button"
+            onClick={() => setActiveSourceId(null)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
+              activeSourceId === null
+                ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold'
+                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+            }`}
+          >
+            <Layers className="h-3 w-3 text-indigo-400" />
+            <span>Patrimonio Total (Global)</span>
+          </button>
+
+          {sources.map((s) => {
+            const isSelected = activeSourceId === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveSourceId(s.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
+                  isSelected
+                    ? 'bg-indigo-600/30 text-white border border-indigo-400/40 shadow-md font-bold'
+                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+                }`}
+              >
+                <SourceAvatar source={s} size="xs" />
+                <span>{s.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* 1. Time Range Selector Segmented Control */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
         {timeRangeOptions.map((opt) => {
@@ -360,21 +419,25 @@ export const AnalyticsView: React.FC = () => {
         {/* 3. Inversiones */}
         <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.07] light:bg-white/85 backdrop-blur-xl border border-white/[0.18] light:border-slate-300/80 shadow-sm flex flex-col gap-1 transition-all">
           <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-400 light:text-indigo-700">
-            <span>Inversiones</span>
+            <span>{activeSource ? 'Aportado' : 'Inversiones'}</span>
             <TrendingUp className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600 flex-shrink-0" />
           </div>
           <div className="mt-0.5">
             <span className="text-[14px] sm:text-base font-extrabold text-white light:text-slate-900 block leading-tight tracking-tight whitespace-nowrap">
-              {formatCompactCurrency(portfolioPerformance.portfolioMarketValue)}
+              {formatCompactCurrency(activeSource ? periodInvest : portfolioPerformance.portfolioMarketValue)}
             </span>
             <span
               className={`text-[10px] font-semibold block truncate mt-0.5 ${
-                portfolioPerformance.roi >= 0
+                activeSource
+                  ? 'text-indigo-400 light:text-indigo-700'
+                  : portfolioPerformance.roi >= 0
                   ? 'text-indigo-400 light:text-indigo-700'
                   : 'text-rose-400 light:text-rose-700'
               }`}
             >
-              {portfolioPerformance.roi >= 0 ? '+' : ''}{portfolioPerformance.roi.toFixed(1)}% ROI
+              {activeSource
+                ? 'Salidas a inversión'
+                : `${portfolioPerformance.roi >= 0 ? '+' : ''}${portfolioPerformance.roi.toFixed(1)}% ROI`}
             </span>
           </div>
         </div>

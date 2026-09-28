@@ -1,6 +1,8 @@
+import React, { useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
-import { useFinancialSummary } from '../../store/useFinanceStore';
+import { useFinanceStore, useFinancialSummary } from '../../store/useFinanceStore';
 import { formatCompactCurrency } from '../../utils/currency';
+import { computeSourceBalance } from '../../utils/finance';
 import type { PillarType } from '../../types/finance';
 
 interface MetricPillarsProps {
@@ -13,6 +15,32 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
   onSelectPillar,
 }) => {
   const summary = useFinancialSummary();
+  const transactions = useFinanceStore((state) => state.transactions);
+  const sources = useFinanceStore((state) => state.sources);
+  const activeSourceId = useFinanceStore((state) => state.activeSourceId);
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
+    [sources, activeSourceId]
+  );
+
+  const isolatedMetrics = useMemo(() => {
+    if (!activeSource) {
+      return {
+        income: summary.totalIncome,
+        expense: summary.totalExpense,
+        invest: summary.portfolioMarketValue,
+        isGlobal: true,
+      };
+    }
+    const balanceInfo = computeSourceBalance(activeSource, transactions);
+    return {
+      income: balanceInfo.income,
+      expense: balanceInfo.expense,
+      invest: balanceInfo.investExpense,
+      isGlobal: false,
+    };
+  }, [activeSource, summary, transactions]);
 
   return (
     <div className="grid grid-cols-3 gap-2.5">
@@ -31,9 +59,11 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
           <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />
         </div>
         <span className="mt-1 text-base font-bold text-white tracking-tight">
-          +{formatCompactCurrency(summary.totalIncome)}
+          +{formatCompactCurrency(isolatedMetrics.income)}
         </span>
-        <span className="text-[10px] text-slate-400 mt-0.5">Mensual</span>
+        <span className="text-[10px] text-slate-400 mt-0.5">
+          {isolatedMetrics.isGlobal ? 'Mensual' : 'En cuenta'}
+        </span>
       </button>
 
       {/* 2. Gastos */}
@@ -51,9 +81,11 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
           <ArrowDownRight className="h-3.5 w-3.5 text-rose-400" />
         </div>
         <span className="mt-1 text-base font-bold text-white tracking-tight">
-          -{formatCompactCurrency(summary.totalExpense)}
+          -{formatCompactCurrency(isolatedMetrics.expense)}
         </span>
-        <span className="text-[10px] text-slate-400 mt-0.5">Mensual</span>
+        <span className="text-[10px] text-slate-400 mt-0.5">
+          {isolatedMetrics.isGlobal ? 'Mensual' : 'En cuenta'}
+        </span>
       </button>
 
       {/* 3. Inversiones */}
@@ -67,13 +99,17 @@ export const MetricPillars: React.FC<MetricPillarsProps> = ({
         }`}
       >
         <div className="flex items-center justify-between w-full">
-          <span className="text-[11px] font-semibold text-indigo-300">Cartera</span>
+          <span className="text-[11px] font-semibold text-indigo-300">
+            {isolatedMetrics.isGlobal ? 'Cartera' : 'Aportado'}
+          </span>
           <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
         </div>
         <span className="mt-1 text-base font-bold text-white tracking-tight">
-          {formatCompactCurrency(summary.portfolioMarketValue)}
+          {formatCompactCurrency(isolatedMetrics.invest)}
         </span>
-        <span className="text-[10px] text-slate-400 mt-0.5">En Activos</span>
+        <span className="text-[10px] text-slate-400 mt-0.5">
+          {isolatedMetrics.isGlobal ? 'En Activos' : 'A inversión'}
+        </span>
       </button>
     </div>
   );

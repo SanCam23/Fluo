@@ -23,7 +23,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Motor de Recurrencias & Catch-up** | ✅ Completado | Motor en cliente `recurringEngine.ts`, calendar clamping para meses cortos, generación histórica idempotente |
 | **Formulario Granular de Recurrencias** | ✅ Completado | Modal Liquid Glass con switch iOS, periodicidad semanal/quincenal/mensual/anual, días de semana/mes y auto-registro |
 | **Formulario Unificado & Selector de Brokers** | ✅ Completado | Consolidación del alta de inversiones dentro del modal (+) de movimientos, selector de broker con `BrandPicker` y doble registro atómico |
-| **Suite de Tests Unitarios (Vitest)** | ✅ Completado | 20 tests automatizados pasando: recurrencias (12 tests) + mercado y búsqueda semántica (8 tests) |
+| **Selector de Fecha & Orden Cronológico** | ✅ Completado | Selector Liquid Glass de fecha en modal (+) con píldoras "Hoy", "Ayer", "Elegir fecha", ordenación cronológica descendente y recálculo de estadísticas |
+| **Suite de Tests Unitarios (Vitest)** | ✅ Completado | 30 tests automatizados pasando: recurrencias (12 tests), seguridad/PIN (3 tests), store y fechas (7 tests) + mercado (8 tests) |
 | **Simulador Temporal de Depuración** | ✅ Completado | Debug Tool `TimeSimulatorModal.tsx` con saltos de +1 semana, +1 mes, ejecución manual y badge reactivo |
 | **Autenticación en la Nube (Supabase)** | ✅ Completado | Login y Registro con Liquid Glass, gestión de sesiones JWT (`AuthContext`) y bypass Demo |
 | **Persistencia en la Nube & RLS** | ✅ Completado | Base de datos PostgreSQL en Supabase con Row Level Security, Optimistic UI y sincronización en segundo plano |
@@ -33,6 +34,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Documentación Oficial & README Maestro** | ✅ Completado | `README.md` exhaustivo con arquitectura, diseño Liquid Glass, ciberseguridad, guía local y despliegue |
 | **Onboarding Limpio a Cero (Zero-State)** | ✅ Completado | Estado inicial a 0 € para cuentas nuevas sin filtración de datos demo; empty states Liquid Glass en Home, Inversiones y Estadísticas |
 | **Centro de Control de Cuenta & Perfil** | ✅ Completado | Avatar flotante en cabecera, `ProfileSettingsModal`, gestión de PIN y WebAuthn, cambio de contraseña Supabase y borrado GDPR (`delete_user_account`) |
+| **Sistema Multicuenta & Carrusel de Fuentes** | ✅ Completado | Gestión de orígenes de dinero (bancos/efectivo), carrusel scroll-snap a 120fps en `HeroBalance.tsx`, onboarding obligatorio, vinculación `sourceId` y reordenación en ajustes |
 
 ---
 
@@ -453,9 +455,82 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Ajuste de la pastilla de pestaña activa a `light:bg-white/75` para integrarse armoniosamente sobre la base más translúcida.
 - **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (23/23 tests pasando) y `npx vite build` exitoso (584ms).
 
+### v0.5.26 (Selector de Fecha Personalizado & Orden Cronológico Descendente de Transacciones)
+- **Selector de Fecha Liquid Glass en [`QuickAddTransactionModal.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/forms/QuickAddTransactionModal.tsx)**:
+  - Campo "Fecha del movimiento" con iconografía Lucide (`Calendar`) integrada a la izquierda.
+  - Valor por defecto inicializado a la fecha actual local (`YYYY-MM-DD`).
+  - **Píldoras de Acceso Rápido Ergonómicas**: Pastillas translúcidas "Hoy", "Ayer" y "Elegir fecha" adaptadas semánticamente al pilar activo (esmeralda para ingresos, coral para gastos). Al pulsar "Elegir fecha", se dispara el selector de calendario nativo mediante `showPicker()`.
+  - Transmisión estricta de la fecha elegida en formato ISO (`YYYY-MM-DDTHH:mm:ss.sssZ`), respetando la fecha original al editar y evitando fijar erróneamente siempre la hora actual.
+- **Ordenación Cronológica Garantizada en [`useFinanceStore.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/useFinanceStore.ts) & [`dates.ts`](file:///c:/Users/Santino/Documents/Fluo/src/utils/dates.ts)**:
+  - Nueva función utilitaria `sortTransactionsDesc` que ordena las transacciones por fecha descendente (las más recientes primero), usando `createdAt` como criterio secundario.
+  - Aplicada de forma automática en `addTransaction`, `updateTransaction`, `setTransactions`, `triggerRecurrencesCheck`, `loadCloudData` y el `merge` de persistencia en `localStorage`.
+  - Almacenamiento resiliente `safeStorage` con fallback a memoria para entornos de testing y runners aislados.
+- **Coherencia en Gráficos, Estadísticas y Filtros**:
+  - Validado que transacciones registradas en meses pasados o futuros se agrupan en su mes respectivo en el gráfico de barras comparativas y la dona de distribución de [`AnalyticsView.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/analytics/AnalyticsView.tsx).
+  - Los filtros temporales (`this_month`, `last_month`, `last_3_months`, etc.) reflejan los movimientos según su fecha real de apunte.
+- **Suite de Pruebas Automatizadas (Vitest)**:
+  - Creado el archivo [`useFinanceStore.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/useFinanceStore.test.ts) con 7 nuevas pruebas unitarias: preservación de fecha pasada, ordenación cronológica descendente ante inserciones desordenadas, actualización de fecha con reordenación, filtrado por rangos temporales y helpers de fechas.
+  - Suite global incrementada a **30 tests unitarios pasando al 100%**.
+- **Validación de Calidad**: `npx tsc -b` (0 errores), `npm test` (30/30 tests pasando) y `npx vite build` exitoso.
+
+### v0.9.0 (Sistema Multicuenta "Fuentes", Carrusel Deslizante de Balance, Onboarding y Reordenación)
+- **Modelado & Persistencia de Fuentes (`SourceAccount`)**:
+  - Definida la entidad `SourceAccount` con soporte para bancos (`bank`) y efectivo (`cash`), `institution`, `initialBalance`, `orderIndex` y `color`.
+  - Nueva tabla SQL `public.source_accounts` en Supabase con índices optimizados y 4 políticas RLS completas (`auth.uid() = user_id`).
+  - Campo `sourceId?: string` añadido a `Transaction` y columna `source_id TEXT` en `public.transactions`.
+  - Sincronización en la nube completa en [`cloudSyncService.ts`](file:///c:/Users/Santino/Documents/Fluo/src/services/cloudSyncService.ts) (`insertCloudSource`, `updateCloudSource`, `reorderCloudSources`, `deleteCloudSource`).
+- **Carrusel Líquido Deslizante en Tarjeta Principal ([`HeroBalance.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/HeroBalance.tsx))**:
+  - Carrusel horizontal snap a 60/120 fps con aceleración por GPU (`snap-x snap-mandatory transform-gpu`).
+  - **Slide 0**: "Patrimonio Neto Total" consolidado con submétricas de ahorro y rendimiento de cartera.
+  - **Slides 1..N**: Tarjetas Liquid Glass para cada fuente ordenada por `orderIndex` con balance neto individual (`initialBalance + ingresos - gastos - inversiones salientes`) y conteo de movimientos.
+  - **Indicador de Paginación**: Cápsulas translúcidas con resplandor índigo activo y microinteracciones de navegación suave.
+- **Onboarding Guiado de Fuente Inicial ([`InitialSourceModal.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/common/InitialSourceModal.tsx))**:
+  - Detección automática al registrarse o tener 0 fuentes en cloud/local, forzando la creación de la primera cuenta o billetera.
+- **Selector de Fuente en Transacciones ([`QuickAddTransactionModal.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/forms/QuickAddTransactionModal.tsx))**:
+  - Selector Liquid Glass integrado en los flujos de Gasto, Ingreso e Inversión con valor predeterminado en `orderIndex: 0`.
+  - Guardado reactivo de `sourceId` con recálculo instantáneo de balances individuales y consolidados.
+- **Gestión y Reordenación en Perfil ([`SourceAccountManager.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/profile/SourceAccountManager.tsx))**:
+  - Tarjetas compactas con botones de subida/bajada que actualizan `orderIndex` en tiempo real.
+  - Modificación de nombre y saldo inicial, modal de alta de nueva fuente y borrado con confirmación preventiva ante movimientos asociados.
+- **Suite de Tests Automatizados (Vitest)**:
+  - Creado [`sourceAccounts.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/sourceAccounts.test.ts) con 9 nuevas pruebas unitarias: balance por fuente vs global, reordenación `orderIndex`, selección predeterminada, onboarding y operaciones CRUD.
+  - Suite global incrementada a **39 tests unitarios pasando al 100%**.
+- **Validación de Calidad**: `npx tsc -b` (0 errores) y `npm test` (39/39 tests pasando).
+
+### v0.9.1 (Aislamiento Total por Cuenta, Logotipos Bancarios Oficiales e Indicador Integrado)
+- **Aislamiento Estricto por Cuenta (`activeSourceId`)**:
+  - `HeroBalance`: La diapositiva activa sincroniza bidireccionalmente `activeSourceId` en el store Zustand (`activeSlide === 0 ? null : source.id`).
+  - `MetricPillars`: Al seleccionar una cuenta X, las estadísticas de Ingresos, Gastos e Inversión se aíslan exclusivamente a los apuntes de esa cuenta. El modo consolidado solo se muestra en Slide 0 ("Patrimonio Neto Total").
+  - `RecentTransactionsList`: Filtra estrictamente los movimientos por `tx.sourceId === activeSourceId`, adapta el título dinámicamente (`Movimientos de {Cuenta}`), renderiza el `SourceAvatar` y muestra estados vacíos contextuales.
+  - `AnalyticsView`: Añadido selector horizontal Liquid Glass de cuentas, aislando el cálculo de KPIs, distribución por categorías y flujo mensual según la cuenta activa o consolidada.
+  - `QuickAddTransactionModal`: Preselección automática de la cuenta activa al abrir el modal (+) de nuevo movimiento.
+- **Logotipos Oficiales Bancarios (`SourceAvatar.tsx`)**:
+  - Componente Liquid Glass reutilizable que resuelve logotipos vectoriales de bancos (BBVA, Santander, Revolut, CaixaBank, Sabadell, ING, N26, Openbank, Bankinter, Wise, Trade Republic, MyInvestor) con cascada multi-CDN y fallback a `Landmark` o `Wallet` para efectivo.
+  - Integrado en `HeroBalance`, `RecentTransactionsList`, `SourceAccountManager`, `QuickAddTransactionModal` y `AnalyticsView`.
+- **Indicador de Paginación Integrado en Esquina Superior Derecha**:
+  - Eliminado el indicador inferior redundante debajo de la tarjeta principal.
+  - Integrado directamente dentro de la tarjeta de balance en la esquina superior derecha (`rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md px-2.5 py-1`).
+- **Suite de Pruebas Automatizadas (Vitest)**:
+  - 2 nuevas pruebas unitarias en [`sourceAccounts.test.ts`](file:///c:/Users/Santino/Documents/Fluo/src/store/sourceAccounts.test.ts) validando el reseteo de `activeSourceId` y alternancia de cuentas.
+  - Suite global incrementada a **41 tests unitarios pasando al 100%**.
+### v0.9.2 (Indicador Inferior Derecho, Paridad Dimensional, Limpieza de Movimientos y Portals en Perfil)
+- **Indicador Interno en Esquina Inferior Derecha ([`HeroBalance.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/HeroBalance.tsx))**:
+  - Reubicación del indicador de diapositivas de la esquina superior derecha a la esquina inferior derecha de cada tarjeta (`flex items-center justify-end mt-2.5`).
+  - Cápsula Liquid Glass integrada sin interferir con la botonera de privacidad ni acciones superiores.
+- **Paridad Dimensional Estricta en Carrusel ([`HeroBalance.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/HeroBalance.tsx))**:
+  - `flex items-stretch` en la pista del carrusel con tarjetas fijadas en `h-full flex flex-col justify-between flex-1 min-h-[240px]`.
+  - Equilibrio de submétricas a 3 líneas de contenido simétricas en todos los modos, eliminando discrepancias de altura que dejaban fondos expuestos debajo de la tarjeta principal.
+- **Limpieza en Cabecera de Movimientos ([`RecentTransactionsList.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/home/RecentTransactionsList.tsx))**:
+  - Retirado el icono de tarjeta junto al título de movimientos recientes para máxima ligereza visual.
+- **Aislamiento de Modales de Fuentes en Perfil ([`SourceAccountManager.tsx`](file:///c:/Users/Santino/Documents/Fluo/src/components/profile/SourceAccountManager.tsx))**:
+  - Implementado `createPortal(..., document.body)` con capa `z-[100]` en los modales de alta, edición y eliminación de cuentas. Se erradica por completo la colisión con la sección de PIN de seguridad que se superponía al formulario.
+  - Título del apartado renombrado estrictamente a **"Mis Fuentes"**.
+  - Supresión del indicador de movimientos (`{txCount} movs`) en cada fila de cuenta.
+- **Validación & Tests**: `npx tsc -b` limpio (0 errores), 41 tests unitarios pasando al 100% y bundle de producción validado con `npm run build`.
+
 ---
 
-## Próximos Hitos (v0.6.0)
+## Próximos Hitos (v1.0.0)
 - [ ] **Presupuestos Mensuales & Metas de Ahorro**: Límites de gasto por categoría con barras de advertencia translúcidas.
 - [ ] **Exportación / Importación de Datos**: Backups locales en formato JSON y exportación de movimientos en CSV/Excel.
 - [ ] **Migración a IndexedDB**: Capacidad de soporte para miles de registros y series temporales históricas con `Dexie.js`.
