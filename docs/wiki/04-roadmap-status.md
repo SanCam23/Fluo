@@ -38,6 +38,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Sistema Multicuenta & Carrusel de Fuentes** | ✅ Completado | Gestión de orígenes de dinero (bancos/efectivo), carrusel scroll-snap a 120fps en `HeroBalance.tsx`, onboarding obligatorio, vinculación `sourceId` y reordenación en ajustes |
 | **Importe Ahorrado & Evolución (/stats)** | ✅ Completado | Tarjeta destacada Liquid Glass con Ahorro Neto Real, Tasa, Ritmo Diario, Proyección Cierre, Gráfico de Área interactivo y reactividad multicuenta |
 | **AppSec & Web Performance (A+)** | ✅ Completado | Migración CSP y cabeceras a `vercel.json`, `robots.txt` estático, WebP (<30 KB) LCP y accesibilidad WCAG |
+| **Sincronización de Fondos por ISIN & Ticker de Referencia** | ✅ Completado | Pipeline multiruta (Yahoo/Morningstar + Twin ETFs VUSA/VEUR), SWR background sync (>6h) y P&L dinámico |
+| **Autocompletado Reactivo por ISIN / Ticker** | ✅ Completado | Detección reactiva de activos existentes (cartera y catálogo), popover Liquid Glass y autocompletado integral |
 
 ---
 
@@ -742,6 +744,41 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Vitest: 84/84 tests unitarios pasando.
   - TypeScript: compilación limpia (`tsc -b`).
   - Build: empaquetado de producción exitoso con generación de Service Worker y precaché de assets.
+
+### v0.9.13 (Sincronización Automática de Fondos por ISIN, Tickers de Referencia & P&L en Tiempo Real)
+- **Motor de Resolución Multiruta por ISIN ([`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts))**:
+  - Detección inteligente de identificadores ISIN mediante expresión regular estándar ISO 6166 (`^[A-Z]{2}[A-Z0-9]{9}[0-9]$`), activando el pipeline especializado para fondos indexados y fondos mutuos/UCITS.
+  - **Ruta 1 (Yahoo Finance / Morningstar API)**: Consulta previa al endpoint de búsqueda `/v1/finance/search?q={ISIN}` para extraer el símbolo interno asignado en bolsas europeas (ej. `0P00000SUJ.F` para Vanguard US 500 `IE0032126645`, `0P00000RQ8.F` para Vanguard European Stock `IE0007987690`).
+  - **Ruta 2 (Mapeo a Ticker / ETF Subyacente Equivalente)**: Tabla de equivalencias predefinida `FUND_ISIN_EQUIVALENCE_MAP` para los fondos indexados más habituales del mercado español y europeo (`IE0032126645` $\rightarrow$ `VUSA.AS`, `IE0007987690` $\rightarrow$ `VEUR.AS`, `IE00B03HD191` $\rightarrow$ `VWCE.DE`, etc.). Almacenamiento dual de `isin` y `quote_ticker` para consultas continuas ultrarrápidas.
+  - **Ruta 3 (Fallback de NAV con Corte Temporal SWR)**: Si una llamada de red falla por cierre de mercado o fin de semana, utiliza la última cotización almacenada con su marca de tiempo (`lastUpdated`), garantizando que jamás se devuelva 0 € ni se resetee el valor patrimonial.
+- **Sincronización Silenciosa en Segundo Plano & P&L Dinámico ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts))**:
+  - Función `syncStaleAssetQuotes(maxAgeHours = 6)` integrada al montar [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx) y abrir [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx).
+  - Preservación estricta e inmutable del precio de adquisición original (`averageBuyPrice`), actualizando exclusivamente el valor liquidativo actual (`currentPrice`), valor de mercado (`currentValue`), beneficio no realizado (`pnl = (currentPrice * shares) - (averageBuyPrice * shares)`) y porcentaje de retorno (`pnlPercentage`).
+  - Recálculo reactivo e instantáneo del Patrimonio Neto consolidado en la tarjeta principal [`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/dashboard/HeroBalance.tsx).
+- **Persistencia en la Nube & Esquema Supabase ([`schema.sql`](file:///c:/Users/santi/Documents/UNI/Fluo/supabase/schema.sql) y [`cloudSyncService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/cloudSyncService.ts))**:
+  - Añadidas columnas `quote_ticker`, `last_price_update` y `current_price` en la tabla `public.investments`.
+  - Corrección de `updateCloudAssetPrice` para garantizar que no sobrescriba `average_buy_price` en Supabase.
+- **Insignia Visual en Interfaz ([`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx))**:
+  - Pastilla Liquid Glass que identifica el ticker de referencia bursátil (`Ref: VUSA.AS`) para fondos indexados resueltos mediante ETF subyacente.
+- **Autocompletado Reactivo por ISIN / Ticker ([`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx) y [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx))**:
+  - Función [`findMatchingExistingAssets`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts) que evalúa dinámicamente en tiempo real si el valor introducido coincide con activos existentes en la cartera del usuario o en el catálogo de fondos indexados.
+  - Menú desplegable flotante Liquid Glass con pastilla `"En cartera"` o clase de activo, datos del broker/plataforma, ticker de referencia y cotización actual.
+  - Al hacer clic, **autocompleta todos los campos restantes de forma atómica** (nombre, identificador, tipo, divisa, broker, cotización y precio de compra).
+- **Validación & Cobertura de Tests**:
+  - Tests unitarios especializados para detección de ISIN, resolución multiruta, cálculo no destructivo de P&L y autocompletado reactivo de activos existentes.
+  - Vitest: 97/97 tests unitarios pasando (7 suites completas).
+  - TypeScript: 0 errores (`tsc -b`).
+
+### v0.9.14 (Estabilidad de Inicio en PWA & Buscador de Movimientos en Home)
+- **Corrección del Desplazamiento Involuntario en Carrusel PWA ([`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx) y [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts))**:
+  - **Diagnóstico**: Al abrir la PWA, `loadCloudData` hidrataba las cuentas desde Supabase y forzaba `validActiveSourceId` a la primera cuenta bancaria (`sources[0].id`) al comprobar erróneamente `some(s => s.id === null) === false`. Esto provocaba que `HeroBalance.tsx` recibiera un cambio externo de `activeSourceId` de `null` $\rightarrow$ `id`, disparando un scroll suave involuntario hacia la tarjeta de la derecha.
+  - **Solución**: Preservación explícita de `currentActiveSourceId === null` durante la hidratación, anclando permanentemente la tarjeta de **Patrimonio Neto Total** en el arranque sin movimientos indeseados.
+  - Se añadió anclaje determinista `scrollLeft = 0` al montar el componente.
+- **Buscador de Movimientos en Home ([`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx))**:
+  - Botón Liquid Glass interactivo `[Buscar]` integrado en la fila de filtros justo al lado de la píldora de `Inversión`.
+  - Campo de búsqueda expandible con icono, botón de borrado rápido (`X`) y filtrado en tiempo real sobre concepto, nombre comercial de marca (`Brand`), categoría financiera e importe.
+- **Cobertura de Tests**:
+  - 98 tests unitarios pasando al 100% en Vitest.
 
 ---
 

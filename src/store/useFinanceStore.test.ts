@@ -201,4 +201,87 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(today).not.toBe(yesterday);
     });
   });
+
+  describe('Investment Store - Silent Quote Sync & P&L recalculation', () => {
+    it('should refetch stale assets (>6h) without altering averageBuyPrice', async () => {
+      const store = useFinanceStore.getState();
+
+      // Create an asset that was updated 10 hours ago (stale)
+      const tenHoursAgo = new Date(Date.now() - 10 * 3600 * 1000).toISOString();
+      const initialBuyPrice = 80.0;
+      const initialShares = 10;
+
+      store.addAsset({
+        name: 'Vanguard US 500 Index Fund EUR',
+        identifier: 'IE0032126645',
+        isin: 'IE0032126645',
+        quoteTicker: '0P00000SUJ.F',
+        assetType: 'index_fund',
+        shares: initialShares,
+        averageBuyPrice: initialBuyPrice,
+        currentPrice: 80.0,
+        currency: 'EUR',
+      });
+
+      // Force asset timestamp to 10 hours ago
+      useFinanceStore.setState((s) => ({
+        assets: s.assets.map((a) => ({
+          ...a,
+          lastPriceUpdate: tenHoursAgo,
+          last_price_update: tenHoursAgo,
+        })),
+      }));
+
+      // Trigger silent background sync
+      await store.syncStaleAssetQuotes(6);
+
+      const updatedAsset = useFinanceStore.getState().assets[0];
+      expect(updatedAsset).toBeDefined();
+
+      // 1. averageBuyPrice is immutable
+      expect(updatedAsset.averageBuyPrice).toBe(initialBuyPrice);
+
+      // 2. Quote was updated
+      expect(updatedAsset.currentPrice).toBeGreaterThan(0);
+      expect(updatedAsset.currentValue).toBe(Number((initialShares * updatedAsset.currentPrice).toFixed(2)));
+      expect(updatedAsset.pnl).toBe(Number((updatedAsset.currentValue! - (initialShares * initialBuyPrice)).toFixed(2)));
+      expect(updatedAsset.quoteTicker).toBeDefined();
+
+      // 3. Last update timestamp is fresh
+      expect(updatedAsset.lastPriceUpdate).not.toBe(tenHoursAgo);
+      const updateAgeMs = Date.now() - new Date(updatedAsset.lastPriceUpdate!).getTime();
+      expect(updateAgeMs).toBeLessThan(10000); // Updated seconds ago
+    });
+
+    it('should NOT refetch fresh assets (<6h)', async () => {
+      const store = useFinanceStore.getState();
+
+      // Create an asset updated 1 hour ago
+      const oneHourAgo = new Date(Date.now() - 1 * 3600 * 1000).toISOString();
+      store.addAsset({
+        name: 'Fresh Stock',
+        identifier: 'AAPL',
+        assetType: 'stock',
+        shares: 5,
+        averageBuyPrice: 200.0,
+        currentPrice: 220.0,
+        currency: 'USD',
+      });
+
+      useFinanceStore.setState((s) => ({
+        assets: s.assets.map((a) => ({
+          ...a,
+          lastPriceUpdate: oneHourAgo,
+          last_price_update: oneHourAgo,
+        })),
+      }));
+
+      // Trigger silent background sync with 6h threshold
+      await store.syncStaleAssetQuotes(6);
+
+      const asset = useFinanceStore.getState().assets[0];
+      // Timestamp should remain unchanged because it was fresh
+      expect(asset.lastPriceUpdate).toBe(oneHourAgo);
+    });
+  });
 });

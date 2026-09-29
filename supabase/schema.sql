@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS public.investments (
     symbol_or_isin TEXT NOT NULL,
     shares NUMERIC NOT NULL,
     average_buy_price NUMERIC NOT NULL,
+    quote_ticker TEXT,
+    last_price_update TIMESTAMPTZ DEFAULT now(),
+    current_price NUMERIC,
     created_at TIMESTAMPTZ DEFAULT now(),
     CONSTRAINT investments_pkey PRIMARY KEY (id),
     CONSTRAINT investments_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE

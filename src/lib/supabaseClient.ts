@@ -27,6 +27,9 @@ export interface DbInvestment {
   symbol_or_isin: string; // TEXT NOT NULL
   shares: number; // NUMERIC NOT NULL
   average_buy_price: number; // NUMERIC NOT NULL
+  quote_ticker?: string | null; // TEXT
+  last_price_update?: string | null; // TIMESTAMPTZ
+  current_price?: number | null; // NUMERIC
   created_at: string; // TIMESTAMPTZ DEFAULT now()
 }
 
@@ -225,6 +228,13 @@ export function mapDbInvestmentToAsset(row: any): InvestmentAsset {
   const currentPrice = row.current_price !== undefined && row.current_price !== null
     ? Number(row.current_price)
     : avgPrice;
+  const shares = Number(row.shares) || 0;
+  const curPrice = currentPrice > 0 ? currentPrice : avgPrice;
+  const currentValue = Number((shares * curPrice).toFixed(2));
+  const pnl = Number((currentValue - (shares * avgPrice)).toFixed(2));
+  const pnlPercentage = avgPrice > 0 ? Number((((curPrice - avgPrice) / avgPrice) * 100).toFixed(2)) : 0;
+  const quoteTicker = row.quote_ticker || undefined;
+  const lastPriceUpdate = row.last_price_update || undefined;
 
   return {
     id: row.id,
@@ -232,10 +242,17 @@ export function mapDbInvestmentToAsset(row: any): InvestmentAsset {
     identifier: symbol,
     ticker: row.ticker || symbol,
     isin: row.isin || (symbol.length === 12 ? symbol : undefined),
+    quoteTicker,
+    quote_ticker: quoteTicker,
+    lastPriceUpdate,
+    last_price_update: lastPriceUpdate,
+    currentValue,
+    pnl,
+    pnlPercentage,
     assetType: (row.asset_type || 'stock') as AssetType,
-    shares: Number(row.shares),
+    shares,
     averageBuyPrice: avgPrice,
-    currentPrice: currentPrice > 0 ? currentPrice : avgPrice,
+    currentPrice: curPrice,
     currency: row.currency || 'EUR',
     platform: row.platform || undefined,
     brandId: row.brand_id || undefined,
@@ -258,6 +275,9 @@ export function mapAssetToDbInvestment(asset: InvestmentAsset, userId: string): 
     symbol_or_isin: asset.identifier || asset.ticker || asset.isin || 'ASSET',
     shares: Number(asset.shares),
     average_buy_price: Number(asset.averageBuyPrice),
+    quote_ticker: asset.quoteTicker || asset.quote_ticker || null,
+    last_price_update: asset.lastPriceUpdate || asset.last_price_update || new Date().toISOString(),
+    current_price: Number(asset.currentPrice) || Number(asset.averageBuyPrice),
     created_at: new Date().toISOString(),
   };
 }

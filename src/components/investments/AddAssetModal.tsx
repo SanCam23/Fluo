@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import {
   X,
@@ -21,7 +21,11 @@ import { useFinanceStore } from '../../store/useFinanceStore';
 import {
   searchAssets,
   fetchCurrentPrice,
+  isIsin,
+  getFundEquivalence,
+  findMatchingExistingAssets,
 } from '../../services/marketDataService';
+import type { AutocompleteAssetMatch } from '../../services/marketDataService';
 import type { AssetType, MarketAssetItem } from '../../types/finance';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
 import { GlassSelect } from '../common/GlassSelect';
@@ -48,6 +52,7 @@ interface AddAssetModalProps {
 
 export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose }) => {
   const addAsset = useFinanceStore((state) => state.addAsset);
+  const portfolioAssets = useFinanceStore((state) => state.assets);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,6 +60,11 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
   const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete by Ticker or ISIN state
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const autocompleteContainerRef = useRef<HTMLDivElement>(null);
+  const [autocompletedNotice, setAutocompletedNotice] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -73,6 +83,9 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
   const [change24h, setChange24h] = useState<number | undefined>(undefined);
   const [isOfflineCached, setIsOfflineCached] = useState<boolean>(false);
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
+  const matchingExistingAssets = useMemo(() => {
+    return findMatchingExistingAssets(identifier, portfolioAssets);
+  }, [identifier, portfolioAssets]);
 
   // Search effect with debounce (only when query is not empty)
   useEffect(() => {
@@ -116,12 +129,72 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false);
       }
+      if (autocompleteContainerRef.current && !autocompleteContainerRef.current.contains(e.target as Node)) {
+        setIsAutocompleteOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   if (!isOpen) return null;
+
+  // Handle autocomplete selection from existing portfolio or catalog matches
+  const handleApplyAutocompleteMatch = async (match: AutocompleteAssetMatch) => {
+    setName(match.name);
+    setIdentifier(match.identifier);
+    setTicker(match.ticker || (match.assetType === 'stock' || match.assetType === 'crypto' ? match.identifier : ''));
+    setIsin(match.isin || (isIsin(match.identifier) ? match.identifier : ''));
+    setAssetType(match.assetType);
+    setCurrency(match.currency);
+    if (match.platform) {
+      setPlatform(match.platform);
+    }
+    if (match.currentPrice > 0) {
+      setCurrentPrice(match.currentPrice.toString());
+    }
+    if (!averageBuyPrice) {
+      if (match.averageBuyPrice && match.averageBuyPrice > 0) {
+        setAverageBuyPrice(match.averageBuyPrice.toString());
+        const s = parseFloat(shares);
+        if (!isNaN(s) && s > 0) {
+          setTotalInvestedInput((s * match.averageBuyPrice).toFixed(2));
+        }
+      } else if (match.currentPrice > 0) {
+        setAverageBuyPrice(match.currentPrice.toString());
+        const s = parseFloat(shares);
+        if (!isNaN(s) && s > 0) {
+          setTotalInvestedInput((s * match.currentPrice).toFixed(2));
+        }
+      }
+    }
+    setIsAutocompleteOpen(false);
+    setAutocompletedNotice(match.name);
+    setTimeout(() => setAutocompletedNotice(null), 3500);
+
+    // Try fetching fresh live quote in background
+    setIsFetchingQuote(true);
+    try {
+      const quote = await fetchCurrentPrice(match.identifier);
+      if (quote && quote.price > 0) {
+        setCurrentPrice(quote.price.toString());
+        setCurrency(quote.currency);
+        setChange24h(quote.change24h);
+        setIsOfflineCached(quote.isOfflineCached);
+        if (!averageBuyPrice && !match.averageBuyPrice) {
+          setAverageBuyPrice(quote.price.toString());
+          const s = parseFloat(shares);
+          if (!isNaN(s) && s > 0) {
+            setTotalInvestedInput((s * quote.price).toFixed(2));
+          }
+        }
+      }
+    } catch {
+      // Ignored, price already set
+    } finally {
+      setIsFetchingQuote(false);
+    }
+  };
 
   // Handle asset selection from search results
   const handleSelectAsset = async (item: MarketAssetItem) => {
@@ -206,11 +279,18 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
       return;
     }
 
+    const cleanIdent = identifier.trim().toUpperCase();
+    const cleanIsin = isin.trim().toUpperCase() || (isIsin(cleanIdent) ? cleanIdent : undefined);
+    const fundEq = cleanIsin ? getFundEquivalence(cleanIsin) : undefined;
+    const resolvedQuoteTicker = fundEq?.referenceTicker || ticker.trim().toUpperCase() || undefined;
+
     addAsset({
       name: name.trim(),
-      identifier: identifier.trim().toUpperCase(),
+      identifier: cleanIdent,
       ticker: ticker.trim().toUpperCase() || undefined,
-      isin: isin.trim().toUpperCase() || undefined,
+      isin: cleanIsin,
+      quoteTicker: resolvedQuoteTicker,
+      quote_ticker: resolvedQuoteTicker,
       assetType,
       shares: numShares,
       averageBuyPrice: numBuyPrice,
@@ -450,18 +530,123 @@ export const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose })
               />
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-slate-400">Ticker o ISIN</label>
+            <div className="relative" ref={autocompleteContainerRef}>
+              <label className="text-xs font-medium text-slate-400 flex items-center justify-between">
+                <span>Ticker o ISIN</span>
+                {matchingExistingAssets.length > 0 && (
+                  <span className="text-[10px] text-indigo-400 font-normal flex items-center gap-1">
+                    <Sparkles className="h-2.5 w-2.5 animate-pulse" />
+                    {matchingExistingAssets.length} {matchingExistingAssets.length === 1 ? 'coincidencia' : 'coincidencias'}
+                  </span>
+                )}
+              </label>
               <input
                 type="text"
                 required
-                placeholder="AAPL, IE00B4L5Y983..."
+                placeholder="AAPL, IE0032126645..."
                 value={identifier}
-                onChange={(e) => setIdentifier(e.target.value.toUpperCase())}
+                onFocus={() => {
+                  if (matchingExistingAssets.length > 0) setIsAutocompleteOpen(true);
+                }}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setIdentifier(val);
+                  setIsAutocompleteOpen(true);
+                }}
                 className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-xs font-mono uppercase text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
               />
+
+              {/* Floating Dropdown for Autocompleting Existing Matches (Liquid Glass) */}
+              {isAutocompleteOpen && matchingExistingAssets.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-[#0E1526]/95 light:bg-white/95 backdrop-blur-2xl border border-indigo-500/30 light:border-indigo-200 rounded-2xl p-2 shadow-[0_12px_36px_rgba(0,0,0,0.6)] light:shadow-[0_12px_24px_rgba(15,23,42,0.1)] divide-y divide-white/5 light:divide-slate-200 max-h-60 overflow-y-auto animate-fadeIn">
+                  <div className="px-2 py-1 text-[10px] font-bold text-indigo-300 light:text-indigo-600 uppercase tracking-wider flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Pinchar para autocompletar
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-normal">
+                      Coincide con existente
+                    </span>
+                  </div>
+
+                  {matchingExistingAssets.map((match) => (
+                    <button
+                      key={`${match.source}-${match.identifier}-${match.isin || ''}`}
+                      type="button"
+                      onClick={() => handleApplyAutocompleteMatch(match)}
+                      className="w-full text-left p-2 rounded-xl hover:bg-indigo-500/15 light:hover:bg-indigo-50/80 transition-all flex items-center justify-between gap-2.5 cursor-pointer group mt-1"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-white light:text-slate-900 group-hover:text-indigo-300 light:group-hover:text-indigo-600 transition-colors truncate">
+                            {match.name}
+                          </span>
+                          {match.source === 'portfolio' ? (
+                            <span className="px-1.5 py-0.2 rounded-md text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 light:bg-emerald-50 light:text-emerald-700 border border-emerald-500/30 shrink-0">
+                              En cartera
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded-md text-[9px] font-semibold bg-indigo-500/15 text-indigo-300 light:bg-indigo-50 light:text-indigo-700 border border-indigo-500/30 shrink-0">
+                              {match.assetType === 'index_fund' ? 'Fondo Indexado' : match.assetType.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 light:text-slate-500 mt-0.5 font-mono">
+                          <span className="font-semibold text-slate-300 light:text-slate-700">{match.identifier}</span>
+                          {match.isin && match.isin !== match.identifier && (
+                            <>
+                              <span>•</span>
+                              <span>ISIN: {match.isin}</span>
+                            </>
+                          )}
+                          {match.quoteTicker && match.quoteTicker !== match.identifier && (
+                            <>
+                              <span>•</span>
+                              <span className="text-indigo-400">Ref: {match.quoteTicker}</span>
+                            </>
+                          )}
+                          {match.platform && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-300 light:text-slate-700">{match.platform}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        {match.currentPrice > 0 && (
+                          <span className="text-xs font-bold text-emerald-400 light:text-emerald-700 block">
+                            {formatCurrency(match.currentPrice, match.currency)}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-indigo-400 light:text-indigo-600 group-hover:underline flex items-center gap-0.5 justify-end mt-0.5 font-semibold">
+                          Rellenar <Check className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Autocompletion notification badge */}
+          {autocompletedNotice && (
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/25 light:border-emerald-200 text-emerald-300 light:text-emerald-800 text-[11px] font-medium flex items-center justify-between animate-fadeIn">
+              <span className="flex items-center gap-1.5 truncate">
+                <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                Datos autocompletados desde: <strong className="font-semibold truncate">{autocompletedNotice}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setAutocompletedNotice(null)}
+                className="text-emerald-400 hover:text-emerald-200 text-xs ml-2 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Asset Class & Currency */}
           <div className="grid grid-cols-2 gap-2.5">

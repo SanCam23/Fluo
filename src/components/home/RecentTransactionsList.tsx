@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronDown, Receipt } from 'lucide-react';
+import { ChevronDown, Receipt, Search, X } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { PillarType, Transaction } from '../../types/finance';
 import { SwipeableTransactionItem } from './SwipeableTransactionItem';
@@ -19,6 +19,8 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
   onEditTransaction,
 }) => {
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Memoized shallow store selectors to avoid re-renders when unrelated store slices update
   const { transactions, sources, activeSourceId, deleteTransaction, getCategoryById, getBrandById } =
@@ -44,11 +46,26 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
     return transactions.filter((tx) => tx.sourceId === activeSourceId);
   }, [transactions, activeSourceId]);
 
-  // Filter transactions according to selected pillar (memoized)
+  // Filter transactions according to selected pillar and search query (memoized)
   const filteredTransactions = useMemo(() => {
-    if (selectedPillar === 'all') return sourceScopedTransactions;
-    return sourceScopedTransactions.filter((tx) => tx.pillar === selectedPillar);
-  }, [sourceScopedTransactions, selectedPillar]);
+    let result = sourceScopedTransactions;
+    if (selectedPillar !== 'all') {
+      result = result.filter((tx) => tx.pillar === selectedPillar);
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((tx) => {
+        const cat = getCategoryById(tx.categoryId);
+        const br = getBrandById(tx.brandId);
+        const conceptMatch = tx.concept.toLowerCase().includes(q);
+        const brandMatch = br ? br.name.toLowerCase().includes(q) : false;
+        const categoryMatch = cat ? cat.name.toLowerCase().includes(q) : false;
+        const amountMatch = tx.amount.toString().includes(q);
+        return conceptMatch || brandMatch || categoryMatch || amountMatch;
+      });
+    }
+    return result;
+  }, [sourceScopedTransactions, selectedPillar, searchQuery, getCategoryById, getBrandById]);
 
   // Windowed visible slice for sub-second layout and instant 60/120fps scrolling
   const visibleTransactions = useMemo(() => {
@@ -74,7 +91,7 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
         </span>
       </div>
 
-      {/* Pill Filters */}
+      {/* Pill Filters + Search Button */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
         {(['all', 'income', 'expense', 'invest'] as const).map((pillar) => {
           const isSelected = selectedPillar === pillar;
@@ -100,7 +117,49 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
             </button>
           );
         })}
+
+        {/* Botón de búsqueda de movimientos al lado de Inversión */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsSearchOpen((prev) => !prev);
+            if (isSearchOpen) setSearchQuery('');
+          }}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-md transition-all duration-200 cursor-pointer flex items-center gap-1 shrink-0 ${
+            isSearchOpen || searchQuery
+              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm font-semibold'
+              : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10'
+          }`}
+          title="Buscar movimientos"
+        >
+          <Search className="h-3 w-3" />
+          <span>Buscar</span>
+        </button>
       </div>
+
+      {/* Campo de búsqueda expandible (Liquid Glass) */}
+      {isSearchOpen && (
+        <div className="relative animate-fadeIn">
+          <input
+            type="text"
+            placeholder="Buscar por concepto, comercio o categoría..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
+            className="w-full rounded-2xl bg-white/[0.06] border border-white/15 pl-9 pr-8 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400/50 backdrop-blur-xl shadow-inner"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* List of items with Swipe-to-Delete and GPU viewport skipping (cv-auto) */}
       <div className="flex flex-col gap-2.5">
@@ -124,7 +183,9 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
           </div>
         ) : filteredTransactions.length === 0 ? (
           <div className="py-8 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs">
-            No hay movimientos de tipo {selectedPillar} en esta cuenta.
+            {searchQuery
+              ? `No se encontraron movimientos que coincidan con «${searchQuery}».`
+              : `No hay movimientos de tipo ${selectedPillar} en esta cuenta.`}
           </div>
         ) : (
           visibleTransactions.map((tx) => {

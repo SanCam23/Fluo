@@ -221,18 +221,55 @@ Permite localizar cualquier instrumento mediante:
 - **Códigos ISIN Normalizados**: `IE00B4L5Y983`, `IE00BK5BQT80`, `IE00B03HD191`, `ES0000012K21`.
 - **Símbolos Personalizados**: Si el usuario introduce un ticker o ISIN no catalogado, el motor genera dinámicamente una opción para darlo de alta de inmediato.
 
-### 2. Estrategia Híbrida de Cotizaciones y Resiliencia Offline
-1. **Conexión a Endpoints Públicos en Vivo**: Para criptoactivos (`BTC`, `ETH`, `SOL`, etc.), el motor consulta en tiempo real el ticker de 24h de la API abierta de Binance con timeout agresivo (2s).
-2. **Caché Local Persistente (`fluo_market_quotes_cache_v1`)**: Toda cotización recuperada se almacena en `localStorage` (y en memoria como fallback para testing y entornos aislados).
-3. **Manejo de Caídas de Red y Rate-Limits**: Si la red falla, la API excede su cuota o hay problemas de CORS, el motor devuelve la última cotización conocida con el flag `isOfflineCached: true`, mostrando en la tarjeta del activo el badge `Dato en caché`.
+### 2. Pipeline Multiruta de Resolución y Sincronización Automática de Fondos por ISIN
+Los fondos indexados y fondos mutuos UCITS (ej. Vanguard US 500 con ISIN `IE0032126645` o Vanguard European Stock con ISIN `IE0007987690`) no son instrumentos de negociación continua en bolsa, por lo que carecen de tickers bursátiles directos. Fluo implementa un pipeline de resolución en 3 etapas:
+1. **Detección Inteligente de ISIN (`isIsin`)**:
+   - Identifica patrones internacionales estándar (12 caracteres alfanuméricos con código de país de 2 letras y dígito de control, ej. `/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`).
+2. **Ruta 1 (Identificador Interno Yahoo Finance / Morningstar)**:
+   - Consulta el endpoint de autocompletado y búsqueda de Yahoo Finance (`https://query1.finance.yahoo.com/v1/finance/search?q={ISIN}`).
+   - Extrae el símbolo interno oficial devuelto con sufijos de bolsa europea (ej. `0P00000SUJ.F` para Vanguard US 500 o `0P00000RQ8.F` para Vanguard European Stock) y consulta su precio y divisa mediante la API v8 Chart (`/v8/finance/chart/{symbol}`).
+3. **Ruta 2 (Tabla de Equivalencias & Ticker Gemelo / ETF de Referencia)**:
+   - Si la consulta de búsqueda no entrega cotización directa o se encuentra restringida, el motor consulta la tabla predefinida `FUND_ISIN_EQUIVALENCE_MAP`:
+     - `IE0032126645` (Vanguard US 500 Index EUR) $\rightarrow$ Ticker de referencia: `VUSA.AS` / `VUAA.DE` (S&P 500 EUR).
+     - `IE0007987690` (Vanguard European Stock Index EUR) $\rightarrow$ Ticker de referencia: `VEUR.AS` / `VGK` (MSCI Europe EUR).
+     - `IE00B03HD191` (Vanguard Global Stock Index EUR) $\rightarrow$ Ticker de referencia: `VWCE.DE` / `SWDA.L` (MSCI World EUR).
+     - `IE0031786142` (Vanguard Eurozone Stock Index EUR) $\rightarrow$ Ticker de referencia: `VEUR.AS`.
+     - `IE00B0476488` (Vanguard Emerging Markets EUR) $\rightarrow$ Ticker de referencia: `VFEM.AS`.
+     - `IE0007987708` (Vanguard Japan Stock Index EUR) $\rightarrow$ Ticker de referencia: `VJPN.AS`.
+     - `IE00B0476041` (Vanguard Global Bond Index EUR Hedged) $\rightarrow$ Ticker de referencia: `AGGH.AS`.
+     - `IE00B18GC888` (Vanguard Euro Government Bond Index EUR) $\rightarrow$ Ticker de referencia: `VETY.DE`.
+     - `LU0996177134` / `LU0996179007` (Amundi MSCI World / S&P 500) $\rightarrow$ Ticker de referencia: `CW8.PA` / `VUSA.AS`.
+   - Se almacena de forma persistente tanto el `isin` como el `quote_ticker` resuelto, permitiendo que las consultas intradiarias subsecuentes ataquen directamente el ticker activo.
+4. **Ruta 3 (Fallback de Valor Liquidativo con Fecha de Corte)**:
+   - Ante caídas de red, fines de semana o festivos bursátiles, el motor recupera la última cotización válida almacenada en caché local (`lastUpdated` y `lastPriceUpdate`), asegurando que jamás se devuelva 0 € ni se reseteen las métricas históricas de la cartera.
 
-### 3. Motor de P&L Dinámico en Cartera (`InvestmentsView.tsx`)
+### 3. Sincronización Silenciosa en Segundo Plano (`syncStaleAssetQuotes`)
+- Al montar el Dashboard principal o abrir la pestaña de Inversiones, el store dispara automáticamente `syncStaleAssetQuotes(6)`:
+  - Evalúa todos los activos cuya marca de tiempo (`lastPriceUpdate`) supere las 6 horas de antigüedad.
+  - Ejecuta una actualización por lotes en segundo plano sin bloquear la interfaz de usuario.
+  - Recalcula de inmediato:
+    $$\text{currentValue} = \text{shares} \times \text{currentPrice}$$
+    $$\text{pnl} = \text{currentValue} - (\text{shares} \times \text{averageBuyPrice})$$
+    $$\text{pnlPercentage} = \frac{\text{currentPrice} - \text{averageBuyPrice}}{\text{averageBuyPrice}} \times 100$$
+  - **Inmutabilidad del Precio de Compra**: `averageBuyPrice` permanece estrictamente protegido e inalterado durante las actualizaciones de cotización.
+  - El Patrimonio Neto Total de la tarjeta principal (`HeroBalance.tsx`) y el valor de mercado de la cartera se actualizan en tiempo real reactivamente.
+
+### 4. Detección y Autocompletado Reactivo de Activos Existentes (`findMatchingExistingAssets`)
+Para agilizar el alta de participaciones adicionales o nuevos activos sin duplicidad ni errores tipográficos:
+- Al introducir un ISIN o Ticker en el campo correspondiente tanto en [`AddAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AddAssetModal.tsx) como en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx):
+  - El motor evalúa coincidencias contra los activos ya registrados en la cartera del usuario (`portfolioAssets`) y contra el catálogo curated/fondos indexados (`FUND_ISIN_EQUIVALENCE_MAP`, `CURATED_MARKET_ASSETS`).
+  - Prioriza activos de la propia cartera marcándolos con la insignia `"En cartera"`, broker/plataforma existente (`MyInvestor`, `Trade Republic`, etc.) y precio anterior.
+  - Despliega un menú flotante Liquid Glass (`bg-[#0E1526]/95 backdrop-blur-2xl border border-indigo-500/30`) con las coincidencias encontradas.
+  - Al pulsar sobre la opción sugerida, se **autocompletan de inmediato todos los campos restantes**: Nombre oficial, Ticker bursátil, ISIN normalizado, Ticker de referencia (`quoteTicker`), Tipo de activo, Divisa, Broker asociado y Cotización de mercado en vivo.
+
+### 5. Motor de P&L Dinámico en Cartera (`InvestmentsView.tsx`)
 Calcula en tiempo real con estética Liquid Glass:
 - **Capital Invertido**: `(cantidad * precio_compra) + comisiones`.
 - **Valor Actual de Mercado**: `cantidad * precio_actual_real`.
-- **Ganancia/Pérdida Neta**: `valor_actual - capital_invertido`.
+- **Ganancia/Pérdida Neta (P&L)**: `valor_actual - capital_invertido`.
 - **Rentabilidad Porcentual**: `((valor_actual - capital_invertido) / capital_invertido) * 100`.
 - **Métricas Globales de Cabecera**: Patrimonio total invertido y P&L global no realizado con feedback semántico (esmeralda translúcido para plusvalías, carmesí para minusvalías).
+- **Badge de Ticker de Referencia**: Si un activo se sincroniza vía ticker de referencia (ej. `Ref: VUSA.AS`), la tarjeta muestra una cápsula vítrea indicativa.
 
 ---
 
@@ -505,6 +542,7 @@ Fluo permite a los usuarios gestionar múltiples orígenes de dinero (cuentas ba
   - Logotipo oficial de la entidad bancaria o billetera de efectivo (`SourceAvatar`).
   - Balance neto específico de la cuenta.
   - Recuento de transacciones vinculadas y flujo neto.
+- **Estabilidad de Inicio en PWA / Móvil**: Preservación estricta de `activeSourceId: null` durante la sincronización y carga de datos de la nube (`fetchUserCloudData`), garantizando que la tarjeta inicial visible sea siempre el Patrimonio Neto Total consolidado sin desplazamientos involuntarios hacia la derecha al iniciar la aplicación.
 - **Indicador de Posición en Esquina Superior Derecha**: Cápsula translúcida Liquid Glass (`rounded-full bg-white/[0.08] border border-white/10 backdrop-blur-md`) situada dentro de la tarjeta en la esquina superior derecha, permitiendo conocer de un vistazo la diapositiva activa o saltar a cualquiera de ellas con un toque sin barras externas inferiores.
 
 ### 4. Aislamiento Reactivo por Cuenta (`activeSourceId`)
@@ -512,7 +550,7 @@ Fluo permite a los usuarios gestionar múltiples orígenes de dinero (cuentas ba
   - **Modo Consolidado (`null`)**: Activo en Slide 0 (Patrimonio Neto Total). Las estadísticas de los 3 pilares (`MetricPillars`), el listado de movimientos (`RecentTransactionsList`) y la vista de análisis (`AnalyticsView`) reflejan los datos globales combinados.
   - **Modo Cuenta Específica (`UUID`)**: Al posicionarse en la tarjeta de una cuenta (o seleccionarla desde el selector de analítica), la interfaz aísla de forma estricta los datos:
     - `MetricPillars`: Ingresos, gastos y salidas a inversión limitados a los movimientos de esa cuenta.
-    - `RecentTransactionsList`: Muestra exclusivamente los movimientos de la cuenta seleccionada con título `Movimientos de {Cuenta}` y avatar oficial.
+    - `RecentTransactionsList`: Muestra exclusivamente los movimientos de la cuenta seleccionada con título `Movimientos de {Cuenta}`, buscador reactivo en vivo y avatar oficial.
     - `AnalyticsView`: Gráficos, métricas KPI y flujo mensual acotados a los flujos de esa cuenta.
     - `QuickAddTransactionModal`: Preselecciona automáticamente la cuenta activa como origen de fondos al registrar nuevos gastos o inversiones.
 

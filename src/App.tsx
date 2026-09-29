@@ -64,6 +64,7 @@ export default function App() {
   const hasHydratedFromCloud = useFinanceStore((state) => state.hasHydratedFromCloud);
   const purgeUserData = useFinanceStore((state) => state.purgeUserData);
   const sources = useFinanceStore((state) => state.sources);
+  const syncStaleAssetQuotes = useFinanceStore((state) => state.syncStaleAssetQuotes);
 
   const {
     isLocked,
@@ -95,6 +96,11 @@ export default function App() {
       setUserId(null);
     }
   }, [user?.id, setUserId, loadCloudData]);
+
+  // Silent background synchronization of stale quotes (> 6 hours) on app load and tab transitions
+  useEffect(() => {
+    syncStaleAssetQuotes(6);
+  }, [activeTab, syncStaleAssetQuotes]);
 
   const handleConfirmSignOut = async () => {
     setIsLoggingOut(true);

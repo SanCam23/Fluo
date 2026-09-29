@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   TrendingUp,
@@ -81,6 +81,15 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
                 Dato offline / en caché
               </span>
             )}
+
+            {asset.quoteTicker && asset.quoteTicker !== asset.identifier && (
+              <span
+                className="px-1.5 py-0.2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 text-[10px] font-mono"
+                title={`Cotización activa vía ticker de referencia: ${asset.quoteTicker}`}
+              >
+                Ref: {asset.quoteTicker}
+              </span>
+            )}
           </div>
         </div>
 
@@ -158,18 +167,24 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
 AssetCard.displayName = 'AssetCard';
 
 export const InvestmentsView: React.FC = () => {
-  const { assets, isLiveUpdating, refreshAllAssetPrices, deleteAsset, lastSyncTimestamp } =
+  const { assets, isLiveUpdating, refreshAllAssetPrices, syncStaleAssetQuotes, deleteAsset, lastSyncTimestamp } =
     useFinanceStore(
       useShallow((state) => ({
         assets: state.assets,
         isLiveUpdating: state.isLiveUpdating,
         refreshAllAssetPrices: state.refreshAllAssetPrices,
+        syncStaleAssetQuotes: state.syncStaleAssetQuotes,
         deleteAsset: state.deleteAsset,
         lastSyncTimestamp: state.lastSyncTimestamp,
       }))
     );
 
   const [selectedType, setSelectedType] = useState<AssetType | 'all'>('all');
+
+  // Trigger silent synchronization for stale quotes (> 6h) when viewing investments
+  useEffect(() => {
+    syncStaleAssetQuotes(6);
+  }, [syncStaleAssetQuotes]);
 
   // Compute portfolio metrics (memoized)
   const { totalCost, totalValue, totalPnL, totalPnLPercent, isOverallProfit } = useMemo(() => {

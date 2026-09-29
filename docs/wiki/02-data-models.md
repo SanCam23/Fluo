@@ -252,19 +252,26 @@ export type AssetType =
 
 export interface InvestmentAsset {
   id: string;
-  name: string;                       // Nombre común (ej. 'Vanguard FTSE All-World')
-  identifier: string;                 // Ticker (ej. 'VWCE.DE') o ISIN (ej. 'IE00BK5BQT80')
+  name: string;                       // Nombre común (ej. 'Vanguard US 500 Stock Index Fund')
+  identifier: string;                 // Ticker (ej. 'VWCE.DE') o ISIN (ej. 'IE0032126645')
   ticker?: string;                    // Ticker bursátil explícito (ej. 'AAPL', 'VUSA')
-  isin?: string;                      // Código ISIN normalizado (ej. 'IE00B4L5Y983')
+  isin?: string;                      // Código ISIN normalizado (ej. 'IE0032126645')
+  quoteTicker?: string;               // Ticker de consulta resuelto (ej. '0P00000SUJ.F' o 'VUSA.AS')
+  quote_ticker?: string;              // Alias de persistencia en base de datos
+  lastPriceUpdate?: string;           // Timestamp ISO 8601 de última sincronización
+  last_price_update?: string;         // Alias de persistencia en base de datos
+  currentValue?: number;              // Valor total de mercado (shares * currentPrice)
+  pnl?: number;                       // Beneficio / pérdida no realizado en divisa base
+  pnlPercentage?: number;             // Rentabilidad no realizada en porcentaje
   assetType: AssetType;
-  shares: number;                     // Cantidad de títulos / unidades / tokens (admite decimales)
-  averageBuyPrice: number;            // Precio medio de compra ponderado (PMCP) en divisa base
+  shares: number;                     // Cantidad de títulos / participaciones (admite decimales)
+  averageBuyPrice: number;            // Precio medio de compra ponderado (PMCP) inmutable
   averagePrice?: number;              // Alias de compatibilidad
   currentPrice: number;               // Cotización actual oficial de mercado
   currency: 'EUR' | 'USD';
-  platform?: string;                  // Broker o entidad (ej. 'Trade Republic', 'MyInvestor', 'Degiro')
-  brandId?: string;                   // ID de la marca/broker en el catálogo para resolución de logo oficial
-  lastUpdated: string;                // Fecha y hora de última cotización
+  platform?: string;                  // Broker o entidad (ej. 'MyInvestor', 'Trade Republic')
+  brandId?: string;                   // ID del broker en el catálogo para resolución de logo oficial
+  lastUpdated: string;                // Fecha y hora de última cotización amigable
   historicalPrices?: {                // Historial de cotización para mini-sparklines
     date: string;
     price: number;
@@ -286,10 +293,13 @@ export interface InvestmentAsset {
 | `name` | `name` | `TEXT` | `NOT NULL`, Índice `idx_investments_user_name` |
 | `identifier` / `ticker` / `isin` | `symbol_or_isin` | `TEXT` | `NOT NULL`, Índice `idx_investments_symbol` |
 | `shares` | `shares` | `NUMERIC` | `NOT NULL` |
-| `averageBuyPrice` | `average_buy_price` | `NUMERIC` | `NOT NULL` |
+| `averageBuyPrice` | `average_buy_price` | `NUMERIC` | `NOT NULL` (Inmutable ante variaciones de mercado) |
+| `quoteTicker` | `quote_ticker` | `TEXT` | `NULLABLE` (Ticker activo resuelto para fondos/ISIN) |
+| `lastPriceUpdate` | `last_price_update` | `TIMESTAMPTZ` | `DEFAULT now()` |
+| `currentPrice` | `current_price` | `NUMERIC` | `NULLABLE` |
 | *(Metadata)* | `created_at` | `TIMESTAMPTZ` | `DEFAULT now()` |
 
-> **Nota Arquitectónica**: `current_price`, `currency`, `last_updated` y `change_24h` se resuelven reactivamente en tiempo real en el frontend mediante `marketDataService.ts`, manteniendo el esquema de base de datos ultraligero y desacoplado de fluctuaciones intradiarias.
+> **Nota Arquitectónica**: `average_buy_price` nunca se sobreescribe durante las actualizaciones periódicas de mercado. `current_value`, `pnl` y `pnl_percentage` se calculan dinámicamente tanto en cliente como en store, reflejando fielmente la rentabilidad viva de la cartera sin alterar la inversión inicial.
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
 Gestiona el catálogo de activos financieros, resolución de símbolos y fallback resiliente:
@@ -321,7 +331,24 @@ export interface MarketQuoteResult {
   isOfflineCached: boolean;
 }
 
+export interface AutocompleteAssetMatch {
+  source: 'portfolio' | 'catalog';
+  name: string;
+  identifier: string;
+  ticker?: string;
+  isin?: string;
+  quoteTicker?: string;
+  assetType: AssetType;
+  currency: 'EUR' | 'USD';
+  currentPrice: number;
+  averageBuyPrice?: number;
+  platform?: string;
+  brandId?: string;
+  benchmarkOrIndex?: string;
+}
+
 export function searchAssets(query: string): Promise<MarketAssetItem[]>;
+export function findMatchingExistingAssets(query: string, portfolioAssets?: InvestmentAsset[]): AutocompleteAssetMatch[];
 export function fetchCurrentPrice(identifier: string): Promise<MarketQuoteResult>;
 export function batchUpdateMarketQuotes(identifiers: string[]): Promise<Record<string, MarketQuoteResult>>;
 export function getQuoteFromCache(identifier: string): MarketQuoteResult | null;

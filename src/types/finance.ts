@@ -69,6 +69,13 @@ export interface InvestmentAsset {
   identifier: string; // Ticker (e.g., 'AAPL', 'BTC') o ISIN (e.g., 'IE00BK5BQT80')
   ticker?: string;
   isin?: string;
+  quoteTicker?: string; // Ticker de consulta resuelto (ej. '0P00000SUJ.F' o 'VUSA.AS')
+  quote_ticker?: string; // Alias de compatibilidad con BD
+  lastPriceUpdate?: string; // Timestamp ISO 8601 de última actualización
+  last_price_update?: string; // Alias de compatibilidad con BD
+  currentValue?: number; // Valor actual de mercado (shares * currentPrice)
+  pnl?: number; // Beneficio / pérdida no realizado en moneda base
+  pnlPercentage?: number; // Rentabilidad no realizada en porcentaje
   assetType: AssetType;
   shares: number;
   averageBuyPrice: number;
@@ -90,6 +97,7 @@ export interface MarketAssetItem {
   identifier: string;
   ticker?: string;
   isin?: string;
+  quoteTicker?: string;
   assetType: AssetType;
   currency: 'EUR' | 'USD';
   basePrice: number;
@@ -104,10 +112,12 @@ export interface MarketQuoteResult {
   name: string;
   ticker?: string;
   isin?: string;
+  quoteTicker?: string; // Ticker activo de consulta resuelto (Ruta 1 / Ruta 2)
   price: number;
   change24h: number;
   currency: 'EUR' | 'USD';
   lastUpdated: string;
+  lastPriceUpdate?: string;
   isOfflineCached: boolean;
 }
 

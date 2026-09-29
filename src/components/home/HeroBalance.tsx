@@ -43,6 +43,13 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
 
   const totalSlides = 1 + sortedSources.length;
 
+  // Ensure carousel starts at 0 on mount if activeSourceId is null
+  useEffect(() => {
+    if (activeSourceId === null && scrollRef.current && scrollRef.current.scrollLeft !== 0) {
+      scrollRef.current.scrollLeft = 0;
+    }
+  }, [activeSourceId]);
+
   // Synchronize when activeSourceId changes externally
   useEffect(() => {
     const expectedSlide =

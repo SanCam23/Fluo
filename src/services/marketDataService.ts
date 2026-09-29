@@ -4,15 +4,165 @@
  * and resilient local caching for offline fallback.
  */
 
-import type { MarketAssetItem, MarketQuoteResult } from '../types/finance';
+import type { AssetType, InvestmentAsset, MarketAssetItem, MarketQuoteResult } from '../types/finance';
 
 const CACHE_STORAGE_KEY = 'fluo_market_quotes_cache_v1';
 
 /**
+ * Validates whether a given symbol conforms to standard 12-char alphanumeric ISIN specifications
+ * (2-letter country prefix + 9 alphanumeric characters + 1 check digit).
+ */
+export function isIsin(code: string): boolean {
+  if (!code || typeof code !== 'string') return false;
+  const clean = code.trim().toUpperCase();
+  return /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(clean);
+}
+
+export interface FundEquivalence {
+  isin: string;
+  name: string;
+  referenceTicker: string;
+  fallbackEtfName: string;
+  currency: 'EUR' | 'USD';
+  benchmarkOrIndex?: string;
+}
+
+/**
+ * Curated Index Fund to Benchmark / Twin ETF Equivalence Map
+ * Resolves standard European mutual/index funds (e.g. Vanguard UCITS funds in MyInvestor/Indexa)
+ * to actively trading twin tickers for real-time NAV and benchmark tracking.
+ */
+export const FUND_ISIN_EQUIVALENCE_MAP: Record<string, FundEquivalence> = {
+  // Vanguard US 500 Stock Index Fund EUR Acc
+  IE0032126645: {
+    isin: 'IE0032126645',
+    name: 'Vanguard US 500 Stock Index Fund EUR Acc',
+    referenceTicker: 'VUSA.AS',
+    fallbackEtfName: 'Vanguard S&P 500 UCITS ETF (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'S&P 500',
+  },
+  // Vanguard European Stock Index Fund EUR Acc
+  IE0007987690: {
+    isin: 'IE0007987690',
+    name: 'Vanguard European Stock Index Fund EUR Acc',
+    referenceTicker: 'VEUR.AS',
+    fallbackEtfName: 'Vanguard FTSE Developed Europe UCITS ETF (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'MSCI Europe',
+  },
+  // Vanguard Global Stock Index Fund EUR Acc
+  IE00B03HD191: {
+    isin: 'IE00B03HD191',
+    name: 'Vanguard Global Stock Index Fund EUR Acc',
+    referenceTicker: 'VWCE.DE',
+    fallbackEtfName: 'Vanguard FTSE All-World UCITS ETF (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'MSCI World',
+  },
+  // Vanguard Eurozone Stock Index Fund EUR Acc
+  IE0031786142: {
+    isin: 'IE0031786142',
+    name: 'Vanguard Eurozone Stock Index Fund EUR Acc',
+    referenceTicker: 'VEUR.AS',
+    fallbackEtfName: 'Vanguard European Stock Index (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'Eurozone Stock',
+  },
+  // Vanguard Emerging Markets Stock Index Fund EUR Acc
+  IE00B0476488: {
+    isin: 'IE00B0476488',
+    name: 'Vanguard Emerging Markets Stock Index Fund EUR Acc',
+    referenceTicker: 'VFEM.AS',
+    fallbackEtfName: 'Vanguard FTSE Emerging Markets UCITS ETF (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'MSCI Emerging Markets',
+  },
+  // Vanguard Japan Stock Index Fund EUR Acc
+  IE0007987708: {
+    isin: 'IE0007987708',
+    name: 'Vanguard Japan Stock Index Fund EUR Acc',
+    referenceTicker: 'VJPN.AS',
+    fallbackEtfName: 'Vanguard FTSE Japan UCITS ETF (EUR)',
+    currency: 'EUR',
+    benchmarkOrIndex: 'MSCI Japan',
+  },
+  // Vanguard Global Bond Index Fund EUR Hedged
+  IE00B0476041: {
+    isin: 'IE00B0476041',
+    name: 'Vanguard Global Bond Index Fund EUR Hedged',
+    referenceTicker: 'AGGH.AS',
+    fallbackEtfName: 'iShares Core Global Aggregate Bond UCITS ETF',
+    currency: 'EUR',
+    benchmarkOrIndex: 'Global Aggregate Bond',
+  },
+  // Vanguard Euro Government Bond Index Fund EUR
+  IE00B18GC888: {
+    isin: 'IE00B18GC888',
+    name: 'Vanguard Euro Government Bond Index Fund EUR',
+    referenceTicker: 'VETY.DE',
+    fallbackEtfName: 'Vanguard EUR Eurozone Government Bond UCITS ETF',
+    currency: 'EUR',
+    benchmarkOrIndex: 'Euro Government Bond',
+  },
+  // Amundi Index Solutions - Amundi MSCI World AE-C
+  LU0996177134: {
+    isin: 'LU0996177134',
+    name: 'Amundi MSCI World Index Fund',
+    referenceTicker: 'CW8.PA',
+    fallbackEtfName: 'Amundi MSCI World UCITS ETF',
+    currency: 'EUR',
+    benchmarkOrIndex: 'MSCI World',
+  },
+  // Amundi S&P 500 Index Fund
+  LU0996179007: {
+    isin: 'LU0996179007',
+    name: 'Amundi S&P 500 Index Fund',
+    referenceTicker: 'VUSA.AS',
+    fallbackEtfName: 'Vanguard S&P 500 UCITS ETF',
+    currency: 'EUR',
+    benchmarkOrIndex: 'S&P 500',
+  },
+};
+
+export function getFundEquivalence(isin: string): FundEquivalence | undefined {
+  if (!isin) return undefined;
+  return FUND_ISIN_EQUIVALENCE_MAP[isin.trim().toUpperCase()];
+}
+
+/**
  * Curated Global Financial Directory
- * Covering major Indices, ETFs, Global/Spanish Stocks, Cryptos, Bonds, and Deposits.
+ * Covering major Indices, ETFs, Index Funds, Global/Spanish Stocks, Cryptos, Bonds, and Deposits.
  */
 export const CURATED_MARKET_ASSETS: MarketAssetItem[] = [
+  // --- FONDOS INDEXADOS (MUTUAL FUNDS / UCITS) ---
+  {
+    name: 'Vanguard US 500 Stock Index Fund EUR Acc',
+    identifier: 'IE0032126645',
+    isin: 'IE0032126645',
+    ticker: '0P00000SUJ.F',
+    quoteTicker: '0P00000SUJ.F',
+    assetType: 'index_fund',
+    currency: 'EUR',
+    basePrice: 82.97,
+    change24h: 0.65,
+    benchmarkOrIndex: 'S&P 500',
+    keywords: ['vanguard', 'us 500', 'sp500', 's&p 500', 'fondo indexado', 'myinvestor', 'ie0032126645'],
+  },
+  {
+    name: 'Vanguard European Stock Index Fund EUR Acc',
+    identifier: 'IE0007987690',
+    isin: 'IE0007987690',
+    ticker: '0P00000RQ8.F',
+    quoteTicker: '0P00000RQ8.F',
+    assetType: 'index_fund',
+    currency: 'EUR',
+    basePrice: 41.25,
+    change24h: 0.45,
+    benchmarkOrIndex: 'MSCI Europe',
+    keywords: ['vanguard', 'european stock', 'europa', 'msci europe', 'fondo indexado', 'myinvestor', 'ie0007987690'],
+  },
+
   // --- ÍNDICES & ETFS GLOBALES ---
   {
     name: 'Vanguard S&P 500 UCITS ETF (VUSA)',
@@ -384,9 +534,10 @@ function getQuotesCache(): Record<string, MarketQuoteResult> {
 function saveQuoteToCache(quote: MarketQuoteResult): void {
   const cache = getQuotesCache();
   cache[quote.identifier] = quote;
-  // Also index by ticker and isin if available
+  // Also index by ticker, isin and quoteTicker if available
   if (quote.ticker) cache[quote.ticker.toUpperCase()] = quote;
   if (quote.isin) cache[quote.isin.toUpperCase()] = quote;
+  if (quote.quoteTicker) cache[quote.quoteTicker.toUpperCase()] = quote;
   memoryCache = cache;
 
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
@@ -493,16 +644,23 @@ export async function searchAssets(query: string): Promise<MarketAssetItem[]> {
   );
 
   if (!hasExact && cleanUpper.length >= 2) {
-    const isProbablyIsin = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(cleanUpper);
+    const isProbablyIsin = isIsin(cleanUpper);
+    const fundEq = isProbablyIsin ? getFundEquivalence(cleanUpper) : undefined;
     const customItem: MarketAssetItem = {
-      name: isProbablyIsin ? `Activo ISIN (${cleanUpper})` : `Símbolo Personalizado (${cleanUpper})`,
+      name: fundEq
+        ? fundEq.name
+        : isProbablyIsin
+        ? `Activo ISIN (${cleanUpper})`
+        : `Símbolo Personalizado (${cleanUpper})`,
       identifier: cleanUpper,
-      ticker: !isProbablyIsin ? cleanUpper : undefined,
+      ticker: fundEq ? fundEq.referenceTicker : !isProbablyIsin ? cleanUpper : undefined,
+      quoteTicker: fundEq ? fundEq.referenceTicker : undefined,
       isin: isProbablyIsin ? cleanUpper : undefined,
-      assetType: isProbablyIsin ? 'etf' : 'stock',
-      currency: 'EUR',
+      assetType: isProbablyIsin ? 'index_fund' : 'stock',
+      currency: fundEq?.currency || 'EUR',
       basePrice: 100.0,
       change24h: 0.0,
+      benchmarkOrIndex: fundEq?.benchmarkOrIndex,
       isCustom: true,
     };
     matches.push(customItem);
@@ -511,7 +669,393 @@ export async function searchAssets(query: string): Promise<MarketAssetItem[]> {
   return matches;
 }
 
-async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> {
+export interface AutocompleteAssetMatch {
+  source: 'portfolio' | 'catalog';
+  name: string;
+  identifier: string;
+  ticker?: string;
+  isin?: string;
+  quoteTicker?: string;
+  assetType: AssetType;
+  currency: 'EUR' | 'USD';
+  currentPrice: number;
+  averageBuyPrice?: number;
+  platform?: string;
+  brandId?: string;
+  benchmarkOrIndex?: string;
+}
+
+/**
+ * Searches for existing assets (in user's portfolio and curated market/index fund catalogue)
+ * matching a given ticker, ISIN, or identifier query.
+ * Gives the user the ability to click on the match and autocomplete the rest of the form.
+ */
+export function findMatchingExistingAssets(
+  query: string,
+  portfolioAssets: InvestmentAsset[] = []
+): AutocompleteAssetMatch[] {
+  const clean = query.trim().toUpperCase();
+  if (clean.length < 2) return [];
+
+  const results: AutocompleteAssetMatch[] = [];
+  const seenKeys = new Set<string>();
+
+  // 1. Search in user's portfolio assets (highest priority)
+  for (const asset of portfolioAssets) {
+    const assetId = asset.identifier.toUpperCase();
+    const assetTicker = asset.ticker?.toUpperCase() || '';
+    const assetIsin = asset.isin?.toUpperCase() || '';
+    const assetQuoteTicker = (asset.quoteTicker || asset.quote_ticker)?.toUpperCase() || '';
+    const assetName = asset.name.toUpperCase();
+
+    const isMatch =
+      assetId === clean ||
+      assetTicker === clean ||
+      assetIsin === clean ||
+      assetQuoteTicker === clean ||
+      assetId.includes(clean) ||
+      assetTicker.includes(clean) ||
+      assetIsin.includes(clean) ||
+      (clean.length >= 3 && assetName.includes(clean));
+
+    if (isMatch) {
+      const dedupeKey = asset.isin?.toUpperCase() || asset.identifier.toUpperCase();
+      if (!seenKeys.has(dedupeKey)) {
+        seenKeys.add(dedupeKey);
+        results.push({
+          source: 'portfolio',
+          name: asset.name,
+          identifier: asset.identifier,
+          ticker: asset.ticker,
+          isin: asset.isin,
+          quoteTicker: asset.quoteTicker || asset.quote_ticker,
+          assetType: asset.assetType,
+          currency: asset.currency,
+          currentPrice: asset.currentPrice,
+          averageBuyPrice: asset.averageBuyPrice,
+          platform: asset.platform,
+          brandId: asset.brandId,
+        });
+      }
+    }
+  }
+
+  // 2. Search in index fund equivalence map (Vanguard, iShares, etc.)
+  for (const [, fund] of Object.entries(FUND_ISIN_EQUIVALENCE_MAP)) {
+    const isinUpper = fund.isin.toUpperCase();
+    const refTickerUpper = fund.referenceTicker.toUpperCase();
+    const nameUpper = fund.name.toUpperCase();
+
+    const isMatch =
+      isinUpper === clean ||
+      refTickerUpper === clean ||
+      isinUpper.includes(clean) ||
+      refTickerUpper.includes(clean) ||
+      (clean.length >= 3 && nameUpper.includes(clean));
+
+    if (isMatch && !seenKeys.has(isinUpper)) {
+      seenKeys.add(isinUpper);
+      results.push({
+        source: 'catalog',
+        name: fund.name,
+        identifier: fund.isin,
+        isin: fund.isin,
+        ticker: fund.referenceTicker,
+        quoteTicker: fund.referenceTicker,
+        assetType: 'index_fund',
+        currency: fund.currency,
+        currentPrice: 0,
+        benchmarkOrIndex: fund.benchmarkOrIndex,
+      });
+    }
+  }
+
+  // 3. Search in curated market assets
+  for (const item of CURATED_MARKET_ASSETS) {
+    const idUpper = item.identifier.toUpperCase();
+    const tickerUpper = item.ticker?.toUpperCase() || '';
+    const isinUpper = item.isin?.toUpperCase() || '';
+    const nameUpper = item.name.toUpperCase();
+
+    const isMatch =
+      idUpper === clean ||
+      tickerUpper === clean ||
+      isinUpper === clean ||
+      idUpper.includes(clean) ||
+      tickerUpper.includes(clean) ||
+      isinUpper.includes(clean) ||
+      (clean.length >= 3 && nameUpper.includes(clean));
+
+    const dedupeKey = isinUpper || idUpper;
+    if (isMatch && !seenKeys.has(dedupeKey)) {
+      seenKeys.add(dedupeKey);
+      results.push({
+        source: 'catalog',
+        name: item.name,
+        identifier: item.identifier,
+        ticker: item.ticker,
+        isin: item.isin,
+        quoteTicker: item.ticker,
+        assetType: item.assetType,
+        currency: item.currency,
+        currentPrice: item.basePrice,
+        benchmarkOrIndex: item.benchmarkOrIndex,
+      });
+    }
+  }
+
+  // 4. If query is a valid 12-char ISIN not yet in results, provide a structured option
+  if (isIsin(clean) && !results.some((r) => r.isin === clean || r.identifier === clean)) {
+    const fundEq = getFundEquivalence(clean);
+    results.push({
+      source: 'catalog',
+      name: fundEq?.name || `Fondo / Activo ISIN (${clean})`,
+      identifier: clean,
+      isin: clean,
+      ticker: fundEq?.referenceTicker,
+      quoteTicker: fundEq?.referenceTicker,
+      assetType: 'index_fund',
+      currency: fundEq?.currency || 'EUR',
+      currentPrice: 0,
+      benchmarkOrIndex: fundEq?.benchmarkOrIndex,
+    });
+  }
+
+  // Sort results: exact matches on identifier/isin/ticker first, then portfolio source first
+  results.sort((a, b) => {
+    const aExact =
+      a.identifier.toUpperCase() === clean ||
+      a.isin?.toUpperCase() === clean ||
+      a.ticker?.toUpperCase() === clean;
+    const bExact =
+      b.identifier.toUpperCase() === clean ||
+      b.isin?.toUpperCase() === clean ||
+      b.ticker?.toUpperCase() === clean;
+
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    if (a.source === 'portfolio' && b.source !== 'portfolio') return -1;
+    if (a.source !== 'portfolio' && b.source === 'portfolio') return 1;
+
+    return 0;
+  });
+
+  return results.slice(0, 5);
+}
+
+/**
+ * Fetches real-time price & daily change from Yahoo Finance v8 chart API
+ */
+async function fetchYahooChartQuote(
+  symbol: string
+): Promise<{ price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s max timeout
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+
+    const meta = result.meta;
+    let price = Number(meta.regularMarketPrice);
+    if (isNaN(price) || price <= 0) {
+      const closeList = result.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closeList) && closeList.length > 0) {
+        const valid = closeList.filter((p: any) => typeof p === 'number' && !isNaN(p) && p > 0);
+        if (valid.length > 0) price = valid[valid.length - 1];
+      }
+    }
+    if (isNaN(price) || price <= 0) return null;
+
+    const prevClose = Number(meta.previousClose);
+    let change24h = 0;
+    if (!isNaN(prevClose) && prevClose > 0) {
+      change24h = ((price - prevClose) / prevClose) * 100;
+    }
+
+    const currency = meta.currency === 'USD' ? 'USD' : 'EUR';
+    return {
+      price: Number(price.toFixed(symbol.includes('BTC') ? 0 : 2)),
+      change24h: Number(change24h.toFixed(2)),
+      currency,
+      symbol,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Multi-route Quote Resolver for Mutual / Index Funds by ISIN
+ *
+ * Ruta 1: Resolves internal Yahoo Finance / Morningstar symbol (e.g. '0P00000SUJ.F') via search endpoint
+ * Ruta 2: Equivalence table to twin ETF / benchmark index (e.g. 'VUSA.AS' / 'VEUR.AS')
+ * Ruta 3: Fallback Net Asset Value (NAV) with cut-off timestamp from persistent cache / baseline
+ */
+export async function resolveIsinQuote(
+  isin: string,
+  quoteTickerHint?: string
+): Promise<MarketQuoteResult> {
+  const cleanIsin = isin.trim().toUpperCase();
+  const equivalence = getFundEquivalence(cleanIsin);
+  const curated = CURATED_MARKET_ASSETS.find(
+    (a) => a.isin?.toUpperCase() === cleanIsin || a.identifier.toUpperCase() === cleanIsin
+  );
+
+  // If a known working quoteTicker was previously resolved or provided as a hint, test it first
+  const cached = getQuoteFromCache(cleanIsin);
+  const candidateTicker = quoteTickerHint || cached?.quoteTicker || curated?.quoteTicker;
+
+  if (candidateTicker) {
+    const directQuote = await fetchYahooChartQuote(candidateTicker);
+    if (directQuote && directQuote.price > 0) {
+      const result: MarketQuoteResult = {
+        identifier: cleanIsin,
+        name: curated?.name || equivalence?.name || cached?.name || `Fondo ISIN ${cleanIsin}`,
+        ticker: candidateTicker,
+        isin: cleanIsin,
+        quoteTicker: candidateTicker,
+        price: directQuote.price,
+        change24h: directQuote.change24h,
+        currency: directQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
+        lastUpdated: new Date().toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        lastPriceUpdate: new Date().toISOString(),
+        isOfflineCached: false,
+      };
+      saveQuoteToCache(result);
+      return result;
+    }
+  }
+
+  // 1. Ruta 1: Búsqueda previa en Yahoo Finance / Morningstar por ISIN
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanIsin)}`;
+    const searchRes = await fetch(searchUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const quotesList = searchData?.quotes;
+      if (Array.isArray(quotesList) && quotesList.length > 0) {
+        // Prioritize mutual funds or symbols with European exchange suffixes (.F, .MC, .DE, .AS)
+        const bestQuote =
+          quotesList.find((q: any) => q.quoteType === 'MUTUALFUND' || (q.symbol && q.symbol.includes('.'))) ||
+          quotesList[0];
+
+        if (bestQuote?.symbol) {
+          const internalSymbol = String(bestQuote.symbol);
+          const chartQuote = await fetchYahooChartQuote(internalSymbol);
+          if (chartQuote && chartQuote.price > 0) {
+            const result: MarketQuoteResult = {
+              identifier: cleanIsin,
+              name: bestQuote.shortname || curated?.name || equivalence?.name || `Fondo ISIN ${cleanIsin}`,
+              ticker: internalSymbol,
+              isin: cleanIsin,
+              quoteTicker: internalSymbol,
+              price: chartQuote.price,
+              change24h: chartQuote.change24h,
+              currency: chartQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
+              lastUpdated: new Date().toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+              lastPriceUpdate: new Date().toISOString(),
+              isOfflineCached: false,
+            };
+            saveQuoteToCache(result);
+            return result;
+          }
+        }
+      }
+    }
+  } catch {
+    // Network or parse error: proceed smoothly to Ruta 2
+  }
+
+  // 2. Ruta 2: Mapeo a Ticker / ETF Subyacente Equivalente
+  if (equivalence?.referenceTicker) {
+    const refTicker = equivalence.referenceTicker;
+    const refQuote = await fetchYahooChartQuote(refTicker);
+    if (refQuote && refQuote.price > 0) {
+      const result: MarketQuoteResult = {
+        identifier: cleanIsin,
+        name: equivalence.name,
+        ticker: refTicker,
+        isin: cleanIsin,
+        quoteTicker: refTicker,
+        price: refQuote.price,
+        change24h: refQuote.change24h,
+        currency: equivalence.currency,
+        lastUpdated: new Date().toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        lastPriceUpdate: new Date().toISOString(),
+        isOfflineCached: false,
+      };
+      saveQuoteToCache(result);
+      return result;
+    }
+  }
+
+  // 3. Ruta 3: Fallback de valor liquidativo con fecha de corte (Caché local persistente / Baseline)
+  if (cached && cached.price > 0) {
+    return {
+      ...cached,
+      isOfflineCached: true,
+    };
+  }
+
+  const basePrice = curated ? curated.basePrice : 100.0;
+  const baseChange = curated ? curated.change24h : 0.0;
+  const assetName = curated ? curated.name : equivalence ? equivalence.name : `Fondo ISIN ${cleanIsin}`;
+  const currency = curated ? curated.currency : equivalence ? equivalence.currency : 'EUR';
+
+  const fallbackQuote: MarketQuoteResult = {
+    identifier: cleanIsin,
+    name: assetName,
+    ticker: candidateTicker || equivalence?.referenceTicker,
+    isin: cleanIsin,
+    quoteTicker: candidateTicker || equivalence?.referenceTicker,
+    price: basePrice,
+    change24h: baseChange,
+    currency,
+    lastUpdated: new Date().toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+    lastPriceUpdate: new Date().toISOString(),
+    isOfflineCached: true,
+  };
+
+  saveQuoteToCache(fallbackQuote);
+  return fallbackQuote;
+}
+
+async function doFetchCurrentPrice(
+  upperId: string,
+  quoteTickerHint?: string
+): Promise<MarketQuoteResult> {
+  // Check if identifier is an ISIN directly
+  if (isIsin(upperId)) {
+    return resolveIsinQuote(upperId, quoteTickerHint);
+  }
+
   // Find asset configuration in curated catalog
   const found = CURATED_MARKET_ASSETS.find(
     (a) =>
@@ -519,6 +1063,15 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
       a.ticker?.toUpperCase() === upperId ||
       a.isin?.toUpperCase() === upperId
   );
+
+  // If curated asset is an index fund and has ISIN, route to specialized fund pipeline
+  if (found?.assetType === 'index_fund' && found.isin && isIsin(found.isin)) {
+    const isinQuote = await resolveIsinQuote(found.isin, found.quoteTicker || found.ticker || quoteTickerHint);
+    return {
+      ...isinQuote,
+      identifier: upperId,
+    };
+  }
 
   // 1. Try Live Public APIs for Crypto (e.g. Binance 24hr ticker public endpoint)
   if (found?.assetType === 'crypto' || ['BTC', 'ETH', 'SOL', 'ADA', 'XRP', 'DOT'].includes(upperId)) {
@@ -552,6 +1105,7 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
             name: found?.name || `${upperId} Crypto`,
             ticker: found?.ticker || upperId,
             isin: found?.isin,
+            quoteTicker: upperId,
             price: Number(price.toFixed(upperId === 'BTC' ? 0 : 2)),
             change24h: Number(change24h.toFixed(2)),
             currency: 'EUR',
@@ -560,6 +1114,7 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
               minute: '2-digit',
               second: '2-digit',
             }),
+            lastPriceUpdate: new Date().toISOString(),
             isOfflineCached: false,
           };
           saveQuoteToCache(liveQuote);
@@ -567,11 +1122,36 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
         }
       }
     } catch {
-      // Network error or timeout, gracefully continue to fallback cache
+      // Network error or timeout, gracefully continue
     }
   }
 
-  // 2. Fallback: Check local cache first
+  // 2. Try Live Yahoo Finance for Stocks / ETFs
+  const liveTicker = quoteTickerHint || found?.quoteTicker || found?.ticker || upperId;
+  const liveQuote = await fetchYahooChartQuote(liveTicker);
+  if (liveQuote && liveQuote.price > 0) {
+    const quoteResult: MarketQuoteResult = {
+      identifier: upperId,
+      name: found?.name || upperId,
+      ticker: liveTicker,
+      isin: found?.isin,
+      quoteTicker: liveTicker,
+      price: liveQuote.price,
+      change24h: liveQuote.change24h,
+      currency: liveQuote.currency || found?.currency || 'EUR',
+      lastUpdated: new Date().toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+      lastPriceUpdate: new Date().toISOString(),
+      isOfflineCached: false,
+    };
+    saveQuoteToCache(quoteResult);
+    return quoteResult;
+  }
+
+  // 3. Fallback: Check local cache first
   const cached = getQuoteFromCache(upperId);
   const basePrice = found ? found.basePrice : cached ? cached.price : 100.0;
   const baseChange = found ? found.change24h : cached ? cached.change24h : 0.5;
@@ -589,8 +1169,9 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
   const quoteResult: MarketQuoteResult = {
     identifier: upperId,
     name: assetName,
-    ticker: found?.ticker,
+    ticker: found?.ticker || liveTicker,
     isin: found?.isin,
+    quoteTicker: liveTicker,
     price: currentPrice,
     change24h: currentChange,
     currency,
@@ -599,6 +1180,7 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
       minute: '2-digit',
       second: '2-digit',
     }),
+    lastPriceUpdate: new Date().toISOString(),
     isOfflineCached: false,
   };
 
@@ -610,7 +1192,10 @@ async function doFetchCurrentPrice(upperId: string): Promise<MarketQuoteResult> 
  * Attempts real-time fetch with in-flight deduplication and Stale-While-Revalidate (SWR).
  * Sub-second response from memory with background revalidation.
  */
-export async function fetchCurrentPrice(identifier: string): Promise<MarketQuoteResult> {
+export async function fetchCurrentPrice(
+  identifier: string,
+  quoteTickerHint?: string
+): Promise<MarketQuoteResult> {
   const upperId = identifier.trim().toUpperCase();
 
   // 1. SWR Freshness Check: If cached quote was refreshed recently, return immediately
@@ -633,7 +1218,7 @@ export async function fetchCurrentPrice(identifier: string): Promise<MarketQuote
   // 3. Initiate request with in-flight tracking
   const fetchPromise = (async () => {
     try {
-      const result = await doFetchCurrentPrice(upperId);
+      const result = await doFetchCurrentPrice(upperId, quoteTickerHint);
       swrQuoteTimestamps.set(upperId, Date.now());
       return result;
     } finally {
@@ -651,18 +1236,27 @@ export async function fetchCurrentPrice(identifier: string): Promise<MarketQuote
   return fetchPromise;
 }
 
+export type BatchAssetQuery =
+  | string
+  | { identifier: string; quoteTicker?: string; isin?: string };
+
 /**
- * Batch update market quotes for a list of identifiers
+ * Batch update market quotes for a list of identifiers or asset query objects.
  */
 export async function batchUpdateMarketQuotes(
-  identifiers: string[]
+  assetsOrIds: BatchAssetQuery[]
 ): Promise<Record<string, MarketQuoteResult>> {
   const results: Record<string, MarketQuoteResult> = {};
   await Promise.all(
-    identifiers.map(async (id) => {
+    assetsOrIds.map(async (query) => {
+      const id = typeof query === 'string' ? query : query.identifier;
+      const hint = typeof query === 'object' ? query.quoteTicker : undefined;
       try {
-        const quote = await fetchCurrentPrice(id);
+        const quote = await fetchCurrentPrice(id, hint);
         results[id] = quote;
+        if (typeof query === 'object' && query.isin) {
+          results[query.isin] = quote;
+        }
       } catch (e) {
         console.warn(`Error updating quote for ${id}:`, e);
         // Fallback to cache if available

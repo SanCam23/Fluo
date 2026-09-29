@@ -76,6 +76,7 @@ interface FinanceState {
   deleteAsset: (id: string) => void;
   updateAssetPrice: (id: string, newPrice: number) => void;
   refreshAllAssetPrices: () => Promise<void>;
+  syncStaleAssetQuotes: (maxAgeHours?: number) => Promise<void>;
   addRecurrence: (rule: Omit<RecurrenceRule, 'id'>) => void;
   toggleRecurrence: (id: string) => void;
   setTimeRange: (range: TimeRangeFilter) => void;
@@ -243,9 +244,12 @@ export const useFinanceStore = create<FinanceState>()(
 
             const currentActiveSourceId = get().activeSourceId;
             const sortedFinalSources = [...finalSources].sort((a, b) => a.orderIndex - b.orderIndex);
-            const validActiveSourceId = sortedFinalSources.some((s) => s.id === currentActiveSourceId)
-              ? currentActiveSourceId
-              : (sortedFinalSources[0]?.id || null);
+            const validActiveSourceId =
+              currentActiveSourceId === null
+                ? null
+                : sortedFinalSources.some((s) => s.id === currentActiveSourceId)
+                ? currentActiveSourceId
+                : null;
 
             set({
               transactions: sortTransactionsDesc(result.transactions),
@@ -423,9 +427,25 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       addAsset: (assetData) => {
+        const shares = Number(assetData.shares) || 0;
+        const buyPrice = Number(assetData.averageBuyPrice) || 0;
+        const curPrice = Number(assetData.currentPrice) || buyPrice;
+        const currentValue = Number((shares * curPrice).toFixed(2));
+        const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
+        const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
+        const nowIso = new Date().toISOString();
+
         const newAsset: InvestmentAsset = {
           ...assetData,
           id: generateId('asset'),
+          shares,
+          averageBuyPrice: buyPrice,
+          currentPrice: curPrice,
+          currentValue,
+          pnl,
+          pnlPercentage,
+          lastPriceUpdate: nowIso,
+          last_price_update: nowIso,
           lastUpdated: 'Recién añadido',
         };
         set((state) => ({
@@ -455,16 +475,27 @@ export const useFinanceStore = create<FinanceState>()(
 
       updateAssetPrice: (id, newPrice) => {
         const { userId } = get();
+        const nowIso = new Date().toISOString();
         set((state) => ({
-          assets: state.assets.map((asset) =>
-            asset.id === id
-              ? {
-                  ...asset,
-                  currentPrice: newPrice,
-                  lastUpdated: 'Ahora mismo',
-                }
-              : asset
-          ),
+          assets: state.assets.map((asset) => {
+            if (asset.id !== id) return asset;
+            const shares = Number(asset.shares) || 0;
+            const buyPrice = Number(asset.averageBuyPrice) || 0; // NEVER alter buy price!
+            const curPrice = Number(newPrice) || buyPrice;
+            const currentValue = Number((shares * curPrice).toFixed(2));
+            const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
+            const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
+            return {
+              ...asset,
+              currentPrice: curPrice,
+              currentValue,
+              pnl,
+              pnlPercentage,
+              lastPriceUpdate: nowIso,
+              last_price_update: nowIso,
+              lastUpdated: 'Ahora mismo',
+            };
+          }),
         }));
 
         if (userId) {
@@ -478,22 +509,47 @@ export const useFinanceStore = create<FinanceState>()(
         set({ isLiveUpdating: true });
         try {
           const state = get();
-          const identifiers = state.assets.map((a) => a.identifier);
-          const quotes = await batchUpdateMarketQuotes(identifiers);
+          const queries = state.assets.map((a) => ({
+            identifier: a.identifier,
+            quoteTicker: a.quoteTicker || a.quote_ticker,
+            isin: a.isin,
+          }));
+          const quotes = await batchUpdateMarketQuotes(queries);
           const syncTime = new Date().toLocaleTimeString('es-ES', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
           });
+          const nowIso = new Date().toISOString();
 
           set((s) => ({
             lastSyncTimestamp: syncTime,
             assets: s.assets.map((asset) => {
-              const quote = quotes[asset.identifier] || quotes[asset.identifier.toUpperCase()];
+              const quote =
+                quotes[asset.identifier] ||
+                quotes[asset.identifier.toUpperCase()] ||
+                (asset.quoteTicker ? quotes[asset.quoteTicker] : undefined) ||
+                (asset.isin ? quotes[asset.isin] : undefined);
+
               if (quote) {
+                const shares = Number(asset.shares) || 0;
+                const buyPrice = Number(asset.averageBuyPrice) || 0; // NEVER alter buy price!
+                const curPrice = Number(quote.price) || buyPrice;
+                const currentValue = Number((shares * curPrice).toFixed(2));
+                const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
+                const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
+                const resolvedTicker = quote.quoteTicker || asset.quoteTicker || asset.quote_ticker;
+
                 return {
                   ...asset,
-                  currentPrice: quote.price,
+                  currentPrice: curPrice,
+                  currentValue,
+                  pnl,
+                  pnlPercentage,
+                  quoteTicker: resolvedTicker,
+                  quote_ticker: resolvedTicker,
+                  lastPriceUpdate: nowIso,
+                  last_price_update: nowIso,
                   change24h: quote.change24h,
                   isOfflineCached: quote.isOfflineCached,
                   lastUpdated: quote.isOfflineCached
@@ -506,6 +562,78 @@ export const useFinanceStore = create<FinanceState>()(
           }));
         } finally {
           set({ isLiveUpdating: false });
+        }
+      },
+
+      syncStaleAssetQuotes: async (maxAgeHours = 6) => {
+        const state = get();
+        const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+        const now = Date.now();
+
+        const staleAssets = state.assets.filter((a) => {
+          const ts = a.lastPriceUpdate || a.last_price_update;
+          if (!ts) return true;
+          const parsed = new Date(ts).getTime();
+          if (isNaN(parsed)) return true;
+          return now - parsed > maxAgeMs;
+        });
+
+        if (staleAssets.length === 0) return;
+
+        try {
+          const queries = staleAssets.map((a) => ({
+            identifier: a.identifier,
+            quoteTicker: a.quoteTicker || a.quote_ticker,
+            isin: a.isin,
+          }));
+          const quotes = await batchUpdateMarketQuotes(queries);
+          const syncTime = new Date().toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+          const nowIso = new Date().toISOString();
+
+          set((s) => ({
+            lastSyncTimestamp: syncTime,
+            assets: s.assets.map((asset) => {
+              const quote =
+                quotes[asset.identifier] ||
+                quotes[asset.identifier.toUpperCase()] ||
+                (asset.quoteTicker ? quotes[asset.quoteTicker] : undefined) ||
+                (asset.isin ? quotes[asset.isin] : undefined);
+
+              if (quote) {
+                const shares = Number(asset.shares) || 0;
+                const buyPrice = Number(asset.averageBuyPrice) || 0; // NEVER alter buy price!
+                const curPrice = Number(quote.price) || buyPrice;
+                const currentValue = Number((shares * curPrice).toFixed(2));
+                const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
+                const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
+                const resolvedTicker = quote.quoteTicker || asset.quoteTicker || asset.quote_ticker;
+
+                return {
+                  ...asset,
+                  currentPrice: curPrice,
+                  currentValue,
+                  pnl,
+                  pnlPercentage,
+                  quoteTicker: resolvedTicker,
+                  quote_ticker: resolvedTicker,
+                  lastPriceUpdate: nowIso,
+                  last_price_update: nowIso,
+                  change24h: quote.change24h,
+                  isOfflineCached: quote.isOfflineCached,
+                  lastUpdated: quote.isOfflineCached
+                    ? `En caché (${quote.lastUpdated})`
+                    : `En vivo (${quote.lastUpdated})`,
+                };
+              }
+              return asset;
+            }),
+          }));
+        } catch (err) {
+          console.warn('[Store] Background syncStaleAssetQuotes error:', err);
         }
       },
 

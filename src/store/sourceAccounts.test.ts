@@ -304,6 +304,15 @@ describe('Sistema Multicuenta (Fuentes / SourceAccounts)', () => {
       setActiveSourceId(null);
       expect(useFinanceStore.getState().activeSourceId).toBeNull();
     });
+
+    it('mantiene activeSourceId en null (Patrimonio Neto Total) para no forzar desplazamiento involuntario en el carrusel', () => {
+      const { addSource, setActiveSourceId } = useFinanceStore.getState();
+      addSource({ name: 'Santander', type: 'bank', orderIndex: 0 });
+      addSource({ name: 'Revolut', type: 'bank', orderIndex: 1 });
+
+      setActiveSourceId(null);
+      expect(useFinanceStore.getState().activeSourceId).toBeNull();
+    });
   });
 
   describe('Persistencia y resiliencia de fuentes al reiniciar sesión o app', () => {

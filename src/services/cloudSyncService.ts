@@ -231,13 +231,25 @@ export async function deleteCloudAsset(id: string, userId?: string): Promise<boo
 /**
  * Update an asset's current market quote (in-memory/local resilient)
  */
-export async function updateCloudAssetPrice(id: string, newPrice: number, userId?: string): Promise<boolean> {
+export async function updateCloudAssetPrice(
+  id: string,
+  newPrice: number,
+  userId?: string,
+  quoteTicker?: string
+): Promise<boolean> {
   if (!isSupabaseConfigured) return false;
 
   try {
-    // Current price is dynamic market feed data; we attempt to update if supported
+    const updatePayload: Record<string, any> = {
+      current_price: newPrice,
+      last_price_update: new Date().toISOString(),
+    };
+    if (quoteTicker) {
+      updatePayload.quote_ticker = quoteTicker;
+    }
+
     let query = (supabase.from('investments') as any)
-      .update({ average_buy_price: newPrice })
+      .update(updatePayload)
       .eq('id', id);
 
     if (userId) {
