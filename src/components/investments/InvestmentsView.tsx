@@ -167,19 +167,37 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
 AssetCard.displayName = 'AssetCard';
 
 export const InvestmentsView: React.FC = () => {
-  const { assets, isLiveUpdating, refreshAllAssetPrices, syncStaleAssetQuotes, deleteAsset, lastSyncTimestamp } =
-    useFinanceStore(
-      useShallow((state) => ({
-        assets: state.assets,
-        isLiveUpdating: state.isLiveUpdating,
-        refreshAllAssetPrices: state.refreshAllAssetPrices,
-        syncStaleAssetQuotes: state.syncStaleAssetQuotes,
-        deleteAsset: state.deleteAsset,
-        lastSyncTimestamp: state.lastSyncTimestamp,
-      }))
-    );
+  const {
+    assets,
+    transactions,
+    reconcileInvestments,
+    isLiveUpdating,
+    refreshAllAssetPrices,
+    syncStaleAssetQuotes,
+    deleteAsset,
+    lastSyncTimestamp,
+  } = useFinanceStore(
+    useShallow((state) => ({
+      assets: state.assets,
+      transactions: state.transactions,
+      reconcileInvestments: state.reconcileInvestments,
+      isLiveUpdating: state.isLiveUpdating,
+      refreshAllAssetPrices: state.refreshAllAssetPrices,
+      syncStaleAssetQuotes: state.syncStaleAssetQuotes,
+      deleteAsset: state.deleteAsset,
+      lastSyncTimestamp: state.lastSyncTimestamp,
+    }))
+  );
 
   const [selectedType, setSelectedType] = useState<AssetType | 'all'>('all');
+
+  // Auto-reconcile investments if ledger contains invest transactions
+  useEffect(() => {
+    const hasInvestTransactions = transactions.some((t) => t.pillar === 'invest');
+    if (hasInvestTransactions) {
+      reconcileInvestments();
+    }
+  }, [transactions, reconcileInvestments]);
 
   // Trigger silent synchronization for stale quotes (> 6h) when viewing investments
   useEffect(() => {

@@ -1,4 +1,4 @@
-import type { Transaction, InvestmentAsset, FinancialSummary, SourceAccount } from '../types/finance';
+import type { Transaction, InvestmentAsset, FinancialSummary, SourceAccount, AssetType } from '../types/finance';
 
 export interface SourceBalanceInfo {
   sourceId: string;
@@ -357,5 +357,149 @@ export function generateSavingsEvolution(
   }
 
   return points;
+}
+
+/**
+ * Extracts clean asset name and ticker/identifier from transaction concepts like:
+ * - "Inversión en Apple (AAPL)" -> { name: "Apple", identifier: "AAPL" }
+ * - "Inversión en Vanguard US 500 (IE0032126645)" -> { name: "Vanguard US 500", identifier: "IE0032126645" }
+ * - "Inversión en BTC" -> { name: "BTC", identifier: "BTC" }
+ * - "Nvidia (NVDA)" -> { name: "Nvidia", identifier: "NVDA" }
+ */
+export function parseInvestmentConcept(concept: string): { name: string; identifier: string } {
+  const clean = (concept || '').trim();
+  if (!clean) {
+    return { name: 'Inversión', identifier: 'ASSET' };
+  }
+
+  // Regex pattern matching: [Inversión en ] NAME (IDENTIFIER)
+  const parenMatch = clean.match(/^(?:Inversi[oó]n\s+en\s+)?(.+?)\s*\(([A-Z0-9.\-_]{1,20})\)$/i);
+  if (parenMatch) {
+    const parsedName = parenMatch[1].trim();
+    const parsedIdent = parenMatch[2].trim().toUpperCase();
+    return {
+      name: parsedName || parsedIdent,
+      identifier: parsedIdent || parsedName,
+    };
+  }
+
+  // Regex pattern matching: Inversión en NAME
+  const prefixMatch = clean.match(/^Inversi[oó]n\s+en\s+(.+)$/i);
+  if (prefixMatch) {
+    const assetPart = prefixMatch[1].trim();
+    return {
+      name: assetPart,
+      identifier: assetPart.toUpperCase(),
+    };
+  }
+
+  return {
+    name: clean,
+    identifier: clean.toUpperCase(),
+  };
+}
+
+/**
+ * Infers AssetType from category ID or asset identifier/symbol
+ */
+export function inferAssetTypeFromCategory(categoryId?: string, identifier?: string): AssetType {
+  const cat = (categoryId || '').toLowerCase();
+  const ident = (identifier || '').toUpperCase();
+
+  if (cat.includes('crypto')) return 'crypto';
+  if (cat.includes('etf')) return 'etf';
+  if (cat.includes('stock') || cat.includes('accion')) return 'stock';
+  if (cat.includes('fixed') || cat.includes('fija')) return 'fixed_income';
+  if (cat.includes('deposit') || cat.includes('deposito')) return 'deposit';
+  if (cat.includes('fund') || cat.includes('fondo')) return 'index_fund';
+
+  // Fallback by identifier format
+  if (ident.startsWith('IE') || ident.startsWith('LU') || ident.startsWith('ES')) {
+    return 'index_fund';
+  }
+  if (['BTC', 'ETH', 'SOL', 'USDT', 'BNB', 'XRP', 'ADA', 'DOT'].includes(ident)) {
+    return 'crypto';
+  }
+  return 'stock';
+}
+
+/**
+ * Reconciles and reconstructs missing InvestmentAssets from transactions of pillar === 'invest'.
+ * If a user has invest transactions in their ledger but their portfolio assets list is empty or missing those items,
+ * this function generates or merges the corresponding InvestmentAsset positions.
+ */
+export function reconcileAssetsFromTransactions(
+  transactions: Transaction[] = [],
+  currentAssets: InvestmentAsset[] = [],
+  brands: { id: string; name: string }[] = []
+): InvestmentAsset[] {
+  const investTransactions = (Array.isArray(transactions) ? transactions : []).filter(
+    (tx) => tx && tx.pillar === 'invest' && typeof tx.amount === 'number' && tx.amount > 0
+  );
+
+  if (investTransactions.length === 0) {
+    return currentAssets;
+  }
+
+  const brandMap = new Map<string, string>();
+  (brands || []).forEach((b) => {
+    if (b?.id && b?.name) brandMap.set(b.id, b.name);
+  });
+
+  // Track existing assets by identifier (uppercase) and id
+  const existingByIdent = new Map<string, InvestmentAsset>();
+  (currentAssets || []).forEach((asset) => {
+    if (asset?.identifier) {
+      existingByIdent.set(asset.identifier.toUpperCase(), asset);
+    }
+  });
+
+  const reconciledAssets = [...currentAssets];
+
+  investTransactions.forEach((tx) => {
+    const { name, identifier } = parseInvestmentConcept(tx.concept);
+    const key = identifier.toUpperCase();
+
+    // If an asset with this identifier already exists in portfolio, keep it
+    if (existingByIdent.has(key)) {
+      return;
+    }
+
+    const assetType = inferAssetTypeFromCategory(tx.categoryId, identifier);
+    const nowIso = new Date().toISOString();
+    const platform = tx.brandId ? brandMap.get(tx.brandId) : undefined;
+    const acquisitionDate = tx.date ? tx.date.substring(0, 10) : nowIso.substring(0, 10);
+    const amount = Number(tx.amount);
+
+    const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(identifier);
+
+    const newAsset: InvestmentAsset = {
+      id: `reconciled-asset-${tx.id}`,
+      name,
+      identifier,
+      ticker: !isIsinFormat ? identifier : undefined,
+      isin: isIsinFormat ? identifier : undefined,
+      assetType,
+      shares: 1,
+      averageBuyPrice: amount,
+      averagePrice: amount,
+      currentPrice: amount,
+      currentValue: amount,
+      pnl: 0,
+      pnlPercentage: 0,
+      currency: 'EUR',
+      platform,
+      brandId: tx.brandId,
+      acquisitionDate,
+      lastPriceUpdate: nowIso,
+      last_price_update: nowIso,
+      lastUpdated: 'Reconciliado de movimientos',
+    };
+
+    reconciledAssets.push(newAsset);
+    existingByIdent.set(key, newAsset);
+  });
+
+  return reconciledAssets;
 }
 

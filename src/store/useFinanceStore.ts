@@ -21,7 +21,7 @@ import {
 } from '../data/initialMockData';
 import { batchUpdateMarketQuotes } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
-import { computeFinancialSummary, computeSourceBalance } from '../utils/finance';
+import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions } from '../utils/finance';
 import type { SourceBalanceInfo } from '../utils/finance';
 import { sortTransactionsDesc } from '../utils/dates';
 import {
@@ -77,6 +77,7 @@ interface FinanceState {
   updateAssetPrice: (id: string, newPrice: number) => void;
   refreshAllAssetPrices: () => Promise<void>;
   syncStaleAssetQuotes: (maxAgeHours?: number) => Promise<void>;
+  reconcileInvestments: () => void;
   addRecurrence: (rule: Omit<RecurrenceRule, 'id'>) => void;
   toggleRecurrence: (id: string) => void;
   setTimeRange: (range: TimeRangeFilter) => void;
@@ -251,9 +252,63 @@ export const useFinanceStore = create<FinanceState>()(
                 ? currentActiveSourceId
                 : null;
 
+            // Intelligent assets reconciliation:
+            // 1. If cloud returned 0 assets, but client has local assets, preserve them and trigger cloud upload.
+            // 2. If cloud returned assets, merge any local unsynced assets.
+            const currentAssets = get().assets || [];
+            const cloudAssets = result.assets || [];
+            let mergedAssets: InvestmentAsset[] = cloudAssets;
+
+            if (cloudAssets.length === 0 && currentAssets.length > 0) {
+              mergedAssets = currentAssets;
+              currentAssets.forEach((a) => {
+                insertCloudAsset(a, userId).catch((err) =>
+                  console.warn('[Store] Auto-sync local asset to cloud failed:', err)
+                );
+              });
+            } else if (cloudAssets.length > 0) {
+              const cloudKeys = new Set(
+                cloudAssets.map((a) => (a.identifier || a.id).toUpperCase())
+              );
+              const unsyncedAssets = currentAssets.filter(
+                (a) => !cloudKeys.has((a.identifier || a.id).toUpperCase())
+              );
+              mergedAssets = [...cloudAssets, ...unsyncedAssets];
+              if (unsyncedAssets.length > 0) {
+                unsyncedAssets.forEach((a) => {
+                  insertCloudAsset(a, userId).catch((err) =>
+                    console.warn('[Store] Auto-sync unsynced asset to cloud failed:', err)
+                  );
+                });
+              }
+            }
+
+            // 3. Self-healing reconciliation: Reconstruct missing assets from transactions with pillar === 'invest'
+            const allTransactions = result.transactions || [];
+            const finalReconciledAssets = reconcileAssetsFromTransactions(
+              allTransactions,
+              mergedAssets,
+              get().brands
+            );
+
+            // Auto-persist any newly reconciled assets to Supabase in background
+            if (finalReconciledAssets.length > mergedAssets.length) {
+              const existingKeys = new Set(
+                mergedAssets.map((a) => (a.identifier || a.id).toUpperCase())
+              );
+              const newlyCreated = finalReconciledAssets.filter(
+                (a) => !existingKeys.has((a.identifier || a.id).toUpperCase())
+              );
+              newlyCreated.forEach((a) => {
+                insertCloudAsset(a, userId).catch((err) =>
+                  console.warn('[Store] Auto-sync reconciled asset to cloud failed:', err)
+                );
+              });
+            }
+
             set({
               transactions: sortTransactionsDesc(result.transactions),
-              assets: result.assets,
+              assets: finalReconciledAssets,
               sources: sortedFinalSources,
               activeSourceId: validActiveSourceId,
               recurrences: [],
@@ -261,6 +316,9 @@ export const useFinanceStore = create<FinanceState>()(
               hasHydratedFromCloud: true,
               cloudSyncError: null,
             });
+
+            // Trigger background quote refresh for stale/reconciled assets
+            get().syncStaleAssetQuotes(6).catch(() => {});
           } else {
             set({
               isCloudLoading: false,
@@ -634,6 +692,26 @@ export const useFinanceStore = create<FinanceState>()(
           }));
         } catch (err) {
           console.warn('[Store] Background syncStaleAssetQuotes error:', err);
+        }
+      },
+
+      reconcileInvestments: () => {
+        const { transactions, assets, brands, userId } = get();
+        const reconciled = reconcileAssetsFromTransactions(transactions, assets, brands);
+        if (reconciled.length > assets.length) {
+          const existingKeys = new Set(assets.map((a) => (a.identifier || a.id).toUpperCase()));
+          const newlyCreated = reconciled.filter(
+            (a) => !existingKeys.has((a.identifier || a.id).toUpperCase())
+          );
+          set({ assets: reconciled });
+          if (userId) {
+            newlyCreated.forEach((a) => {
+              insertCloudAsset(a, userId).catch((err) =>
+                console.warn('[Store] Cloud sync failed for reconcileInvestments asset:', err)
+              );
+            });
+          }
+          get().syncStaleAssetQuotes(0).catch(() => {});
         }
       },
 

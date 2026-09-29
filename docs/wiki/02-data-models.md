@@ -291,15 +291,30 @@ export interface InvestmentAsset {
 | *(Auth Context)* | `user_id` | `UUID` | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` |
 | `assetType` | `asset_type` | `TEXT` | `NOT NULL` |
 | `name` | `name` | `TEXT` | `NOT NULL`, Índice `idx_investments_user_name` |
-| `identifier` / `ticker` / `isin` | `symbol_or_isin` | `TEXT` | `NOT NULL`, Índice `idx_investments_symbol` |
+| `identifier` / `ticker` / `isin` | `symbol_or_isin` o `identifier` | `TEXT` | `NOT NULL`, Soporte dual transparente en inserción y lectura |
 | `shares` | `shares` | `NUMERIC` | `NOT NULL` |
 | `averageBuyPrice` | `average_buy_price` | `NUMERIC` | `NOT NULL` (Inmutable ante variaciones de mercado) |
+| `currency` | `currency` | `TEXT` | `DEFAULT 'EUR'` |
+| `platform` | `platform` | `TEXT` | `NULLABLE` |
+| `initialFee` | `initial_fee` | `NUMERIC` | `DEFAULT 0` |
+| `acquisitionDate` | `acquisition_date` | `TIMESTAMPTZ` | `NULLABLE` |
 | `quoteTicker` | `quote_ticker` | `TEXT` | `NULLABLE` (Ticker activo resuelto para fondos/ISIN) |
 | `lastPriceUpdate` | `last_price_update` | `TIMESTAMPTZ` | `DEFAULT now()` |
 | `currentPrice` | `current_price` | `NUMERIC` | `NULLABLE` |
 | *(Metadata)* | `created_at` | `TIMESTAMPTZ` | `DEFAULT now()` |
 
-> **Nota Arquitectónica**: `average_buy_price` nunca se sobreescribe durante las actualizaciones periódicas de mercado. `current_value`, `pnl` y `pnl_percentage` se calculan dinámicamente tanto en cliente como en store, reflejando fielmente la rentabilidad viva de la cartera sin alterar la inversión inicial.
+> **Nota Arquitectónica**: `average_buy_price` nunca se sobreescribe durante las actualizaciones periódicas de mercado. `current_value`, `pnl` y `pnl_percentage` se calculan dinámicamente tanto en cliente como en store, reflejando fielmente la rentabilidad viva de la cartera sin alterar la inversión inicial. La persistencia en `public.investments` implementa inserción adaptativa para soportar tanto instalaciones con columna `identifier` como instalaciones con `symbol_or_isin`.
+
+### Funciones de Reconciliación y Extracción de Inversiones (`finance.ts`)
+```typescript
+export function parseInvestmentConcept(concept: string): { name: string; identifier: string };
+export function inferAssetTypeFromCategory(categoryId?: string, identifier?: string): AssetType;
+export function reconcileAssetsFromTransactions(
+  transactions: Transaction[],
+  currentAssets?: InvestmentAsset[],
+  brands?: { id: string; name: string }[]
+): InvestmentAsset[];
+```
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
 Gestiona el catálogo de activos financieros, resolución de símbolos y fallback resiliente:

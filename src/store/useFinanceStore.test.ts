@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useFinanceStore } from './useFinanceStore';
 import { sortTransactionsDesc, getTodayDateString, getYesterdayDateString } from '../utils/dates';
+import { parseInvestmentConcept, inferAssetTypeFromCategory, reconcileAssetsFromTransactions } from '../utils/finance';
 
 describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
   beforeEach(() => {
@@ -282,6 +283,130 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       const asset = useFinanceStore.getState().assets[0];
       // Timestamp should remain unchanged because it was fresh
       expect(asset.lastPriceUpdate).toBe(oneHourAgo);
+    });
+  });
+
+  describe('Investment Reconciliation & Extraction from Transactions', () => {
+    it('should correctly parse diverse investment transaction concepts', () => {
+      expect(parseInvestmentConcept('Inversión en Apple (AAPL)')).toEqual({
+        name: 'Apple',
+        identifier: 'AAPL',
+      });
+      expect(parseInvestmentConcept('Inversión en Vanguard US 500 (IE0032126645)')).toEqual({
+        name: 'Vanguard US 500',
+        identifier: 'IE0032126645',
+      });
+      expect(parseInvestmentConcept('Inversión en Bitcoin')).toEqual({
+        name: 'Bitcoin',
+        identifier: 'BITCOIN',
+      });
+      expect(parseInvestmentConcept('Tesla (TSLA)')).toEqual({
+        name: 'Tesla',
+        identifier: 'TSLA',
+      });
+      expect(parseInvestmentConcept('')).toEqual({
+        name: 'Inversión',
+        identifier: 'ASSET',
+      });
+    });
+
+    it('should correctly infer asset types', () => {
+      expect(inferAssetTypeFromCategory('cat-stock', 'AAPL')).toBe('stock');
+      expect(inferAssetTypeFromCategory('cat-crypto', 'BTC')).toBe('crypto');
+      expect(inferAssetTypeFromCategory('cat-etf', 'VUSA')).toBe('etf');
+      expect(inferAssetTypeFromCategory(undefined, 'IE0032126645')).toBe('index_fund');
+      expect(inferAssetTypeFromCategory(undefined, 'ETH')).toBe('crypto');
+    });
+
+    it('should reconcile missing assets from transactions of pillar === "invest"', () => {
+      const txs = [
+        {
+          id: 'tx-inv-1',
+          amount: 500,
+          pillar: 'invest' as const,
+          categoryId: 'cat-stock',
+          concept: 'Inversión en Apple (AAPL)',
+          date: '2026-09-10T12:00:00.000Z',
+          createdAt: 100,
+        },
+        {
+          id: 'tx-inv-2',
+          amount: 1200,
+          pillar: 'invest' as const,
+          categoryId: 'cat-etf',
+          concept: 'Inversión en Vanguard S&P 500 (VUSA)',
+          date: '2026-09-15T12:00:00.000Z',
+          createdAt: 200,
+        },
+        {
+          id: 'tx-expense-1',
+          amount: 45,
+          pillar: 'expense' as const,
+          categoryId: 'cat-groceries',
+          concept: 'Supermercado',
+          date: '2026-09-18T12:00:00.000Z',
+          createdAt: 300,
+        },
+      ];
+
+      const reconciled = reconcileAssetsFromTransactions(txs, []);
+      expect(reconciled).toHaveLength(2);
+
+      const aapl = reconciled.find((a) => a.identifier === 'AAPL');
+      expect(aapl).toBeDefined();
+      expect(aapl?.name).toBe('Apple');
+      expect(aapl?.averageBuyPrice).toBe(500);
+      expect(aapl?.shares).toBe(1);
+      expect(aapl?.currentPrice).toBe(500);
+      expect(aapl?.currentValue).toBe(500);
+      expect(aapl?.acquisitionDate).toBe('2026-09-10');
+
+      const vusa = reconciled.find((a) => a.identifier === 'VUSA');
+      expect(vusa).toBeDefined();
+      expect(vusa?.name).toBe('Vanguard S&P 500');
+      expect(vusa?.averageBuyPrice).toBe(1200);
+
+      // Does not duplicate if already present
+      const secondRun = reconcileAssetsFromTransactions(txs, reconciled);
+      expect(secondRun).toHaveLength(2);
+    });
+
+    it('should auto-populate store assets when reconcileInvestments is triggered', () => {
+      // Start with empty assets and 2 invest transactions
+      useFinanceStore.setState({
+        assets: [],
+        transactions: [
+          {
+            id: 'tx-1',
+            amount: 750,
+            pillar: 'invest',
+            categoryId: 'cat-stock',
+            concept: 'Inversión en Nvidia (NVDA)',
+            date: '2026-09-20T12:00:00.000Z',
+            createdAt: 1,
+          },
+          {
+            id: 'tx-2',
+            amount: 300,
+            pillar: 'invest',
+            categoryId: 'cat-crypto',
+            concept: 'Inversión en Bitcoin (BTC)',
+            date: '2026-09-22T12:00:00.000Z',
+            createdAt: 2,
+          },
+        ],
+      });
+
+      expect(useFinanceStore.getState().assets).toHaveLength(0);
+
+      // Run reconcileInvestments
+      useFinanceStore.getState().reconcileInvestments();
+
+      const assets = useFinanceStore.getState().assets;
+      expect(assets).toHaveLength(2);
+      expect(assets.map((a) => a.identifier).sort()).toEqual(['BTC', 'NVDA']);
+      expect(assets.find((a) => a.identifier === 'NVDA')?.currentValue).toBe(750);
+      expect(assets.find((a) => a.identifier === 'BTC')?.currentValue).toBe(300);
     });
   });
 });

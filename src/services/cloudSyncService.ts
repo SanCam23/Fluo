@@ -192,13 +192,61 @@ export async function insertCloudAsset(asset: InvestmentAsset, userId: string): 
   if (!isSupabaseConfigured || !userId) return false;
 
   try {
-    const dbPayload = mapAssetToDbInvestment(asset, userId);
-    const { error } = await (supabase.from('investments') as any).upsert(dbPayload, { onConflict: 'id' });
-    if (error) {
-      console.warn('[CloudSync] Error inserting/upserting asset:', error.message);
-      return false;
-    }
-    return true;
+    const fullPayload = mapAssetToDbInvestment(asset, userId) as any;
+
+    // Attempt 1: Full payload
+    const res1 = await (supabase.from('investments') as any).upsert(fullPayload, { onConflict: 'id' });
+    if (!res1.error) return true;
+
+    console.warn('[CloudSync] Upsert full payload failed, trying adaptive fallbacks:', res1.error.message);
+
+    // Attempt 2: Schema with 'identifier' (production Supabase DDL variant)
+    const schemaIdentifierPayload: Record<string, any> = {
+      id: fullPayload.id,
+      user_id: fullPayload.user_id,
+      name: fullPayload.name,
+      identifier: fullPayload.identifier || fullPayload.symbol_or_isin,
+      asset_type: fullPayload.asset_type,
+      shares: fullPayload.shares,
+      average_buy_price: fullPayload.average_buy_price,
+      currency: fullPayload.currency,
+      platform: fullPayload.platform,
+      initial_fee: fullPayload.initial_fee,
+      acquisition_date: fullPayload.acquisition_date,
+      created_at: fullPayload.created_at,
+    };
+    const res2 = await (supabase.from('investments') as any).upsert(schemaIdentifierPayload, { onConflict: 'id' });
+    if (!res2.error) return true;
+
+    // Attempt 3: Schema with 'symbol_or_isin' (standard schema.sql DDL variant)
+    const schemaSymbolPayload: Record<string, any> = {
+      id: fullPayload.id,
+      user_id: fullPayload.user_id,
+      name: fullPayload.name,
+      symbol_or_isin: fullPayload.symbol_or_isin || fullPayload.identifier,
+      asset_type: fullPayload.asset_type,
+      shares: fullPayload.shares,
+      average_buy_price: fullPayload.average_buy_price,
+      created_at: fullPayload.created_at,
+    };
+    const res3 = await (supabase.from('investments') as any).upsert(schemaSymbolPayload, { onConflict: 'id' });
+    if (!res3.error) return true;
+
+    // Attempt 4: Minimal identifier schema
+    const minimalPayload: Record<string, any> = {
+      id: fullPayload.id,
+      user_id: fullPayload.user_id,
+      name: fullPayload.name,
+      identifier: fullPayload.identifier || fullPayload.symbol_or_isin,
+      asset_type: fullPayload.asset_type,
+      shares: fullPayload.shares,
+      average_buy_price: fullPayload.average_buy_price,
+    };
+    const res4 = await (supabase.from('investments') as any).upsert(minimalPayload, { onConflict: 'id' });
+    if (!res4.error) return true;
+
+    console.error('[CloudSync] All adaptive upsert attempts failed for asset:', res4.error.message);
+    return false;
   } catch (err) {
     console.error('[CloudSync] Unexpected error inserting asset:', err);
     return false;

@@ -24,9 +24,14 @@ export interface DbInvestment {
   user_id: string; // UUID NOT NULL DEFAULT auth.uid()
   asset_type: string; // TEXT NOT NULL
   name: string; // TEXT NOT NULL
-  symbol_or_isin: string; // TEXT NOT NULL
+  symbol_or_isin?: string; // TEXT NOT NULL (schema variant A)
+  identifier?: string; // TEXT NOT NULL (schema variant B)
   shares: number; // NUMERIC NOT NULL
   average_buy_price: number; // NUMERIC NOT NULL
+  currency?: string | null;
+  platform?: string | null;
+  initial_fee?: number | null;
+  acquisition_date?: string | null;
   quote_ticker?: string | null; // TEXT
   last_price_update?: string | null; // TIMESTAMPTZ
   current_price?: number | null; // NUMERIC
@@ -267,14 +272,20 @@ export function mapDbInvestmentToAsset(row: any): InvestmentAsset {
  * Maps a frontend `InvestmentAsset` to a payload strictly conforming to `public.investments`.
  */
 export function mapAssetToDbInvestment(asset: InvestmentAsset, userId: string): DbInvestment {
+  const symbol = asset.identifier || asset.ticker || asset.isin || 'ASSET';
   return {
     id: ensureValidUuid(asset.id),
     user_id: userId,
     asset_type: asset.assetType,
     name: asset.name,
-    symbol_or_isin: asset.identifier || asset.ticker || asset.isin || 'ASSET',
-    shares: Number(asset.shares),
-    average_buy_price: Number(asset.averageBuyPrice),
+    symbol_or_isin: symbol,
+    identifier: symbol,
+    shares: Number(asset.shares) || 1,
+    average_buy_price: Number(asset.averageBuyPrice) || 0,
+    currency: asset.currency || 'EUR',
+    platform: asset.platform || null,
+    initial_fee: asset.initialFee !== undefined && asset.initialFee !== null ? Number(asset.initialFee) : 0,
+    acquisition_date: asset.acquisitionDate ? new Date(`${asset.acquisitionDate}T12:00:00.000Z`).toISOString() : null,
     quote_ticker: asset.quoteTicker || asset.quote_ticker || null,
     last_price_update: asset.lastPriceUpdate || asset.last_price_update || new Date().toISOString(),
     current_price: Number(asset.currentPrice) || Number(asset.averageBuyPrice),

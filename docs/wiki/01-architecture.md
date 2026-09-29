@@ -271,6 +271,19 @@ Calcula en tiempo real con estética Liquid Glass:
 - **Métricas Globales de Cabecera**: Patrimonio total invertido y P&L global no realizado con feedback semántico (esmeralda translúcido para plusvalías, carmesí para minusvalías).
 - **Badge de Ticker de Referencia**: Si un activo se sincroniza vía ticker de referencia (ej. `Ref: VUSA.AS`), la tarjeta muestra una cápsula vítrea indicativa.
 
+### 6. Auto-Sanación y Reconciliación Reactiva de Cartera (`reconcileAssetsFromTransactions`)
+Para garantizar que nunca exista discrepancia entre los movimientos registrados en la cuenta y la vista de Inversiones:
+- **Detección Automática de Movimientos Huérfanos**:
+  - Si un usuario tiene transacciones en su cuenta con `pillar: 'invest'` (ej. compras de activos, suscripciones a fondos o aportaciones históricas) pero la tabla `investments` de Supabase o la cartera local no los reflejan, el sistema auto-reconcilia los activos en tiempo de carga (`loadCloudData`) y al montar `InvestmentsView.tsx`.
+- **Extracción Inteligente de Concepto (`parseInvestmentConcept`)**:
+  - Parsea automáticamente conceptos como `"Inversión en Apple (AAPL)"`, `"Inversión en Vanguard US 500 (IE0032126645)"` o `"BTC"`, abstrayendo nombre oficial y ticker/ISIN.
+- **Inferencia Semántica de Tipo de Activo (`inferAssetTypeFromCategory`)**:
+  - Deduce si se trata de `stock`, `etf`, `index_fund`, `crypto`, `fixed_income` o `deposit` a partir de la categoría y formato del identificador.
+- **Sincronización Cloud Resiliente Multi-Esquema (`insertCloudAsset`)**:
+  - Implementa fallback escalonado adaptativo ante variaciones de DDL en Supabase (soporta columnas `identifier` o `symbol_or_isin`, con o sin columnas opcionales de cotización en vivo `quote_ticker`/`current_price`), garantizando persistencia exitosa permanente en cualquier versión de base de datos.
+- **Preservación Local Bidireccional**:
+  - En `loadCloudData`, si Supabase devuelve 0 activos pero existen activos locales creados offline, estos se preservan estrictamente y se suben a la nube en segundo plano, evitando cualquier borrado accidental de cartera.
+
 ---
 
 ## 9. Flujo Unificado de Movimientos e Inversiones (`QuickAddTransactionModal.tsx`)
