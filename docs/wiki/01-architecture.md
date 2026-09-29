@@ -281,8 +281,14 @@ Para garantizar que nunca exista discrepancia entre los movimientos registrados 
   - Deduce si se trata de `stock`, `etf`, `index_fund`, `crypto`, `fixed_income` o `deposit` a partir de la categoría y formato del identificador.
 - **Sincronización Cloud Resiliente Multi-Esquema (`insertCloudAsset`)**:
   - Implementa fallback escalonado adaptativo ante variaciones de DDL en Supabase (soporta columnas `identifier` o `symbol_or_isin`, con o sin columnas opcionales de cotización en vivo `quote_ticker`/`current_price`), garantizando persistencia exitosa permanente en cualquier versión de base de datos.
-- **Preservación Local Bidireccional**:
-  - En `loadCloudData`, si Supabase devuelve 0 activos pero existen activos locales creados offline, estos se preservan estrictamente y se suben a la nube en segundo plano, evitando cualquier borrado accidental de cartera.
+- **Cálculo Exacto de Unidades y Auto-Corrección de Cartera (`autoCorrectAssetShares`)**:
+  - Evita y subsana automáticamente la distorsión donde un usuario introduce un importe total en euros (ej. 209.81 € en S&P 500 a cotización 82.97 €) y el sistema asignaba 1 título unitario con coste 209.81 €, provocando que al actualizar cotización cayera a 82.97 € (-126 €).
+  - La función detecta posiciones con `shares === 1` cuyo precio medio de compra supera la cotización oficial de mercado (`averageBuyPrice >= currentPrice * 1.25` o activos conocidos de S&P 500).
+  - Reajusta automáticamente:
+    $$\text{shares} = \frac{\text{totalInvested}}{\text{unitPrice}} \quad (209.81 / 82.97 = 2.528745 \text{ unidades})$$
+    $$\text{averageBuyPrice} = \text{unitPrice} \quad (82.97 \text{ €})$$
+    $$\text{currentValue} = \text{shares} \times \text{unitPrice} \quad (209.81 \text{ €})$$
+  - Se ejecuta de manera transparente al abrir la aplicación, en `syncStaleAssetQuotes`, en `refreshAllAssetPrices` y en `reconcileInvestments`, sincronizando la corrección a Supabase sin requerir que el usuario borre o vuelva a crear sus activos.
 
 ---
 

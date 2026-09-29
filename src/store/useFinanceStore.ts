@@ -21,7 +21,7 @@ import {
 } from '../data/initialMockData';
 import { batchUpdateMarketQuotes } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
-import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions } from '../utils/finance';
+import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions, autoCorrectAssetShares } from '../utils/finance';
 import type { SourceBalanceInfo } from '../utils/finance';
 import { sortTransactionsDesc } from '../utils/dates';
 import {
@@ -590,16 +590,22 @@ export const useFinanceStore = create<FinanceState>()(
                 (asset.isin ? quotes[asset.isin] : undefined);
 
               if (quote) {
-                const shares = Number(asset.shares) || 0;
-                const buyPrice = Number(asset.averageBuyPrice) || 0; // NEVER alter buy price!
+                // Auto-correct any single-share distorted cost position (e.g. S&P 500 total invested vs quotation)
+                const { asset: correctedAsset, wasCorrected } = autoCorrectAssetShares(asset, Number(quote.price));
+                const shares = Number(correctedAsset.shares) || 0;
+                const buyPrice = Number(correctedAsset.averageBuyPrice) || 0;
                 const curPrice = Number(quote.price) || buyPrice;
                 const currentValue = Number((shares * curPrice).toFixed(2));
                 const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
                 const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
                 const resolvedTicker = quote.quoteTicker || asset.quoteTicker || asset.quote_ticker;
 
+                if (wasCorrected && get().userId) {
+                  insertCloudAsset(correctedAsset, get().userId!).catch(() => {});
+                }
+
                 return {
-                  ...asset,
+                  ...correctedAsset,
                   currentPrice: curPrice,
                   currentValue,
                   pnl,
@@ -662,16 +668,22 @@ export const useFinanceStore = create<FinanceState>()(
                 (asset.isin ? quotes[asset.isin] : undefined);
 
               if (quote) {
-                const shares = Number(asset.shares) || 0;
-                const buyPrice = Number(asset.averageBuyPrice) || 0; // NEVER alter buy price!
+                // Auto-correct any single-share distorted cost position (e.g. S&P 500 total invested vs quotation)
+                const { asset: correctedAsset, wasCorrected } = autoCorrectAssetShares(asset, Number(quote.price));
+                const shares = Number(correctedAsset.shares) || 0;
+                const buyPrice = Number(correctedAsset.averageBuyPrice) || 0;
                 const curPrice = Number(quote.price) || buyPrice;
                 const currentValue = Number((shares * curPrice).toFixed(2));
                 const pnl = Number((currentValue - (shares * buyPrice)).toFixed(2));
                 const pnlPercentage = buyPrice > 0 ? Number((((curPrice - buyPrice) / buyPrice) * 100).toFixed(2)) : 0;
                 const resolvedTicker = quote.quoteTicker || asset.quoteTicker || asset.quote_ticker;
 
+                if (wasCorrected && get().userId) {
+                  insertCloudAsset(correctedAsset, get().userId!).catch(() => {});
+                }
+
                 return {
-                  ...asset,
+                  ...correctedAsset,
                   currentPrice: curPrice,
                   currentValue,
                   pnl,
@@ -697,15 +709,21 @@ export const useFinanceStore = create<FinanceState>()(
 
       reconcileInvestments: () => {
         const { transactions, assets, brands, userId } = get();
-        const reconciled = reconcileAssetsFromTransactions(transactions, assets, brands);
-        if (reconciled.length > assets.length) {
-          const existingKeys = new Set(assets.map((a) => (a.identifier || a.id).toUpperCase()));
-          const newlyCreated = reconciled.filter(
-            (a) => !existingKeys.has((a.identifier || a.id).toUpperCase())
-          );
+        // 1. Run auto-correction on all existing assets
+        let anyCorrected = false;
+        const correctedAssets = assets.map((a) => {
+          const { asset: fixed, wasCorrected } = autoCorrectAssetShares(a);
+          if (wasCorrected) anyCorrected = true;
+          return fixed;
+        });
+
+        // 2. Reconcile with transactions
+        const reconciled = reconcileAssetsFromTransactions(transactions, correctedAssets, brands);
+
+        if (reconciled.length !== assets.length || anyCorrected) {
           set({ assets: reconciled });
           if (userId) {
-            newlyCreated.forEach((a) => {
+            reconciled.forEach((a) => {
               insertCloudAsset(a, userId).catch((err) =>
                 console.warn('[Store] Cloud sync failed for reconcileInvestments asset:', err)
               );

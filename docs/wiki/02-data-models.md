@@ -305,14 +305,17 @@ export interface InvestmentAsset {
 
 > **Nota Arquitectónica**: `average_buy_price` nunca se sobreescribe durante las actualizaciones periódicas de mercado. `current_value`, `pnl` y `pnl_percentage` se calculan dinámicamente tanto en cliente como en store, reflejando fielmente la rentabilidad viva de la cartera sin alterar la inversión inicial. La persistencia en `public.investments` implementa inserción adaptativa para soportar tanto instalaciones con columna `identifier` como instalaciones con `symbol_or_isin`.
 
-### Funciones de Reconciliación y Extracción de Inversiones (`finance.ts`)
-```typescript
 export function parseInvestmentConcept(concept: string): { name: string; identifier: string };
 export function inferAssetTypeFromCategory(categoryId?: string, identifier?: string): AssetType;
+export function autoCorrectAssetShares(
+  asset: InvestmentAsset,
+  referenceMarketPrice?: number
+): { asset: InvestmentAsset; wasCorrected: boolean };
 export function reconcileAssetsFromTransactions(
   transactions: Transaction[],
   currentAssets?: InvestmentAsset[],
-  brands?: { id: string; name: string }[]
+  brands?: { id: string; name: string }[],
+  priceLookup?: (identifier: string) => number | undefined
 ): InvestmentAsset[];
 ```
 

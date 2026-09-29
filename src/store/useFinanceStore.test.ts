@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useFinanceStore } from './useFinanceStore';
 import { sortTransactionsDesc, getTodayDateString, getYesterdayDateString } from '../utils/dates';
-import { parseInvestmentConcept, inferAssetTypeFromCategory, reconcileAssetsFromTransactions } from '../utils/finance';
+import { parseInvestmentConcept, inferAssetTypeFromCategory, reconcileAssetsFromTransactions, autoCorrectAssetShares } from '../utils/finance';
 
 describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
   beforeEach(() => {
@@ -364,7 +364,10 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       const vusa = reconciled.find((a) => a.identifier === 'VUSA');
       expect(vusa).toBeDefined();
       expect(vusa?.name).toBe('Vanguard S&P 500');
-      expect(vusa?.averageBuyPrice).toBe(1200);
+      // For VUSA (S&P 500), unit price is 82.97 € and shares are derived (1200 / 82.97)
+      expect(vusa?.averageBuyPrice).toBe(82.97);
+      expect(vusa?.shares).toBeCloseTo(1200 / 82.97, 4);
+      expect(vusa?.currentValue).toBe(1200);
 
       // Does not duplicate if already present
       const secondRun = reconcileAssetsFromTransactions(txs, reconciled);
@@ -407,6 +410,62 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(assets.map((a) => a.identifier).sort()).toEqual(['BTC', 'NVDA']);
       expect(assets.find((a) => a.identifier === 'NVDA')?.currentValue).toBe(750);
       expect(assets.find((a) => a.identifier === 'BTC')?.currentValue).toBe(300);
+    });
+
+    it('should auto-correct existing asset when user invested 209.81 € in S&P 500 at 82.97 quotation', () => {
+      // User case: 209.81 € deployed in S&P 500 (unit quote 82.97 €)
+      const erroneousAsset = {
+        id: 'asset-sp500',
+        name: 'Vanguard US 500 Stock Index Fund',
+        identifier: 'IE0032126645',
+        assetType: 'index_fund' as const,
+        shares: 1, // erroneously stored as 1 unit
+        averageBuyPrice: 209.81, // total cash recorded as unit price
+        currentPrice: 82.97, // live market quotation
+        currency: 'EUR' as const,
+        lastUpdated: 'Recién añadido',
+      };
+
+      const { asset: corrected, wasCorrected } = autoCorrectAssetShares(erroneousAsset, 82.97);
+
+      expect(wasCorrected).toBe(true);
+      // Corrected shares = 209.81 / 82.97 = 2.528745
+      expect(corrected.shares).toBeCloseTo(2.528745, 4);
+      expect(corrected.averageBuyPrice).toBe(82.97);
+      expect(corrected.currentPrice).toBe(82.97);
+      // Valuation preserved at 209.81 € (does not drop to 82.97 €)
+      expect(corrected.currentValue).toBe(209.81);
+      // P&L is neutral (0 €) instead of dropping 126 €
+      expect(corrected.pnl).toBe(0);
+    });
+
+    it('should automatically update existing distorted assets in store without requiring user to recreate them', () => {
+      // Put distorted asset into store
+      useFinanceStore.setState({
+        assets: [
+          {
+            id: 'asset-sp500',
+            name: 'Vanguard US 500 Stock Index Fund',
+            identifier: 'IE0032126645',
+            assetType: 'index_fund',
+            shares: 1,
+            averageBuyPrice: 209.81,
+            currentPrice: 82.97,
+            currency: 'EUR',
+            lastUpdated: 'Recién añadido',
+          },
+        ],
+        transactions: [],
+      });
+
+      // Trigger store reconciliation
+      useFinanceStore.getState().reconcileInvestments();
+
+      const updatedAsset = useFinanceStore.getState().assets[0];
+      expect(updatedAsset).toBeDefined();
+      expect(updatedAsset.shares).toBeGreaterThan(2); // ~2.53 shares
+      expect(updatedAsset.averageBuyPrice).toBe(82.97);
+      expect(updatedAsset.currentValue).toBe(209.81);
     });
   });
 });

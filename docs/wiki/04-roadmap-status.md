@@ -39,8 +39,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Importe Ahorrado & Evolución (/stats)** | ✅ Completado | Tarjeta destacada Liquid Glass con Ahorro Neto Real, Tasa, Ritmo Diario, Proyección Cierre, Gráfico de Área interactivo y reactividad multicuenta |
 | **AppSec & Web Performance (A+)** | ✅ Completado | Migración CSP y cabeceras a `vercel.json`, `robots.txt` estático, WebP (<30 KB) LCP y accesibilidad WCAG |
 | **Sincronización de Fondos por ISIN & Ticker de Referencia** | ✅ Completado | Pipeline multiruta (Yahoo/Morningstar + Twin ETFs VUSA/VEUR), SWR background sync (>6h) y P&L dinámico |
-| **Autocompletado Reactivo por ISIN / Ticker** | ✅ Completado | Detección reactiva de activos existentes (cartera y catálogo), popover Liquid Glass y autocompletado integral |
 | **Reconciliación & Persistencia Resiliente de Inversiones** | ✅ Completado | Auto-reconciliación reactiva desde movimientos (`pillar: invest`), multi-esquema adaptativo en Supabase (`identifier`/`symbol_or_isin`) y preservación local |
+| **Cálculo Exacto de Unidades & Auto-Corrección de Cartera** | ✅ Completado | Derivación estricta de títulos en modo importe total (`shares = total / price`), auto-reparación transparente de activos con `shares = 1` distorsionados (`autoCorrectAssetShares`) y sincronización atómica a Supabase |
 
 ---
 

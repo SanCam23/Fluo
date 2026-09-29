@@ -459,15 +459,16 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     const val = normalizeDecimalInput(rawVal);
     setTotalInvestedInput(val);
     const numTotal = parsePositiveNumber(val);
-    const numUnit = parsePositiveNumber(averageBuyPrice);
-    if (numTotal !== null && numUnit !== null) {
-      // Calculate shares from total
+    const numUnit = parsePositiveNumber(averageBuyPrice) ?? parsePositiveNumber(currentPrice);
+    if (numTotal !== null && numUnit !== null && numUnit > 0) {
+      // Calculate shares from total using unit price
       const calcShares = calculateSharesFromTotal(numTotal, numUnit);
       if (calcShares !== null) setShares(calcShares.toString());
+      if (!averageBuyPrice) setAverageBuyPrice(numUnit.toString());
     } else if (numTotal !== null) {
-      // If no buy price yet, derive from shares
+      // If no buy price yet, derive from shares if user entered shares
       const numShares = parsePositiveNumber(shares);
-      if (numShares !== null) {
+      if (numShares !== null && numShares > 0) {
         const avgP = calculateAverageBuyPrice(numTotal, numShares);
         if (avgP !== null) setAverageBuyPrice(avgP.toString());
       }
@@ -513,11 +514,11 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       let numShares = parsePositiveNumber(shares);
       const numTotal = parsePositiveNumber(totalInvestedInput);
 
-      // In "by total" mode, auto-derive shares if not set
+      // In "by total" mode, auto-derive shares strictly from total / unit price
       if (investInputMode === 'total') {
         if (numTotal === null) {
           errors.push('El importe total desembolsado debe ser un número positivo.');
-        } else if (numBuyPrice !== null && (numShares === null || numShares <= 0)) {
+        } else if (numBuyPrice !== null && numBuyPrice > 0) {
           numShares = calculateSharesFromTotal(numTotal, numBuyPrice);
           if (numShares !== null) setShares(numShares.toString());
         }
