@@ -19,7 +19,7 @@ import {
   INITIAL_RECURRENCE_RULES,
   INITIAL_SOURCE_ACCOUNTS,
 } from '../data/initialMockData';
-import { batchUpdateMarketQuotes, pruneExpiredQuoteCache } from '../services/marketDataService';
+import { batchUpdateMarketQuotes, pruneExpiredQuoteCache, resetSwrTimestamps } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
 import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions, autoCorrectAssetShares } from '../utils/finance';
 import type { SourceBalanceInfo } from '../utils/finance';
@@ -612,6 +612,8 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       refreshAllAssetPrices: async () => {
+        // Force bypass SWR freshness window so the user's manual refresh always fetches live data
+        resetSwrTimestamps();
         set({ isLiveUpdating: true });
         try {
           const state = get();

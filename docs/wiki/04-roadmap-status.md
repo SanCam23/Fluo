@@ -863,3 +863,34 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - [x] **Widgets de PWA & Offline First**: Service Worker y manifiesto PWA para instalación nativa en dispositivos iOS/Android.
 - [x] **Endurecimiento AppSec & Optimización LCP**: Cabeceras de seguridad HTTP en `vercel.json` (A+), robots.txt estático, logo WebP de alto rendimiento y accesibilidad WCAG.
 - [x] **Arquitectura Responsive Desktop**: Sidebar Liquid Glass lateral, grid multi-columna en Dashboard y layout fluido en todas las vistas.
+
+### v0.9.18 (Corrección de Cotizaciones en Móvil: CORS Proxy + SWR Bypass + Caché Expirable)
+
+**Problema:** `IE0007987690` y otros fondos siempre mostraban "dato offline/en caché" en móvil, incluso tras pulsar el botón de refresh.
+
+**Causas raíz identificadas y corregidas:**
+
+- **[x] CORS en navegadores móviles** ([`api/quote.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/api/quote.ts)):
+  - Los navegadores (especialmente iOS Safari / Chrome móvil) bloquean las peticiones directas a `query1.finance.yahoo.com` por política CORS del browser.
+  - **Fix:** Nueva **Vercel Serverless Function** `/api/quote` que actúa de proxy: recibe `?symbol=VEUR.AS`, llama a Yahoo desde Node.js (sin restricciones CORS), y devuelve `{ price, change24h, currency, symbol }`.
+  - `fetchYahooChartQuote` ahora usa `typeof window !== 'undefined'` para detectar entorno: browser → `/api/quote`, Node/Vitest → directo a Yahoo.
+  - La función añade `Cache-Control: s-maxage=300` (5 min caché Vercel CDN) y `Access-Control-Allow-Origin: *`.
+
+- **[x] SWR (Stale-While-Revalidate) bloqueaba el botón de refresh** ([`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts)):
+  - `fetchCurrentPrice` tiene una ventana de frescura de 25s. Si el usuario pulsaba el botón en ese período, devolvía el caché sin llamar a la red.
+  - **Fix:** Nueva función `resetSwrTimestamps()` que limpia los timestamps en memoria. Se llama al inicio de `refreshAllAssetPrices` para garantizar un fetch real cada vez que el usuario lo pida explícitamente.
+
+- **[x] vercel.json — SPA rewrite interceptaba `/api/*`** ([`vercel.json`](file:///c:/Users/santi/Documents/UNI/Fluo/vercel.json)):
+  - El catch-all `/(.*) → /index.html` redirigía las peticiones a `/api/quote` a la app React en lugar de a la Serverless Function.
+  - **Fix:** Rewrite ajustado a `/((?!api/).*)` para excluir todas las rutas bajo `/api/`.
+
+- **[x] Caché localStorage sin expiración** (fix de v0.9.17 completado):
+  - `saveQuoteToCache` añade `cachedAt: Date.now()`.
+  - `getQuoteFromCache` retorna `null` para entradas > 23h.
+  - `pruneExpiredQuoteCache()` limpia entradas legacy (sin `cachedAt`) en cada arranque.
+  - `syncStaleAssetQuotes` ya no avanza `lastPriceUpdate` cuando el quote es `isOfflineCached: true`.
+
+- **Validación de Calidad**:
+  - Vitest: 108/108 tests unitarios pasando.
+  - TypeScript: 0 errores (`tsc -b`).
+  - Tests de `marketDataService.ts` (live fetch via Vitest → Node, no CORS): 19/19 ✅.

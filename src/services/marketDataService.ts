@@ -621,6 +621,16 @@ export function clearMarketQuotesCache(): void {
 }
 
 /**
+ * Resets only the in-memory SWR freshness timestamps, forcing the next fetchCurrentPrice
+ * call for each asset to perform an actual network fetch instead of returning cached data.
+ * Use this when the user manually requests a price refresh.
+ */
+export function resetSwrTimestamps(): void {
+  swrQuoteTimestamps.clear();
+  inFlightQuotePromises.clear();
+}
+
+/**
  * Search financial assets with semantic query support.
  * Supports Names (e.g. "S&P 500", "MSCI Europe", "Apple", "Santander"),
  * Tickers (e.g. "VOO", "AAPL", "BTC"), and ISIN codes (e.g. "IE00B4L5Y983").
@@ -887,47 +897,68 @@ export function findMatchingExistingAssets(
 }
 
 /**
- * Fetches real-time price & daily change from Yahoo Finance v8 chart API
+ * Fetches real-time price & daily change.
+ *
+ * In browser environments (mobile + desktop) routes through the Vercel /api/quote proxy
+ * to avoid CORS restrictions from Yahoo Finance.
+ * In non-browser environments (Vitest, Node) calls Yahoo directly.
  */
 async function fetchYahooChartQuote(
   symbol: string
 ): Promise<{ price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s max timeout
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result = data?.chart?.result?.[0];
-    if (!result) return null;
+    let data: { price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null = null;
 
-    const meta = result.meta;
-    let price = Number(meta.regularMarketPrice);
-    if (isNaN(price) || price <= 0) {
-      const closeList = result.indicators?.quote?.[0]?.close;
-      if (Array.isArray(closeList) && closeList.length > 0) {
-        const valid = closeList.filter((p: any) => typeof p === 'number' && !isNaN(p) && p > 0);
-        if (valid.length > 0) price = valid[valid.length - 1];
+    if (typeof window !== 'undefined') {
+      // ── Browser (mobile + desktop): use our CORS-safe Vercel proxy ──
+      const proxyUrl = `/api/quote?symbol=${encodeURIComponent(symbol)}`;
+      const res = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json.error || !json.price || isNaN(Number(json.price)) || Number(json.price) <= 0) return null;
+      data = {
+        price: Number(json.price),
+        change24h: Number(json.change24h ?? 0),
+        currency: json.currency === 'USD' ? 'USD' : 'EUR',
+        symbol,
+      };
+    } else {
+      // ── Non-browser (Node / Vitest): direct call to Yahoo ──
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const result = json?.chart?.result?.[0];
+      if (!result) return null;
+      const meta = result.meta;
+      let price = Number(meta.regularMarketPrice);
+      if (isNaN(price) || price <= 0) {
+        const closeList = result.indicators?.quote?.[0]?.close;
+        if (Array.isArray(closeList) && closeList.length > 0) {
+          const valid = closeList.filter((p: any) => typeof p === 'number' && !isNaN(p) && p > 0);
+          if (valid.length > 0) price = valid[valid.length - 1];
+        }
       }
+      if (isNaN(price) || price <= 0) return null;
+      const prevClose = Number(meta.previousClose);
+      let change24h = 0;
+      if (!isNaN(prevClose) && prevClose > 0) {
+        change24h = ((price - prevClose) / prevClose) * 100;
+      }
+      data = {
+        price: Number(price.toFixed(2)),
+        change24h: Number(change24h.toFixed(2)),
+        currency: meta.currency === 'USD' ? 'USD' : 'EUR',
+        symbol,
+      };
     }
-    if (isNaN(price) || price <= 0) return null;
 
-    const prevClose = Number(meta.previousClose);
-    let change24h = 0;
-    if (!isNaN(prevClose) && prevClose > 0) {
-      change24h = ((price - prevClose) / prevClose) * 100;
-    }
-
-    const currency = meta.currency === 'USD' ? 'USD' : 'EUR';
-    return {
-      price: Number(price.toFixed(symbol.includes('BTC') ? 0 : 2)),
-      change24h: Number(change24h.toFixed(2)),
-      currency,
-      symbol,
-    };
+    return data;
   } catch {
     return null;
   }
