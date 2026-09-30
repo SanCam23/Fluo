@@ -325,7 +325,7 @@ export const InvestmentsView: React.FC = () => {
       </div>
 
       {/* Filter Tabs by Asset Class */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex items-center gap-1.5 overflow-x-auto lg:overflow-x-visible lg:flex-wrap pb-1 no-scrollbar">
         {assetTypeTabs.map((tab) => {
           const isSelected = selectedType === tab.type;
           return (

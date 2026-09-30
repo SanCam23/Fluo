@@ -27,7 +27,7 @@ export const RecurrenceSummaryWidget: React.FC = () => {
         <span className="text-[10px] text-slate-500">Automatizado</span>
       </div>
 
-      <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex gap-2.5 overflow-x-auto lg:overflow-x-visible lg:flex-wrap pb-1 no-scrollbar">
         {activeRecurrences.map((rule) => {
           const daysLeft = getDaysUntil(rule.nextDueDate);
           const brand = getBrandById(rule.brandId);

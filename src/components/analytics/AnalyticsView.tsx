@@ -474,7 +474,7 @@ export const AnalyticsView: React.FC = () => {
     <div className="flex flex-col gap-5 pb-16">
       {/* 0. Account Isolation Selector */}
       {sources.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto lg:overflow-x-visible lg:flex-wrap pb-1 no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveSourceId(null)}
@@ -543,7 +543,7 @@ export const AnalyticsView: React.FC = () => {
 
         {/* Inline Options based on filterType */}
         {filterType === 'period' ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar flex-1 min-w-0 pr-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto lg:overflow-x-visible lg:flex-wrap pb-0.5 no-scrollbar flex-1 min-w-0 pr-1">
             {timeRangeOptions.map((opt) => {
               const isSelected = timeRange === opt.range;
               return (

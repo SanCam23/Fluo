@@ -28,7 +28,6 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
   const startY = useRef(0);
   const isHorizontal = useRef<boolean | null>(null);
   const currentOffset = useRef(0);
-  const isMouseDown = useRef(false);
 
   const isIncome = tx.pillar === 'income';
   const isInvest = tx.pillar === 'invest';
@@ -94,49 +93,8 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     isHorizontal.current = null;
   };
 
-  // Mouse handlers for desktop dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isDeleting) return;
-    isMouseDown.current = true;
-    startX.current = e.clientX;
-    currentOffset.current = 0;
-    setIsSwiping(true);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isMouseDown.current || isDeleting) return;
-    const diffX = e.clientX - startX.current;
-    if (diffX < 0) {
-      const clamped = diffX < -100 ? -100 + (diffX + 100) * 0.35 : diffX;
-      currentOffset.current = clamped;
-      setOffsetX(clamped);
-    } else {
-      const clamped = diffX > 100 ? 100 + (diffX - 100) * 0.35 : diffX;
-      currentOffset.current = clamped;
-      setOffsetX(clamped);
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (!isMouseDown.current || isDeleting) return;
-    isMouseDown.current = false;
-    setIsSwiping(false);
-    if (currentOffset.current <= -80) {
-      triggerDelete();
-    } else if (currentOffset.current >= 80) {
-      setOffsetX(0);
-      currentOffset.current = 0;
-      onEdit?.(tx);
-    } else {
-      setOffsetX(0);
-      currentOffset.current = 0;
-    }
-  };
-
   const handleMouseLeave = () => {
-    if (isMouseDown.current) {
-      handleMouseUp();
-    }
+    // No-op: mouse-drag swipe disabled. Actions accessible via hover buttons.
   };
 
   const isPastDeleteThreshold = offsetX <= -80;
@@ -199,15 +157,12 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
         style={{
           transform: isDeleting ? 'translateX(-100%)' : `translateX(${offsetX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           touchAction: 'pan-y',
         }}
-        className="group relative flex items-center justify-between py-3 pl-3 pr-2.5 sm:pr-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.18] hover:border-white/30 transition-all duration-200 cursor-grab active:cursor-grabbing shadow-[0_2px_8px_-1px_rgba(0,0,0,0.3)] shadow-inner"
+        className="group relative flex items-center justify-between py-3 pl-3 pr-2.5 sm:pr-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.18] hover:border-white/30 transition-all duration-200 cursor-pointer shadow-[0_2px_8px_-1px_rgba(0,0,0,0.3)] shadow-inner"
       >
         {/* Left side: Avatar */}
         <div className="flex-shrink-0 mr-2.5 pointer-events-none">
@@ -265,7 +220,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
             </span>
           </div>
 
-          {/* Action buttons (only on desktop hover so they don't push the amount away on mobile) */}
+          {/* Action buttons visible on hover (desktop: always reachable by click, not swipe) */}
           <div className="hidden sm:flex items-center gap-0.5 -mr-1">
             <button
               type="button"
@@ -273,7 +228,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
                 e.stopPropagation();
                 onEdit?.(tx);
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-indigo-400 transition-opacity rounded-lg hover:bg-white/10 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1.5 text-slate-500 hover:text-indigo-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
               title="Editar movimiento"
               aria-label="Editar movimiento"
             >
@@ -286,7 +241,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
                 e.stopPropagation();
                 triggerDelete();
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-opacity rounded-lg hover:bg-white/10 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
               title="Eliminar movimiento"
               aria-label="Eliminar movimiento"
             >

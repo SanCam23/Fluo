@@ -1,7 +1,7 @@
 # 01 - Arquitectura del Sistema: Fluo
 
 ## 1. Visión General
-**Fluo** es una aplicación de finanzas personales *Mobile-First* concebida con los más altos estándares de fidelidad visual y rendimiento interactivo. Implementa el lenguaje estético **Liquid Glass** (inspirado en la API nativa de iOS 26+ y traducido a Tailwind CSS v4 y CSS3 moderno).
+**Fluo** es una aplicación de finanzas personales *Responsive-First* (Mobile → Tablet → Desktop/PC) concebida con los más altos estándares de fidelidad visual y rendimiento interactivo. Implementa el lenguaje estético **Liquid Glass** (inspirado en la API nativa de iOS 26+ y traducido a Tailwind CSS v4 y CSS3 moderno). El sistema de navegación es dual: barra inferior flotante en móvil/tablet (`< lg`) y barra lateral fija Liquid Glass en escritorio (`≥ lg`).
 
 ---
 
@@ -63,9 +63,10 @@ Fluo/
 │   │   ├── profile/                # Centro de control de usuario y ajustes
 │   │   │   ├── ProfileSettingsModal.tsx # Modal principal de ajustes y seguridad
 │   │   │   └── SourceAccountManager.tsx # Gestor y reordenador reactivo de fuentes de dinero
-│   │   ├── layout/                 # Estructura del dispositivo móvil
-│   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante simétrica Liquid Glass (grid 4-cols)
-│   │   │   └── MobileContainer.tsx # Contenedor responsive max-w-md
+│   │   ├── layout/                 # Estructura responsive del layout
+│   │   │   ├── DesktopSidebar.tsx  # Barra lateral Liquid Glass fija (solo lg+): navegación, CTA, perfil, PIN
+│   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante Liquid Glass (oculta en lg+)
+│   │   │   └── MobileContainer.tsx # Contenedor responsive: max-w-md centrado (<lg) / lg:ml-64 ancho completo (≥lg)
 │   │   ├── home/                   # Vista de Inicio
 │   │   │   ├── HeroBalance.tsx     # Carrusel deslizable Liquid Glass (Consolidado + Cuentas)
 │   │   │   ├── MetricPillars.tsx   # Los 3 pilares (Ingresos, Gastos, Inversión)
@@ -140,11 +141,33 @@ Fluo/
 
 ---
 
-## 5. Principios de Renderizado y Liquid Glass
+## 5. Principios de Renderizado, Responsive y Liquid Glass
 
-- **Viewport Restringido (Mobile-First)**: El layout se ancla a un contenedor central `max-w-md mx-auto min-h-screen`, simulando la experiencia de un dispositivo iOS moderno con `safe-area-inset-top` y `safe-area-inset-bottom`.
-- **Regla de Oro de Desempeño**: Se evita la multiplicidad de capas de `backdrop-filter: blur()` dentro de listas virtuales o con scroll continuo. Los elementos con scroll usan fondos planos semi-translúcidos (`bg-white/[0.04]`), reservando el desenfoque volumétrico a tarjetas clave, encabezados y la barra flotante.
-- **Logotipos e Identidad de Marcas**: Los avatares de marcas utilizan un fondo oscuro neutro `#111726` sin degradados o líneas especulares blancas que distorsionen los logotipos corporativos, garantizando que el diseño respete las guías de estilo oficiales de cada firma.
+### Arquitectura de Navegación Dual
+| Breakpoint | Sistema de Nav | Descripción |
+| :--- | :--- | :--- |
+| `< lg` (< 1024px) — Mobile/Tablet | `FloatingNavbar` (dock inferior) | Barra flotante Liquid Glass `fixed bottom-4`, grid 4 columnas: Inicio, Estadísticas, Inversiones, (+) |
+| `≥ lg` (≥ 1024px) — Desktop/PC | `DesktopSidebar` (barra lateral) | Sidebar fija `w-64 fixed left-0 h-screen`, logo, navegación con pill activo, CTA, mini-card de perfil |
+
+### Grid Layout por Vista
+| Vista | Mobile (`< lg`) | Desktop (`≥ lg`) |
+| :--- | :--- | :--- |
+| **Home** | Stack vertical: HeroBalance → MetricPillars → Recurrences → Transactions | `grid-cols-12`: col-8 (Hero + Pillars + Transactions) + col-4 sticky (Recurrences + Quick-Action) |
+| **Estadísticas** | Stack vertical de tarjetas analíticas | Stack vertical dentro del área de contenido `lg:ml-64` |
+| **Inversiones** | Listado de activos vertical | Listado dentro del área de contenido `lg:ml-64` |
+
+### Breakpoints de Tailwind en Fluo
+| Prefijo | Ancho mínimo | Uso principal |
+| :--- | :--- | :--- |
+| `sm:` | 640px | Ajustes de tipografía y padding secundarios |
+| `md:` | 768px | Transiciones de tablet (preparación para cambios de layout) |
+| `lg:` | 1024px | **Breakpoint principal**: activa sidebar, oculta BottomNav, habilita grid multi-col |
+| `xl:` | 1280px | Padding adicional en el área de contenido (`xl:px-14`) |
+
+### Regla de Oro de Desempeño
+- Se evita la multiplicidad de capas de `backdrop-filter: blur()` dentro de listas virtuales o con scroll continuo. Los elementos con scroll usan fondos planos semi-translúcidos (`bg-white/[0.04]`), reservando el desenfoque volumétrico a tarjetas clave, encabezados y la barra de navegación.
+- La sidebar utiliza `transform-gpu` para aislamiento de composición GPU, garantizando que sus efectos de desenfoque no afecten al rendimiento del área de contenido principal.
+- **Logotipos e Identidad de Marcas**: Los avatares de marcas utilizan un fondo oscuro neutro `#111726` sin degradados o líneas especulares blancas.
 
 ---
 

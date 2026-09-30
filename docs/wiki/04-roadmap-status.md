@@ -801,6 +801,59 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - TypeScript: compilación limpia (`tsc -b`).
   - Build de producción: exitoso con Service Worker y precaché PWA.
 
+### v0.9.16 (Arquitectura Responsive Completa: Mobile + Tablet + Desktop/PC)
+- **[x] Sistema de Navegación Dual** ([`DesktopSidebar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/DesktopSidebar.tsx) + [`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx)):
+  - **Mobile/Tablet (`< lg`)**: Barra inferior flotante Liquid Glass `FloatingNavbar` preservada íntegramente.
+  - **Desktop/PC (`≥ lg`)**: Nueva barra lateral fija `DesktopSidebar` (`w-64 h-screen fixed left-0 bg-slate-900/40 backdrop-blur-2xl border-r border-white/10`):
+    - Logo + wordmark Fluo con indicador de estado de conexión segura (badge esmeralda) o sincronización (`Loader2` índigo pulsante).
+    - CTA principal prominente "+ Nuevo Movimiento" con gradiente indigo→esmeralda y sombra `rgba(99,102,241,0.35)`.
+    - Menú de navegación con pill activo translúcido (`bg-indigo-500/20 text-indigo-300 border-indigo-500/30`) e indicador neón activo.
+    - Botón de PIN / bloqueo en la zona inferior.
+    - Mini-tarjeta de perfil del usuario (avatar con initial, nombre de cuenta, email, badge de estado, acceso directo a ajustes).
+  - `FloatingNavbar.tsx` añade `lg:hidden` para desaparecer exclusivamente en escritorio sin alterar `z-index` ni composición móvil.
+- **[x] Layout Grid Multi-Columna en Desktop** ([`MobileContainer.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/MobileContainer.tsx) y [`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx)):
+  - `MobileContainer.tsx` evoluciona de contenedor `max-w-md mx-auto` a contenedor responsive dual:
+    - `< lg`: `max-w-md mx-auto px-4` + padding inferior de BottomNav → experiencia móvil intacta.
+    - `≥ lg`: `ml-64 max-w-none px-10 xl:px-14 pb-10` → área de contenido fluida desplazada 256px por la sidebar.
+  - **Dashboard Home (`activeTab === 'home'`)**: Grid `grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8`:
+    - **Columna principal (8/12)**: HeroBalance → MetricPillars → RecurrenceSummaryWidget (solo mobile) → RecentTransactionsList.
+    - **Columna lateral derecha sticky (4/12, solo desktop)**: RecurrenceSummaryWidget + tarjeta de acceso rápido "Registrar movimiento".
+  - Barra de título de página solo desktop (`hidden lg:flex`) con subtítulo semántico por pestaña activa.
+- **[x] Compatibilidad PWA y Mobile preservada**:
+  - `safe-area-inset-top` y `safe-area-inset-bottom` mantenidos en contenedor para modo standalone iOS/Android.
+  - Orbes ambientales reactivos al pilar activo preservados con `position: fixed` independientemente del layout.
+- **Validación de Calidad**:
+  - Vitest: 108/108 tests unitarios pasando.
+  - TypeScript: 0 errores (`tsc -b`).
+  - Funcionalidad móvil: intacta (barra flotante, carrusel, swipe-to-delete).
+
+### v0.9.17 (Optimización de UX para Desktop: Interacción por Clic vs. Gestos Táctiles)
+- **[x] HeroBalance — Carrusel móvil + Grid estático en desktop** ([`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx)):
+  - **Móvil (`< lg`)**: Carrusel deslizable (`snap-x snap-mandatory`) y dots paginados preservados íntegramente para gestos táctiles.
+  - **Desktop (`≥ lg`)**: Carrusel eliminado. Sustituido por:
+    - Tarjeta consolidada de patrimonio siempre visible (con sub-métricas en columna derecha `w-64`).
+    - Fila de tabs clicables tipo pill para selección de cuenta/fuente (`Consolidado | Cuenta 1 | Cuenta 2 | ...`).
+    - Botones de navegación `ChevronLeft` / `ChevronRight` para usuarios con teclado cuando hay ≥ 3 fuentes.
+    - Tarjeta de cuenta activa renderizada directamente debajo, sin necesidad de arrastrar.
+  - Función `selectDesktopSource(index)` gestiona el estado en desktop sin depender del `scrollRef`.
+- **[x] SwipeableTransactionItem — Swipe táctil + Click en desktop** ([`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx)):
+  - Eliminados los handlers de mouse-drag (`handleMouseDown`, `handleMouseMove`, `handleMouseUp`) — los gestos de ratón ya no deslizaban nada naturalmente.
+  - Cursors cambiados de `cursor-grab / active:cursor-grabbing` a `cursor-pointer` en desktop.
+  - Botones de editar y eliminar (`Pencil` / `Trash2`) visibles vía `group-hover:opacity-100` al pasar el ratón — accesibles con un clic limpio.
+  - `isMouseDown` ref eliminado (ya no se usa).
+- **[x] Pill Filters — Scroll horizontal → Flex-wrap en desktop** (todos los componentes):
+  - [`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx): Filtros de pilares envuelven en líneas en `lg+` (`lg:flex-wrap lg:overflow-x-visible`).
+  - [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx): Tabs de clase de activo envuelven en `lg+`.
+  - [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx): Selector de cuenta y opciones de periodo envuelven en `lg+`.
+  - [`RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx): Tarjetas de recurrencia envuelven en `lg+`.
+- **[x] Separación de paradigmas de interacción** documentada en wiki:
+  - Móvil: gestos táctiles (swipe, scroll-snap horizontal, pull-to-refresh).
+  - Desktop: clic directo, hover states, teclado (`Escape`, `Enter`, `Tab`), grids y botones explícitos.
+- **Validación de Calidad**:
+  - Vitest: 108/108 tests unitarios pasando.
+  - TypeScript: 0 errores (`tsc -b`).
+  - Funcionalidad táctil móvil: 100% intacta.
+
 ---
 
 ## Próximos Hitos (v1.0.0)
@@ -809,3 +862,4 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - [ ] **Migración a IndexedDB**: Capacidad de soporte para miles de registros y series temporales históricas con `Dexie.js`.
 - [x] **Widgets de PWA & Offline First**: Service Worker y manifiesto PWA para instalación nativa en dispositivos iOS/Android.
 - [x] **Endurecimiento AppSec & Optimización LCP**: Cabeceras de seguridad HTTP en `vercel.json` (A+), robots.txt estático, logo WebP de alto rendimiento y accesibilidad WCAG.
+- [x] **Arquitectura Responsive Desktop**: Sidebar Liquid Glass lateral, grid multi-columna en Dashboard y layout fluido en todas las vistas.

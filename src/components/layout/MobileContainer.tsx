@@ -8,7 +8,7 @@ interface MobileContainerProps {
 
 export const MobileContainer: React.FC<MobileContainerProps> = ({ children, activePillar = 'all' }) => {
   return (
-    <div className="relative min-h-screen w-full bg-[#0B0F19] light:bg-[#F1F5F9] text-white light:text-slate-900 flex justify-center overflow-x-hidden selection:bg-indigo-500 selection:text-white transition-colors duration-500">
+    <div className="relative min-h-screen w-full bg-[#0B0F19] light:bg-[#F1F5F9] text-white light:text-slate-900 flex justify-center lg:justify-start overflow-x-hidden selection:bg-indigo-500 selection:text-white transition-colors duration-500">
       {/* Soft ambient background light orbs (feather-light and ultra-diffuse) */}
       <div
         className={`fixed top-[-10%] left-[-15%] h-[380px] w-[380px] rounded-full blur-[160px] pointer-events-none transition-all duration-700 ${
@@ -57,8 +57,20 @@ export const MobileContainer: React.FC<MobileContainerProps> = ({ children, acti
         }`}
       />
 
-      {/* Mobile viewport restriction frame with iOS safe area compliance */}
-      <div className="relative z-10 w-full max-w-md min-h-screen flex flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))]">
+      {/*
+        Responsive viewport frame:
+        - Mobile/Tablet (<lg): centred narrow column, max-w-md, bottom padding for FloatingNavbar
+        - Desktop (≥lg): flush-left after 256px sidebar offset, full max-w-7xl, standard vertical padding
+      */}
+      <div className="
+        relative z-10 flex flex-col w-full min-h-screen
+        px-4 lg:px-10 xl:px-14
+        pt-[max(1.5rem,env(safe-area-inset-top))]
+        pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))]
+        lg:pb-10
+        max-w-md mx-auto
+        lg:max-w-none lg:mx-0 lg:ml-64
+      ">
         {children}
       </div>
     </div>

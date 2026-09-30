@@ -6,6 +6,7 @@ import { useSecurityLock } from './hooks/useSecurityLock';
 import { useTheme } from './hooks/useTheme';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
+import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { HeroBalance } from './components/home/HeroBalance';
 import { MetricPillars } from './components/home/MetricPillars';
 import { RecurrenceSummaryWidget } from './components/home/RecurrenceSummaryWidget';
@@ -141,8 +142,23 @@ export default function App() {
   // 3. Main Dashboard (Authenticated or Demo Mode)
   return (
     <MobileContainer activePillar={activeTab === 'home' ? selectedPillar : 'all'}>
-      {/* Top Mobile Bar */}
-      <header className="flex items-center justify-between mb-5 px-1 gap-2">
+      {/* Desktop Sidebar (lg+) — hidden on mobile/tablet */}
+      <DesktopSidebar
+        onOpenAddModal={() => setIsAddModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenSimulator={!user ? () => setIsSimulatorOpen(true) : undefined}
+        onLockOrSetupPin={() => {
+          if (hasPin) { lockNow(); } else { setIsConfiguringPin(true); }
+        }}
+        hasPin={hasPin}
+        userEmail={user?.email}
+        isDemoMode={isDemoMode}
+        isCloudLoading={isCloudLoading}
+        simulatedTimeOffsetDays={simulatedTimeOffsetDays}
+      />
+
+      {/* Top Mobile Bar — hidden on lg+ (sidebar takes over) */}
+      <header className="lg:hidden flex items-center justify-between mb-5 px-1 gap-2">
         <div className="flex items-center gap-2 flex-shrink-0">
           <img
             src="/fluo-wordmark.webp"
@@ -241,6 +257,31 @@ export default function App() {
         </div>
       </header>
 
+      {/* Desktop page title bar — only visible at lg+ */}
+      <div className="hidden lg:flex items-center justify-between mb-6 pt-2">
+        <div>
+          <h1 className="text-xl font-black text-white tracking-tight">
+            {activeTab === 'home' && 'Dashboard'}
+            {activeTab === 'stats' && 'Estadísticas'}
+            {activeTab === 'invest' && 'Inversiones'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {activeTab === 'home' && 'Resumen financiero personal'}
+            {activeTab === 'stats' && 'Análisis de flujo de caja y patrimonio'}
+            {activeTab === 'invest' && 'Cartera de inversiones y P&L en tiempo real'}
+          </p>
+        </div>
+        {/* Quick security badge on desktop */}
+        <div className="flex items-center gap-2">
+          {isCloudLoading && (
+            <div className="flex items-center gap-1.5 text-xs text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20 animate-pulse">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Sincronizando…</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main View Switcher with Privacy Obfuscation when locked */}
       <main
         className={`flex-1 flex flex-col gap-6 transition-all duration-300 ${
@@ -248,27 +289,56 @@ export default function App() {
         }`}
       >
         {activeTab === 'home' && (
-          <>
-            {/* 1. Hero Net Balance */}
-            <HeroBalance selectedPillar={selectedPillar} />
+          /* Desktop: 12-col grid — content (8) + sidebar panel (4). Mobile: single column */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+            {/* ── Main column (8/12) ── */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              {/* 1. Hero Net Balance */}
+              <HeroBalance selectedPillar={selectedPillar} />
 
-            {/* 2. Three Metric Pillars (Ingresos, Gastos, Cartera) */}
-            <MetricPillars
-              selectedPillar={selectedPillar}
-              onSelectPillar={setSelectedPillar}
-            />
+              {/* 2. Three Metric Pillars (Ingresos, Gastos, Cartera) */}
+              <MetricPillars
+                selectedPillar={selectedPillar}
+                onSelectPillar={setSelectedPillar}
+              />
 
-            {/* 3. Upcoming Recurrences / Scheduled Cashflow */}
-            <RecurrenceSummaryWidget />
+              {/* 3. Upcoming Recurrences — mobile only (desktop shows in right panel) */}
+              <div className="lg:hidden">
+                <RecurrenceSummaryWidget />
+              </div>
 
-            {/* 4. Recent Transactions with Brand Avatars & Filtering */}
-            <RecentTransactionsList
-              selectedPillar={selectedPillar}
-              onSelectPillar={setSelectedPillar}
-              onEditTransaction={setEditingTransaction}
-            />
-          </>
+              {/* 4. Recent Transactions with Brand Avatars & Filtering */}
+              <RecentTransactionsList
+                selectedPillar={selectedPillar}
+                onSelectPillar={setSelectedPillar}
+                onEditTransaction={setEditingTransaction}
+              />
+            </div>
+
+            {/* ── Right sidebar panel (4/12) — visible only on desktop ── */}
+            <div className="hidden lg:flex lg:col-span-4 flex-col gap-5 sticky top-6">
+              {/* Upcoming Recurrences Widget */}
+              <RecurrenceSummaryWidget />
+
+              {/* Desktop quick-action hint card */}
+              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-md">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Acceso rápido</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium
+                    bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300
+                    border border-indigo-500/25 hover:border-indigo-500/40
+                    transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                >
+                  <span className="h-6 w-6 rounded-lg bg-indigo-500/25 flex items-center justify-center flex-shrink-0 text-indigo-400 font-black text-base">+</span>
+                  Registrar movimiento
+                </button>
+              </div>
+            </div>
+          </div>
         )}
+
 
         {activeTab === 'stats' && (
           <Suspense fallback={<ViewSkeletonFallback />}>
@@ -283,7 +353,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Bottom Glass Navigation Bar */}
+      {/* Floating Bottom Glass Navigation Bar (mobile/tablet only — hidden at lg+) */}
       <FloatingNavbar onOpenAddModal={() => setIsAddModalOpen(true)} />
 
       {/* Quick Add / Edit Transaction Modal */}

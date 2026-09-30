@@ -345,7 +345,37 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 - **Active State**: Cada botón o tarjeta interactiva implementa `active:scale-[0.97]` con curva suave `cubic-bezier(0.16, 1, 0.3, 1)`.
 - **Luces Ambientales**: Tres orbes difusos de color en el fondo (`blur-3xl`) se sitúan detrás de la capa de interfaz, permitiendo que el efecto de cristal cobre vida al hacer scroll y refractar diferentes colores.
 
+---
 
+## 5. Paradigmas de Interacción: Táctil (Móvil) vs. Determinista (Desktop)
 
+Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El breakpoint frontera es `lg` (≥ 1024px).
 
+### 5.1. Móvil / Tablet (`< lg`) — Gestos Táctiles
+
+| Patrón | Implementación | Componentes |
+| :--- | :--- | :--- |
+| **Carrusel deslizable** | `overflow-x-auto snap-x snap-mandatory no-scrollbar` + dots de paginación | `HeroBalance.tsx` |
+| **Swipe para eliminar** | Touch handlers (`touchstart/move/end`) + umbral -80px | `SwipeableTransactionItem.tsx` |
+| **Swipe para editar** | Touch handlers + umbral +80px | `SwipeableTransactionItem.tsx` |
+| **Scroll horizontal de pills** | `overflow-x-auto no-scrollbar` con `flex-shrink-0` en cada pill | `RecentTransactionsList`, `InvestmentsView`, `AnalyticsView` |
+| **Scroll horizontal de cards** | `overflow-x-auto flex gap-2.5 no-scrollbar` | `RecurrenceSummaryWidget.tsx` |
+
+### 5.2. Desktop / PC (`≥ lg`) — Clic, Hover y Teclado
+
+| Patrón | Implementación | Componentes |
+| :--- | :--- | :--- |
+| **Selector de cuenta por tabs** | Fila de botones pill clicables + `ChevronLeft/Right` explícitos | `HeroBalance.tsx` (desktop branch `hidden lg:flex`) |
+| **Grid de tarjeta activa** | Tarjeta consolidada siempre visible + tarjeta de cuenta activa bajo los tabs | `HeroBalance.tsx` |
+| **Eliminar / Editar por hover** | `opacity-0 group-hover:opacity-100` en botones `Pencil` y `Trash2` | `SwipeableTransactionItem.tsx` |
+| **Filtros wrap sin scroll** | `lg:overflow-x-visible lg:flex-wrap` | `RecentTransactionsList`, `InvestmentsView`, `AnalyticsView`, `RecurrenceSummaryWidget` |
+| **Cursor** | `cursor-pointer` (nunca `cursor-grab`) | Todos los componentes de lista |
+| **Navegación teclado** | `Escape` para cerrar modales, `Tab` para navegación de foco, `Enter` para confirmar | Modales Liquid Glass |
+
+### 5.3. Reglas Obligatorias
+
+1. **Nunca usar `cursor-grab` o `active:cursor-grabbing` en desktop.** Los elementos deslizables en móvil deben ser interacciones táctiles exclusivas; el cursor de ratón siempre debe ser `pointer`.
+2. **Nunca ocultar opciones de acción detrás de swipe en desktop.** Toda acción debe ser accesible por clic directo en estado visible o por hover (`group-hover:opacity-100`).
+3. **`overflow-x-auto` sin barra visible es un antipatrón de UX en desktop.** Siempre complementar con `lg:overflow-x-visible lg:flex-wrap` para que el ratón pueda acceder a todos los elementos sin arrastrar.
+4. **Tooltips y detalles de gráficos se activan con `mouseover/hover`** en recharts — no requieren clics mantenidos ni arrastres.
 

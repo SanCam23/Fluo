@@ -10,7 +10,7 @@ export const FloatingNavbar: React.FC<FloatingNavbarProps> = ({ onOpenAddModal }
   const setActiveTab = useFinanceStore((state) => state.setActiveTab);
 
   return (
-    <div className="fixed bottom-4 inset-x-4 max-w-sm mx-auto z-50 gpu-layer transform-gpu">
+    <div className="lg:hidden fixed bottom-4 inset-x-4 max-w-sm mx-auto z-50 gpu-layer transform-gpu">
       {/* Subsurface soft atmospheric aura underneath the dock */}
       <div className="pointer-events-none absolute -bottom-1 inset-x-12 h-4 bg-indigo-500/10 light:bg-indigo-500/25 blur-xl rounded-full" />
 

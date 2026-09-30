@@ -92,7 +92,7 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
       </div>
 
       {/* Pill Filters + Search Button */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex items-center gap-1.5 overflow-x-auto lg:overflow-x-visible lg:flex-wrap pb-1 no-scrollbar">
         {(['all', 'income', 'expense', 'invest'] as const).map((pillar) => {
           const isSelected = selectedPillar === pillar;
           const labels: Record<string, string> = {
