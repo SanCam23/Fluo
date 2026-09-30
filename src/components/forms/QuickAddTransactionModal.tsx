@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   DollarSign,
   Hash,
+  Banknote,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -1441,6 +1442,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                   options={categoryOptions}
                 />
               </div>
+
+              {/* Informative banner for ATM / Cajero cash companion deposit */}
+              {pillar === 'expense' && selectedCatId === 'cat-atm' && (
+                <div className="p-3 rounded-2xl bg-teal-500/10 light:bg-teal-50/80 border border-teal-500/25 light:border-teal-200 text-xs text-teal-300 light:text-teal-800 flex items-start gap-2.5 animate-fadeIn">
+                  <Banknote className="h-4 w-4 text-teal-400 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-teal-200 light:text-teal-900">Retirada en Cajero Automático</span>
+                    <span className="text-[11px] text-teal-300/80 light:text-teal-700 leading-relaxed">
+                      {sources.some((s) => s.type === 'cash')
+                        ? `Al guardar, se registrará este gasto en la cuenta origen y automáticamente un ingreso del mismo importe en tu cuenta de efectivo ("${
+                            sources.find((s) => s.type === 'cash')?.name
+                          }").`
+                        : 'No tienes una cuenta de efectivo configurada aún. Puedes crear una desde tu Perfil > Fuentes para que las retiradas se abonen solas en tu efectivo.'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Source Account Selector (Liquid Glass) */}
               {sourceOptions.length > 0 && (

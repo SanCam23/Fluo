@@ -642,6 +642,25 @@ Fluo cuenta con una capa de cabeceras HTTP de servidor configurada para la máxi
 - **Landmarks Semánticos Accesibles (WCAG 1.3.1 Info and Relationships)**: La pantalla de autenticación (`AuthScreen.tsx`) y el área central del dashboard (`App.tsx`) están envueltas en contenedores semánticos `<main>`.
 - **Área Táctil Mínima (WCAG 2.5.8 Target Size)**: El botón de alternar visibilidad de contraseña (icono de ojo) cuenta con un contenedor interactivo centrado de `w-8 h-8` (32×32 px), superando holgadamente el mínimo de 24×24 px.
 
+---
+
+## 14. Módulo de Estadísticas (/stats): Selección Dual (Periodo vs Mes Concreto) y Transferencia Automática de Cajero
+
+### 1. Selector Unificado en Una Sola Línea (`AnalyticsView.tsx`)
+- **Diseño Compacto en Una Sola Fila**: Integra en un único contenedor horizontal desplazable (`flex items-center gap-2 overflow-x-auto`) tanto el conmutador de modo (`Periodo` vs `Por Mes`) como las opciones reactivas correspondientes, optimizando al máximo el espacio vertical en pantallas móviles.
+- **Modo Periodo (`filterType === 'period'`)**: Píldoras de desplazamiento horizontal en la misma línea (`Este Mes`, `Mes Pasado`, `Últimos 3 Meses`, `Últimos 6 Meses`, `Este Año`, `Todo`).
+- **Modo Por Mes (`filterType === 'month'`)**: 
+  - Control paso a paso compacto (`< [ 📅 Mes ] >`) con selector nativo tipo `input[type="month"]` accesible con un toque sobre la etiqueta.
+  - Píldoras de acceso rápido inline con los últimos 12 meses y cualquier mes con movimientos existentes.
+  - Generación de curva continua día por día (`generateSavingsEvolution(txs, YYYY-MM)`) adaptada a los días del mes seleccionado.
+
+### 2. Flujo Automatizado de Retiradas en Cajero (`cat-atm`)
+- Al registrar un gasto con categoría `cat-atm` ("Cajero"), el store detecta automáticamente si el usuario cuenta con una fuente de tipo `cash` ("Efectivo").
+- Si existe una cuenta en efectivo diferente de la cuenta bancaria de origen, se genera de forma síncrona y atómica un movimiento gemelo de ingreso (`pillar: 'income'`) por el mismo importe en la cuenta de efectivo.
+- La regla se preserva en Supabase (`insertCloudTransaction`) y se refleja en el recálculo instantáneo de saldo de la billetera.
+- **Restricción de Billetera Única**: El usuario solo puede poseer un máximo de una cuenta en efectivo (`type: 'cash'`), validada de forma estricta tanto en `addSource` como en `updateSource`.
+
+
 
 
 

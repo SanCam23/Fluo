@@ -97,7 +97,10 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
 
 ### 8. Insignias de Categoría (`CategoryIcon`)
 - **Contenedor**: `bg-white/5 border border-white/10 rounded-xl flex items-center justify-center`
-- **Glifo**: Iconos de Lucide React renderizados en tamaño proporcional con color semántico según la categoría financiera asociada.
+- **Glifo**: Iconos de Lucide React renderizados en tamaño proporcional con color semántico según la categoría financiera asociada:
+  - Ingresos: `Briefcase`, `ArrowDownLeft`, `Coins`, `Laptop`, `Sparkles`, `Building2`, `Percent`, `RotateCcw`, `Gift`, `Wallet`.
+  - Gastos: `ShoppingBag`, `Tv`, `Home`, `Car`, `Utensils`, `HeartPulse`, `GraduationCap` (Estudios), `Banknote` (Cajero), `Send` (Bizum), `Plane` (Viajes), `Gift` (Regalos), `MoreHorizontal` (Otros).
+  - Inversiones: `TrendingUp`, `LineChart`, `Bitcoin`, `ShieldCheck`, `Landmark`.
 
 ### 9. Selector Desplegable de Cristal (`GlassSelect`)
 - **Disparador Liquid Glass**: `bg-white/[0.06] hover:bg-white/[0.1] border border-white/15 backdrop-blur-xl rounded-2xl px-3.5 py-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] active:scale-[0.99]` con chevron rotatorio `transition-transform duration-200`.

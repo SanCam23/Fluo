@@ -9,6 +9,9 @@ import {
   BarChart3,
   Flame,
   PiggyBank,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   PieChart,
@@ -128,6 +131,28 @@ const SavingsCustomTooltip: React.FC<SavingsCustomTooltipProps> = ({ active, pay
   return null;
 };
 
+const MONTH_NAMES_LONG = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+const MONTH_NAMES_SHORT = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+];
+
+function formatMonthTitle(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return monthKey;
+  return `${MONTH_NAMES_LONG[m - 1]} ${y}`;
+}
+
+function formatMonthPill(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return monthKey;
+  return `${MONTH_NAMES_SHORT[m - 1]} '${String(y).slice(-2)}`;
+}
+
 export const AnalyticsView: React.FC = () => {
   const timeRange = useFinanceStore((state) => state.timeRange);
   const setTimeRange = useFinanceStore((state) => state.setTimeRange);
@@ -138,6 +163,13 @@ export const AnalyticsView: React.FC = () => {
   const sources = useFinanceStore((state) => state.sources);
   const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const setActiveSourceId = useFinanceStore((state) => state.setActiveSourceId);
+
+  // Filter mode: 'period' (relative timeRange) vs 'month' (specific YYYY-MM)
+  const [filterType, setFilterType] = useState<'period' | 'month'>('period');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const [activeChartSection, setActiveChartSection] = useState<'savings' | 'categories' | 'comparison' | 'networth'>('savings');
   const [savingsChartMode, setSavingsChartMode] = useState<'accumulated' | 'net'>('accumulated');
@@ -153,7 +185,19 @@ export const AnalyticsView: React.FC = () => {
     return transactions.filter((tx) => tx.sourceId === activeSourceId);
   }, [transactions, activeSourceId]);
 
-  // Filter options
+  const handlePrevMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  // Filter options for Period Mode
   const timeRangeOptions: { range: TimeRangeFilter; label: string }[] = [
     { range: 'this_month', label: 'Este Mes' },
     { range: 'last_month', label: 'Mes Pasado' },
@@ -163,7 +207,7 @@ export const AnalyticsView: React.FC = () => {
     { range: 'all', label: 'Todo' },
   ];
 
-  // Aggregated data for active period
+  // Aggregated data for active period or selected month
   const {
     periodIncome,
     periodExpense,
@@ -172,15 +216,25 @@ export const AnalyticsView: React.FC = () => {
     daysInPeriod,
   } = useMemo(() => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
-    const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+    const [selYear, selMonth] = selectedMonth.split('-').map(Number);
+    const startOfSelMonth = new Date(selYear, selMonth - 1, 1).getTime();
+    const startOfNextMonth = new Date(selYear, selMonth, 1).getTime();
 
     const filtered = sourceScopedTransactions.filter((tx) => {
       if (!tx || !tx.date) return false;
       const txTime = new Date(tx.date).getTime();
+
+      if (filterType === 'month') {
+        return txTime >= startOfSelMonth && txTime < startOfNextMonth;
+      }
+
+      // filterType === 'period'
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
+      const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+
       switch (timeRange) {
         case 'this_month':
           return txTime >= startOfMonth;
@@ -224,23 +278,35 @@ export const AnalyticsView: React.FC = () => {
     });
 
     let days = 120;
-    switch (timeRange) {
-      case 'this_month':
+    if (filterType === 'month') {
+      if (selYear === now.getFullYear() && selMonth === now.getMonth() + 1) {
         days = Math.max(1, now.getDate());
-        break;
-      case 'last_month':
-        days = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-        break;
-      case 'last_3_months':
-        days = 90;
-        break;
-      case 'last_6_months':
-        days = 180;
-        break;
-      case 'this_year': {
-        const start = new Date(now.getFullYear(), 0, 1);
-        days = Math.max(1, Math.round((now.getTime() - start.getTime()) / 86400000));
-        break;
+      } else {
+        days = new Date(selYear, selMonth, 0).getDate();
+      }
+    } else {
+      switch (timeRange) {
+        case 'this_month':
+          days = Math.max(1, now.getDate());
+          break;
+        case 'last_month':
+          days = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+          break;
+        case 'last_3_months':
+          days = 90;
+          break;
+        case 'last_6_months':
+          days = 180;
+          break;
+        case 'this_year': {
+          const start = new Date(now.getFullYear(), 0, 1);
+          days = Math.max(1, Math.round((now.getTime() - start.getTime()) / 86400000));
+          break;
+        }
+        case 'all':
+        default:
+          days = 120;
+          break;
       }
     }
 
@@ -252,7 +318,7 @@ export const AnalyticsView: React.FC = () => {
       expensesByBrand: byBrand,
       daysInPeriod: days,
     };
-  }, [sourceScopedTransactions, timeRange]);
+  }, [sourceScopedTransactions, timeRange, filterType, selectedMonth]);
 
   // Dedicated Absolute Savings Metrics
   const savingsMetrics = useMemo(
@@ -260,10 +326,14 @@ export const AnalyticsView: React.FC = () => {
     [periodIncome, periodExpense, daysInPeriod]
   );
 
-  // Time-Series Savings Evolution for AreaChart
+  // Time-Series Savings Evolution for AreaChart (passes selectedMonth YYYY-MM or timeRange)
   const savingsEvolutionData = useMemo(
-    () => generateSavingsEvolution(sourceScopedTransactions, timeRange),
-    [sourceScopedTransactions, timeRange]
+    () =>
+      generateSavingsEvolution(
+        sourceScopedTransactions,
+        filterType === 'month' ? selectedMonth : timeRange
+      ),
+    [sourceScopedTransactions, timeRange, filterType, selectedMonth]
   );
 
   // KPI 1: Savings rate
@@ -439,25 +509,98 @@ export const AnalyticsView: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Time Range Selector Segmented Control */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        {timeRangeOptions.map((opt) => {
-          const isSelected = timeRange === opt.range;
-          return (
+      {/* 1. Selection Mode (Periodo vs Mes) & Options */}
+      <div className="flex items-center gap-2 w-full">
+        {/* Toggle Mode Segmented Control */}
+        <div className="inline-flex p-0.5 rounded-full bg-white/[0.06] light:bg-slate-200/80 border border-white/10 light:border-slate-300 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setFilterType('period')}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex-shrink-0 active:scale-95 ${
+              filterType === 'period'
+                ? 'bg-white/20 light:bg-indigo-600 text-white shadow-sm font-extrabold'
+                : 'text-slate-400 hover:text-white light:text-slate-600'
+            }`}
+          >
+            Periodo
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('month')}
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex-shrink-0 active:scale-95 ${
+              filterType === 'month'
+                ? 'bg-white/20 light:bg-indigo-600 text-white shadow-sm border border-white/20 light:border-indigo-600 font-extrabold'
+                : 'text-slate-400 hover:text-white light:text-slate-600'
+            }`}
+          >
+            <Calendar className="h-3 w-3 text-indigo-400 light:text-indigo-200" />
+            <span>Mes</span>
+          </button>
+        </div>
+
+        {/* Subtle Vertical Divider */}
+        <div className="h-4 w-px bg-white/15 light:bg-slate-300 flex-shrink-0" />
+
+        {/* Inline Options based on filterType */}
+        {filterType === 'period' ? (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar flex-1 min-w-0 pr-1">
+            {timeRangeOptions.map((opt) => {
+              const isSelected = timeRange === opt.range;
+              return (
+                <button
+                  key={opt.range}
+                  type="button"
+                  onClick={() => setTimeRange(opt.range)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
+                    isSelected
+                      ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold light:bg-indigo-600 light:text-white light:border-indigo-600 light:shadow-sm'
+                      : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10 light:bg-white/90 light:text-slate-700 light:border-slate-300/80 hover:light:bg-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* Month Stepper - Expanded across full remaining width with correct margins */
+          <div className="flex items-center justify-between px-2 sm:px-3 py-1 rounded-full bg-white/[0.06] light:bg-slate-100 border border-white/10 light:border-slate-300 flex-1 min-w-0 backdrop-blur-md shadow-sm">
             <button
-              key={opt.range}
               type="button"
-              onClick={() => setTimeRange(opt.range)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md transition-all duration-200 cursor-pointer flex-shrink-0 active:scale-95 ${
-                isSelected
-                  ? 'bg-white/20 text-white border border-white/30 shadow-md font-bold light:bg-indigo-600 light:text-white light:border-indigo-600 light:shadow-sm'
-                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border border-white/10 light:bg-white/90 light:text-slate-700 light:border-slate-300/80 hover:light:bg-white'
-              }`}
+              onClick={handlePrevMonth}
+              className="p-1 rounded-full hover:bg-white/10 text-slate-300 light:text-slate-700 transition-all cursor-pointer active:scale-90 flex-shrink-0"
+              title="Mes anterior"
+              aria-label="Mes anterior"
             >
-              {opt.label}
+              <ChevronLeft className="h-4 w-4" />
             </button>
-          );
-        })}
+
+            <div className="relative flex items-center justify-center flex-1 min-w-0 px-2 cursor-pointer">
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  if (e.target.value) setSelectedMonth(e.target.value);
+                }}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                aria-label="Seleccionar mes"
+              />
+              <span className="text-xs sm:text-sm font-bold text-indigo-300 light:text-indigo-700 whitespace-nowrap capitalize text-center">
+                {formatMonthTitle(selectedMonth)}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1 rounded-full hover:bg-white/10 text-slate-300 light:text-slate-700 transition-all cursor-pointer active:scale-90 flex-shrink-0"
+              title="Mes siguiente"
+              aria-label="Mes siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. UNIFIED MASTER SAVINGS & BALANCE HERO CARD (Liquid Glass) */}
@@ -543,8 +686,12 @@ export const AnalyticsView: React.FC = () => {
           </div>
           <p className="text-[11px] text-slate-400 light:text-slate-500 mt-0.5">
             {savingsMetrics.netSavings >= 0
-              ? 'Diferencia neta positiva retenida tras cubrir los gastos del periodo'
-              : 'Los gastos han superado a los ingresos registrados en este periodo'}
+              ? filterType === 'month'
+                ? `Superávit neto conseguido en ${formatMonthTitle(selectedMonth)}`
+                : 'Diferencia neta positiva retenida tras cubrir los gastos del periodo'
+              : filterType === 'month'
+                ? `Los gastos han superado a los ingresos en ${formatMonthTitle(selectedMonth)}`
+                : 'Los gastos han superado a los ingresos registrados en este periodo'}
           </p>
         </div>
 
@@ -561,7 +708,7 @@ export const AnalyticsView: React.FC = () => {
                 +{formatCompactCurrency(periodIncome)}
               </span>
               <span className="text-[9px] text-slate-500 light:text-slate-500 font-medium block truncate mt-0.5">
-                en el periodo
+                {filterType === 'month' ? formatMonthPill(selectedMonth) : 'en el periodo'}
               </span>
             </div>
           </div>

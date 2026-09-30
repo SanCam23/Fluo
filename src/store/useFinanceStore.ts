@@ -337,6 +337,13 @@ export const useFinanceStore = create<FinanceState>()(
 
       addSource: (sourceData) => {
         const { sources, userId } = get();
+
+        // Regla de negocio: solo se permite una cuenta en efectivo
+        if (sourceData.type === 'cash' && sources.some((s) => s.type === 'cash')) {
+          console.warn('[Store] Solo se permite una cuenta en efectivo');
+          throw new Error('Solo puedes tener una cuenta en efectivo.');
+        }
+
         const newSource: SourceAccount = {
           ...sourceData,
           id: generateId('source'),
@@ -356,7 +363,17 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       updateSource: (id, updatedFields) => {
-        const { userId } = get();
+        const { sources, userId } = get();
+
+        // Regla de negocio: solo se permite una cuenta en efectivo
+        if (
+          updatedFields.type === 'cash' &&
+          sources.some((s) => s.type === 'cash' && s.id !== id)
+        ) {
+          console.warn('[Store] Solo se permite una cuenta en efectivo');
+          throw new Error('Solo puedes tener una cuenta en efectivo.');
+        }
+
         set((state) => ({
           sources: state.sources
             .map((s) => (s.id === id ? { ...s, ...updatedFields } : s))
@@ -442,15 +459,42 @@ export const useFinanceStore = create<FinanceState>()(
           id: generateId('tx'),
           createdAt: Date.now(),
         };
+
+        const { sources, userId } = get();
+        let companionIncomeTx: Transaction | null = null;
+
+        // Cajero automated companion deposit in cash account:
+        // "Cajero, en este caso se registrara como gasto y automaticamente como ingreso en la cuenta en efectivo si el usuario tiene."
+        if (newTx.pillar === 'expense' && newTx.categoryId === 'cat-atm') {
+          const cashSource = sources.find((s) => s.type === 'cash');
+          if (cashSource && cashSource.id !== newTx.sourceId) {
+            companionIncomeTx = {
+              id: generateId('tx'),
+              amount: newTx.amount,
+              pillar: 'income',
+              categoryId: 'cat-atm',
+              sourceId: cashSource.id,
+              concept: newTx.concept
+                ? `Ingreso en efectivo (${newTx.concept})`
+                : 'Ingreso en efectivo (Cajero)',
+              date: newTx.date,
+              createdAt: Date.now() + 1,
+            };
+          }
+        }
+
+        const txsToAdd = companionIncomeTx ? [newTx, companionIncomeTx] : [newTx];
+
         set((state) => ({
-          transactions: sortTransactionsDesc([newTx, ...state.transactions]),
+          transactions: sortTransactionsDesc([...txsToAdd, ...state.transactions]),
         }));
 
-        const { userId } = get();
         if (userId) {
-          insertCloudTransaction(newTx, userId).catch((err) =>
-            console.warn('[Store] Cloud sync failed for addTransaction:', err)
-          );
+          txsToAdd.forEach((tx) => {
+            insertCloudTransaction(tx, userId).catch((err) =>
+              console.warn('[Store] Cloud sync failed for addTransaction:', err)
+            );
+          });
         }
       },
 

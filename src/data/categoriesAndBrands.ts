@@ -21,6 +21,12 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-leisure', name: 'Ocio y Restaurantes', pillar: 'expense', icon: 'Utensils', color: '#E11D48' },
   { id: 'cat-shopping', name: 'Compras y Moda', pillar: 'expense', icon: 'ShoppingBag', color: '#EC4899' },
   { id: 'cat-health', name: 'Salud y Cuidado', pillar: 'expense', icon: 'HeartPulse', color: '#BE123C' },
+  { id: 'cat-education', name: 'Estudios / Formación', pillar: 'expense', icon: 'GraduationCap', color: '#F59E0B' },
+  { id: 'cat-atm', name: 'Cajero', pillar: 'expense', icon: 'Banknote', color: '#14B8A6' },
+  { id: 'cat-bizum-expense', name: 'Bizum', pillar: 'expense', icon: 'Send', color: '#06B6D4' },
+  { id: 'cat-travel', name: 'Viajes', pillar: 'expense', icon: 'Plane', color: '#38BDF8' },
+  { id: 'cat-gifts', name: 'Regalos', pillar: 'expense', icon: 'Gift', color: '#F472B6' },
+  { id: 'cat-other-expense', name: 'Otros', pillar: 'expense', icon: 'MoreHorizontal', color: '#94A3B8' },
 
   // Inversiones
   { id: 'cat-etf', name: 'Fondos y ETFs', pillar: 'invest', icon: 'TrendingUp', color: '#6366F1' },

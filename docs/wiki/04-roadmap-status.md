@@ -41,6 +41,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Sincronización de Fondos por ISIN & Ticker de Referencia** | ✅ Completado | Pipeline multiruta (Yahoo/Morningstar + Twin ETFs VUSA/VEUR), SWR background sync (>6h) y P&L dinámico |
 | **Reconciliación & Persistencia Resiliente de Inversiones** | ✅ Completado | Auto-reconciliación reactiva desde movimientos (`pillar: invest`), multi-esquema adaptativo en Supabase (`identifier`/`symbol_or_isin`) y preservación local |
 | **Cálculo Exacto de Unidades & Auto-Corrección de Cartera** | ✅ Completado | Derivación estricta de títulos en modo importe total (`shares = total / price`), auto-reparación transparente de activos con `shares = 1` distorsionados (`autoCorrectAssetShares`) y sincronización atómica a Supabase |
+| **Nuevas Categorías de Gasto & Flujo Cajero** | ✅ Completado | 6 nuevas categorías (Estudios, Cajero, Bizum, Viajes, Regalos, Otros), auto-ingreso gemelo en efectivo en Cajero y restricción a 1 sola cuenta de efectivo |
+| **Selector Dual en Estadísticas (Periodo vs Mes)** | ✅ Completado | Conmutador Liquid Glass en `/stats`: selección por periodos relativos o mes específico con stepper, picker nativo y evolución diaria continua |
 
 ---
 
@@ -780,6 +782,24 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Campo de búsqueda expandible con icono, botón de borrado rápido (`X`) y filtrado en tiempo real sobre concepto, nombre comercial de marca (`Brand`), categoría financiera e importe.
 - **Cobertura de Tests**:
   - 98 tests unitarios pasando al 100% en Vitest.
+
+### v0.9.15 (Nuevas Categorías de Gastos, Flujo Cajero & Selector Dual en Estadísticas)
+- **Nuevas Categorías Oficiales de Gasto ([`categoriesAndBrands.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/data/categoriesAndBrands.ts))**:
+  - Incorporadas 6 nuevas categorías oficiales: `Estudios / Formación` (`cat-education`), `Cajero` (`cat-atm`), `Bizum` (`cat-bizum-expense`), `Viajes` (`cat-travel`), `Regalos` (`cat-gifts`) y `Otros` (`cat-other-expense`).
+  - Mapeo de nuevos iconos vectoriales Lucide en [`CategoryIcon.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/CategoryIcon.tsx): `GraduationCap`, `Banknote`, `Send`, `Plane` y `MoreHorizontal`.
+- **Flujo Automatizado de Cajero & Regla de Cuenta Única en Efectivo ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts) y [`SourceAccountManager.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/SourceAccountManager.tsx))**:
+  - Al añadir un gasto en la categoría `Cajero`, si el usuario cuenta con una fuente de tipo efectivo (`type === 'cash'`), se genera automáticamente y de forma atómica una transacción de ingreso gemela (`pillar: 'income'`) por el mismo importe en la cuenta de efectivo.
+  - Se añade un banner informativo Liquid Glass en el formulario modal indicando la cuenta de destino del efectivo o avisando si aún no tiene una configurada.
+  - Validación estricta que prohíbe tener más de una cuenta en efectivo tanto en el store (`addSource` / `updateSource`) como en la interfaz de gestión de fuentes (bloqueo reactivo del selector con mensaje explicativo).
+- **Selector Dual Unificado en Una Sola Línea ([`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx))**:
+  - Integración en una sola fila (`w-full flex items-center gap-2`) del segmented control `[Periodo | Mes]` con opciones adaptativas.
+  - Al seleccionar `Mes`: eliminación completa de las pastillas rápidas redundantes y expansión del selector `< Mes YYYY >` al ancho completo disponible de la pantalla (`flex-1 min-w-0 justify-between`) respetando los márgenes perimetrales. Chevrons en los extremos y título del mes centrado con selector nativo.
+  - Al seleccionar `Periodo`: carrusel horizontal suave con píldoras de periodo (`Este Mes`, `Mes Pasado`, `Últimos 3 Meses`...).
+  - Adaptación de la curva continua de ahorro acumulado y diario en [`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts) (`generateSavingsEvolution`) para computar exactamente los días del mes elegido.
+- **Validación de Calidad**:
+  - Vitest: 108/108 tests unitarios pasando.
+  - TypeScript: compilación limpia (`tsc -b`).
+  - Build de producción: exitoso con Service Worker y precaché PWA.
 
 ---
 

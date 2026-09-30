@@ -468,4 +468,150 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(updatedAsset.currentValue).toBe(209.81);
     });
   });
+
+  describe('New Expense Categories & ATM (Cajero) Automated Cash Transfer', () => {
+    it('should include the 6 required expense categories in INITIAL_CATEGORIES', () => {
+      const categories = useFinanceStore.getState().categories;
+      const expenseCats = categories.filter((c) => c.pillar === 'expense');
+
+      const expectedNew = [
+        { id: 'cat-education', name: 'Estudios / Formación' },
+        { id: 'cat-atm', name: 'Cajero' },
+        { id: 'cat-bizum-expense', name: 'Bizum' },
+        { id: 'cat-travel', name: 'Viajes' },
+        { id: 'cat-gifts', name: 'Regalos' },
+        { id: 'cat-other-expense', name: 'Otros' },
+      ];
+
+      expectedNew.forEach((exp) => {
+        const found = expenseCats.find((c) => c.id === exp.id);
+        expect(found).toBeDefined();
+        expect(found?.name).toBe(exp.name);
+      });
+    });
+
+    it('should strictly enforce that a user can have at most one cash account', () => {
+      useFinanceStore.setState({ sources: [] });
+      const store = useFinanceStore.getState();
+
+      // 1. Add first cash account -> succeeds
+      const cashSource1 = store.addSource({
+        name: 'Billetera Principal',
+        type: 'cash',
+        initialBalance: 50,
+        orderIndex: 0,
+      });
+      expect(cashSource1.id).toBeDefined();
+      expect(useFinanceStore.getState().sources).toHaveLength(1);
+
+      // 2. Add second cash account -> throws error
+      expect(() => {
+        store.addSource({
+          name: 'Segunda Billetera',
+          type: 'cash',
+          initialBalance: 20,
+          orderIndex: 1,
+        });
+      }).toThrow(/una cuenta en efectivo/i);
+
+      // 3. Add bank account -> succeeds
+      const bankSource = store.addSource({
+        name: 'Cuenta BBVA',
+        type: 'bank',
+        initialBalance: 1000,
+        orderIndex: 1,
+      });
+      expect(bankSource.id).toBeDefined();
+
+      // 4. Update bank account to cash -> throws error because cash account already exists
+      expect(() => {
+        store.updateSource(bankSource.id, { type: 'cash' });
+      }).toThrow(/una cuenta en efectivo/i);
+
+      // 5. Updating the existing cash account itself -> succeeds
+      expect(() => {
+        store.updateSource(cashSource1.id, { name: 'Efectivo Diario' });
+      }).not.toThrow();
+    });
+
+    it('should record ATM (Cajero) expense and automatically create companion income into cash account', () => {
+      useFinanceStore.setState({
+        sources: [
+          {
+            id: 'src-bank-1',
+            name: 'BBVA Nómina',
+            type: 'bank',
+            orderIndex: 0,
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+          {
+            id: 'src-cash-1',
+            name: 'Billetera Efectivo',
+            type: 'cash',
+            orderIndex: 1,
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        transactions: [],
+      });
+
+      const store = useFinanceStore.getState();
+
+      // Register an ATM withdrawal from the bank account
+      store.addTransaction({
+        amount: 60,
+        pillar: 'expense',
+        categoryId: 'cat-atm',
+        sourceId: 'src-bank-1',
+        concept: 'Retirada cajero CaixaBank',
+        date: '2026-09-28T14:30:00.000Z',
+      });
+
+      const txs = useFinanceStore.getState().transactions;
+      // Must contain 2 transactions: the bank expense and the cash income
+      expect(txs).toHaveLength(2);
+
+      const expenseTx = txs.find((t) => t.pillar === 'expense');
+      const incomeTx = txs.find((t) => t.pillar === 'income');
+
+      expect(expenseTx).toBeDefined();
+      expect(expenseTx?.amount).toBe(60);
+      expect(expenseTx?.categoryId).toBe('cat-atm');
+      expect(expenseTx?.sourceId).toBe('src-bank-1');
+
+      expect(incomeTx).toBeDefined();
+      expect(incomeTx?.amount).toBe(60);
+      expect(incomeTx?.sourceId).toBe('src-cash-1'); // automated income in cash account
+      expect(incomeTx?.concept).toContain('Retirada cajero CaixaBank');
+    });
+
+    it('should only record the expense if the user has no cash account configured', () => {
+      useFinanceStore.setState({
+        sources: [
+          {
+            id: 'src-bank-only',
+            name: 'Cuenta Única',
+            type: 'bank',
+            orderIndex: 0,
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        transactions: [],
+      });
+
+      useFinanceStore.getState().addTransaction({
+        amount: 40,
+        pillar: 'expense',
+        categoryId: 'cat-atm',
+        sourceId: 'src-bank-only',
+        concept: 'Cajero Santander',
+        date: '2026-09-29T10:00:00.000Z',
+      });
+
+      const txs = useFinanceStore.getState().transactions;
+      expect(txs).toHaveLength(1);
+      expect(txs[0].pillar).toBe('expense');
+      expect(txs[0].amount).toBe(40);
+    });
+  });
 });

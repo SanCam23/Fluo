@@ -21,6 +21,11 @@ import {
   Percent,
   Wallet,
   Laptop,
+  GraduationCap,
+  Banknote,
+  Send,
+  Plane,
+  MoreHorizontal,
 } from 'lucide-react';
 
 interface CategoryIconProps {
@@ -76,6 +81,16 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
       return <ShieldCheck className={className} />;
     case 'vault':
       return <Landmark className={className} />;
+    case 'graduationcap':
+      return <GraduationCap className={className} />;
+    case 'banknote':
+      return <Banknote className={className} />;
+    case 'send':
+      return <Send className={className} />;
+    case 'plane':
+      return <Plane className={className} />;
+    case 'morehorizontal':
+      return <MoreHorizontal className={className} />;
     default:
       return <CircleDollarSign className={className} />;
   }

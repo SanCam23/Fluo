@@ -158,15 +158,40 @@ describe('Generación de Series Temporales de Ahorro (generateSavingsEvolution)'
     expect(points[4].accumulatedSavings).toBe(1400);
   });
 
-  it('genera puntos mensuales acumulados para "last_6_months"', () => {
-    const refDate = new Date(2026, 8, 20); // Septiembre 2026
-    const points = generateSavingsEvolution(mockTransactions, 'last_6_months', refDate);
+  it('genera puntos diarios acumulados para un mes específico YYYY-MM', () => {
+    const augustTransactions: Transaction[] = [
+      {
+        id: 'tx-aug-1',
+        amount: 1500,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        concept: 'Nómina Agosto',
+        date: '2026-08-01T10:00:00.000Z',
+        createdAt: 1,
+      },
+      {
+        id: 'tx-aug-2',
+        amount: 200,
+        pillar: 'expense',
+        categoryId: 'cat-travel',
+        concept: 'Viaje Agosto',
+        date: '2026-08-10T12:00:00.000Z',
+        createdAt: 2,
+      },
+    ];
 
-    // 6 puntos mensuales
-    expect(points).toHaveLength(6);
-    // Último punto debe ser Septiembre ('Sep')
-    expect(points[5].label).toBe('Sep');
-    expect(points[5].accumulatedSavings).toBe(1400);
+    const refDate = new Date(2026, 8, 20); // Septiembre 2026
+    const points = generateSavingsEvolution(augustTransactions, '2026-08', refDate);
+
+    // Agosto tiene 31 días
+    expect(points).toHaveLength(31);
+    expect(points[0].income).toBe(1500);
+    expect(points[0].accumulatedSavings).toBe(1500);
+    // Día 10 (index 9)
+    expect(points[9].expense).toBe(200);
+    expect(points[9].accumulatedSavings).toBe(1300);
+    // Día 31
+    expect(points[30].accumulatedSavings).toBe(1300);
   });
 });
 

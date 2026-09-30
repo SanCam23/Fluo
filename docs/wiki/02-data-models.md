@@ -44,7 +44,20 @@ export interface Category {
   8. `cat-refunds`: Devoluciones y Reembolsos (`RotateCcw`, `#6EE7B7`)
   9. `cat-gifts-grants`: Premios, Regalos y Becas (`Gift`, `#A7F3D0`)
   10. `cat-other-income`: Otros Ingresos (`Wallet`, `#059669`)
-- **Gastos (`expense`) - 7 Categorías**: Supermercado, Suscripciones, Vivienda, Transporte, Ocio, Compras y Salud.
+- **Gastos (`expense`) - 13 Categorías Semánticas**:
+  1. `cat-food`: Supermercado y Alimentación (`ShoppingBag`, `#F87171`)
+  2. `cat-subs`: Suscripciones y Streaming (`Tv`, `#EF4444`)
+  3. `cat-housing`: Vivienda y Facturas (`Home`, `#FB7185`)
+  4. `cat-transport`: Transporte y Movilidad (`Car`, `#F43F5E`)
+  5. `cat-leisure`: Ocio y Restaurantes (`Utensils`, `#E11D48`)
+  6. `cat-shopping`: Compras y Moda (`ShoppingBag`, `#EC4899`)
+  7. `cat-health`: Salud y Cuidado (`HeartPulse`, `#BE123C`)
+  8. `cat-education`: Estudios / Formación (`GraduationCap`, `#F59E0B`)
+  9. `cat-atm`: Cajero (`Banknote`, `#14B8A6`) *(Al registrar un gasto en Cajero, genera automáticamente un ingreso por el mismo importe en la cuenta de efectivo del usuario si existe)*
+  10. `cat-bizum-expense`: Bizum (`Send`, `#06B6D4`)
+  11. `cat-travel`: Viajes (`Plane`, `#38BDF8`)
+  12. `cat-gifts`: Regalos (`Gift`, `#F472B6`)
+  13. `cat-other-expense`: Otros (`MoreHorizontal`, `#94A3B8`)
 - **Inversiones (`invest`) - 5 Categorías**: Fondos y ETFs, Acciones, Criptoactivos, Renta Fija y Depósitos.
 
 ### Marca Comercial (`Brand`)
@@ -209,6 +222,8 @@ export interface SourceBalanceInfo {
 // Estado de aislamiento de cuenta en el store global:
 // activeSourceId: string | null (null = Patrimonio Neto Total / Consolidado)
 // setActiveSourceId: (id: string | null) => void;
+
+> **Regla de Negocio Crítica**: Solo se permite un máximo de **una cuenta en efectivo (`type === 'cash'`)** por usuario. Tanto `addSource` como `updateSource` en `useFinanceStore.ts` y el gestor de fuentes `SourceAccountManager.tsx` validan e impiden la creación o conversión de múltiples cuentas de efectivo, garantizando la unicidad de la billetera física.
 ```
 
 ### Correspondencia con la Tabla SQL `public.source_accounts` en Supabase

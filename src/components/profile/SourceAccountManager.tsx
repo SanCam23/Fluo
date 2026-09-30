@@ -82,26 +82,39 @@ export const SourceAccountManager: React.FC = () => {
       return;
     }
 
+    const hasExistingCash = sortedSources.some(
+      (s) => s.type === 'cash' && (!editingSource || editingSource.id !== s.id)
+    );
+    if (formType === 'cash' && hasExistingCash) {
+      setFormError('Solo puedes tener una cuenta en efectivo.');
+      return;
+    }
+
     const parsedBalance = parseFloat(formInitialBalance.replace(',', '.'));
     const initialBalanceNum = isNaN(parsedBalance) ? 0 : parsedBalance;
 
-    if (editingSource) {
-      updateSource(editingSource.id, {
-        name: formName.trim(),
-        type: formType,
-        institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
-        initialBalance: initialBalanceNum,
-        color: formType === 'cash' ? '#10b981' : '#6366f1',
-      });
-    } else {
-      addSource({
-        name: formName.trim(),
-        type: formType,
-        institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
-        initialBalance: initialBalanceNum,
-        orderIndex: sortedSources.length,
-        color: formType === 'cash' ? '#10b981' : '#6366f1',
-      });
+    try {
+      if (editingSource) {
+        updateSource(editingSource.id, {
+          name: formName.trim(),
+          type: formType,
+          institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
+          initialBalance: initialBalanceNum,
+          color: formType === 'cash' ? '#10b981' : '#6366f1',
+        });
+      } else {
+        addSource({
+          name: formName.trim(),
+          type: formType,
+          institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
+          initialBalance: initialBalanceNum,
+          orderIndex: sortedSources.length,
+          color: formType === 'cash' ? '#10b981' : '#6366f1',
+        });
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Error al guardar la fuente.');
+      return;
     }
 
     setIsModalOpen(false);
@@ -283,39 +296,58 @@ export const SourceAccountManager: React.FC = () => {
 
               <form onSubmit={handleSaveForm} className="flex flex-col gap-3.5">
                 {/* Type Switcher */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormType('bank');
-                      if (formInstitution === 'Efectivo') setFormInstitution('BBVA');
-                    }}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                      formType === 'bank'
-                        ? 'bg-indigo-500/25 border-indigo-400 text-white'
-                        : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Landmark className="h-3.5 w-3.5 text-indigo-400" />
-                    <span>Banco</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormType('cash');
-                      if (!formName || formName === 'Cuenta Nómina') setFormName('Billetera');
-                      setFormInstitution('Efectivo');
-                    }}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                      formType === 'cash'
-                        ? 'bg-emerald-500/25 border-emerald-400 text-white'
-                        : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Wallet className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Efectivo</span>
-                  </button>
-                </div>
+                {(() => {
+                  const hasExistingCash = sortedSources.some(
+                    (s) => s.type === 'cash' && (!editingSource || editingSource.id !== s.id)
+                  );
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormType('bank');
+                            if (formInstitution === 'Efectivo') setFormInstitution('BBVA');
+                          }}
+                          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                            formType === 'bank'
+                              ? 'bg-indigo-500/25 border-indigo-400 text-white'
+                              : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Landmark className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>Banco</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={hasExistingCash}
+                          onClick={() => {
+                            if (hasExistingCash) return;
+                            setFormType('cash');
+                            if (!formName || formName === 'Cuenta Nómina') setFormName('Billetera');
+                            setFormInstitution('Efectivo');
+                          }}
+                          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
+                            hasExistingCash
+                              ? 'opacity-40 cursor-not-allowed bg-white/[0.02] border-white/5 text-slate-500'
+                              : formType === 'cash'
+                              ? 'bg-emerald-500/25 border-emerald-400 text-white cursor-pointer'
+                              : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white cursor-pointer'
+                          }`}
+                          title={hasExistingCash ? 'Solo puedes tener una cuenta en efectivo' : undefined}
+                        >
+                          <Wallet className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Efectivo</span>
+                        </button>
+                      </div>
+                      {hasExistingCash && (
+                        <p className="text-[10px] text-amber-300/80 light:text-amber-700 italic">
+                          * Solo se permite una cuenta en efectivo. Ya tienes una configurada.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Name */}
                 <div className="flex flex-col gap-1">

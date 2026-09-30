@@ -200,6 +200,51 @@ export function generateSavingsEvolution(
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
 
+  // 0. SPECIFIC MONTH (YYYY-MM): Daily points for the requested month
+  if (/^\d{4}-\d{2}$/.test(timeRange)) {
+    const [targetYear, targetMonthNum] = timeRange.split('-').map(Number);
+    const targetMonthIdx = targetMonthNum - 1;
+    const isCurrentMonth = targetYear === currentYear && targetMonthIdx === currentMonth;
+    const totalDays = isCurrentMonth
+      ? Math.max(1, now.getDate())
+      : new Date(targetYear, targetMonthNum, 0).getDate();
+
+    const points: SavingsEvolutionPoint[] = [];
+    let runningAccumulated = 0;
+
+    const dayMap = new Map<number, { income: number; expense: number }>();
+    txList.forEach((tx) => {
+      if (!tx?.date) return;
+      const d = new Date(tx.date);
+      if (d.getFullYear() === targetYear && d.getMonth() === targetMonthIdx) {
+        const day = d.getDate();
+        if (day <= totalDays) {
+          const cur = dayMap.get(day) || { income: 0, expense: 0 };
+          if (tx.pillar === 'income') cur.income += tx.amount;
+          if (tx.pillar === 'expense') cur.expense += tx.amount;
+          dayMap.set(day, cur);
+        }
+      }
+    });
+
+    const monthShort = monthNames[targetMonthIdx] || 'Mes';
+    for (let day = 1; day <= totalDays; day++) {
+      const data = dayMap.get(day) || { income: 0, expense: 0 };
+      const net = data.income - data.expense;
+      runningAccumulated += net;
+      points.push({
+        label: `${day} ${monthShort}`,
+        dateKey: `${targetYear}-${String(targetMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+        income: Math.round(data.income * 100) / 100,
+        expense: Math.round(data.expense * 100) / 100,
+        netSavings: Math.round(net * 100) / 100,
+        accumulatedSavings: Math.round(runningAccumulated * 100) / 100,
+      });
+    }
+
+    return points;
+  }
+
   // 1. THIS MONTH: Daily points from day 1 up to today
   if (timeRange === 'this_month') {
     const today = Math.max(1, now.getDate());
