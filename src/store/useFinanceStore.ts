@@ -298,20 +298,24 @@ export const useFinanceStore = create<FinanceState>()(
               get().brands
             );
 
-            // Auto-persist any newly reconciled assets to Supabase in background
-            if (finalReconciledAssets.length > mergedAssets.length) {
-              const existingKeys = new Set(
-                mergedAssets.map((a) => (a.identifier || a.id).toUpperCase())
+            // Auto-persist any newly reconciled or healed assets to Supabase in background
+            const existingMap = new Map(
+              mergedAssets.map((a) => [(a.identifier || a.id).toUpperCase(), a])
+            );
+            const changedOrNew = finalReconciledAssets.filter((ra) => {
+              const prev = existingMap.get((ra.identifier || ra.id).toUpperCase());
+              return (
+                !prev ||
+                prev.name !== ra.name ||
+                prev.shares !== ra.shares ||
+                prev.averageBuyPrice !== ra.averageBuyPrice
               );
-              const newlyCreated = finalReconciledAssets.filter(
-                (a) => !existingKeys.has((a.identifier || a.id).toUpperCase())
+            });
+            changedOrNew.forEach((a) => {
+              insertCloudAsset(a, userId).catch((err) =>
+                console.warn('[Store] Auto-sync reconciled asset to cloud failed:', err)
               );
-              newlyCreated.forEach((a) => {
-                insertCloudAsset(a, userId).catch((err) =>
-                  console.warn('[Store] Auto-sync reconciled asset to cloud failed:', err)
-                );
-              });
-            }
+            });
 
             set({
               transactions: sortTransactionsDesc(result.transactions),
@@ -764,6 +768,9 @@ export const useFinanceStore = create<FinanceState>()(
             console.warn('[Store] Cloud sync failed for deleteAsset:', err)
           );
         }
+
+        // Reconcile immediately so any shadowed active transaction is restored
+        get().reconcileInvestments();
       },
 
       updateAssetPrice: (id, newPrice) => {
@@ -963,7 +970,22 @@ export const useFinanceStore = create<FinanceState>()(
         // 2. Reconcile with transactions
         const reconciled = reconcileAssetsFromTransactions(transactions, correctedAssets, brands);
 
-        if (reconciled.length !== assets.length || anyCorrected) {
+        const hasChanges =
+          reconciled.length !== assets.length ||
+          anyCorrected ||
+          reconciled.some((ra, idx) => {
+            const a = assets[idx];
+            return (
+              !a ||
+              ra.id !== a.id ||
+              ra.name !== a.name ||
+              ra.shares !== a.shares ||
+              ra.averageBuyPrice !== a.averageBuyPrice ||
+              ra.identifier !== a.identifier
+            );
+          });
+
+        if (hasChanges) {
           set({ assets: reconciled });
           if (userId) {
             reconciled.forEach((a) => {

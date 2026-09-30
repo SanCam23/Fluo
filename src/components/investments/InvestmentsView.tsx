@@ -153,7 +153,7 @@ const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
           <button
             type="button"
             onClick={() => onDelete(asset.id)}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition-all cursor-pointer"
+            className="opacity-80 hover:opacity-100 active:scale-95 p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition-all cursor-pointer"
             title="Eliminar activo de la cartera"
           >
             <Trash2 className="h-3.5 w-3.5" />

@@ -638,8 +638,10 @@ export function reconcileAssetsFromTransactions(
   );
 
   if (investTransactions.length === 0) {
-    // Still run autoCorrectAssetShares on any existing assets
-    return currentAssets.map((a) => autoCorrectAssetShares(a).asset);
+    // If no invest transactions exist in the ledger, prune any orphaned auto-reconciled assets
+    return currentAssets
+      .filter((a) => !a.id.startsWith('reconciled-asset-'))
+      .map((a) => autoCorrectAssetShares(a).asset);
   }
 
   const brandMap = new Map<string, string>();
@@ -647,32 +649,123 @@ export function reconcileAssetsFromTransactions(
     if (b?.id && b?.name) brandMap.set(b.id, b.name);
   });
 
-  // Track existing assets by identifier (uppercase) and id
+  // Track existing assets by identifier/ISIN/ticker (uppercase)
   const existingByIdent = new Map<string, InvestmentAsset>();
   (currentAssets || []).forEach((asset) => {
-    if (asset?.identifier) {
-      // Auto-correct any existing asset during scan
-      const { asset: corrected } = autoCorrectAssetShares(asset);
-      existingByIdent.set(corrected.identifier.toUpperCase(), corrected);
+    if (!asset) return;
+    const { asset: corrected } = autoCorrectAssetShares(asset);
+    const primaryKey = (corrected.identifier || corrected.isin || corrected.ticker || '').toUpperCase();
+    if (primaryKey) {
+      existingByIdent.set(primaryKey, corrected);
     }
   });
 
-  const reconciledAssets = Array.from(existingByIdent.values());
-
-  // Group transactions for missing assets by normalized identifier key
+  // Group all active invest transactions by normalized identifier key
   const txsByKey = new Map<string, Transaction[]>();
   investTransactions.forEach((tx) => {
     const { identifier } = parseInvestmentConcept(tx.concept);
     const key = identifier.toUpperCase();
-    if (existingByIdent.has(key)) {
-      return;
-    }
     const list = txsByKey.get(key) || [];
     list.push(tx);
     txsByKey.set(key, list);
   });
 
+  const reconciledAssets: InvestmentAsset[] = [];
+
+  // 1. Process and heal existing assets
+  existingByIdent.forEach((existingAsset, key) => {
+    const txs = txsByKey.get(key);
+
+    // If an asset was created as reconciled-asset-* but has NO active transactions, drop it (orphan from deleted tx)
+    if ((!txs || txs.length === 0) && existingAsset.id.startsWith('reconciled-asset-')) {
+      return;
+    }
+
+    if (txs && txs.length > 0) {
+      const firstTx = txs[0];
+      const { name: primaryTxName, identifier: txIdent } = parseInvestmentConcept(firstTx.concept);
+      const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(txIdent);
+      const totalInvested = txs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+      // Check for name conflict (e.g. fund was overwritten by an orphaned/deleted movement)
+      const existingNameLower = (existingAsset.name || '').toLowerCase();
+      const txNameLower = (primaryTxName || '').toLowerCase();
+      const hasSpecificTxName = primaryTxName && primaryTxName !== txIdent && primaryTxName.length > 2;
+
+      const isSameIndexFamily =
+        ((existingNameLower.includes('500') || existingNameLower.includes('sp500') || existingNameLower.includes('s&p')) &&
+          (txNameLower.includes('500') || txNameLower.includes('sp500') || txNameLower.includes('s&p'))) ||
+        ((existingNameLower.includes('world') || existingNameLower.includes('vwce')) &&
+          (txNameLower.includes('world') || txNameLower.includes('vwce')));
+
+      const namesConflict =
+        hasSpecificTxName &&
+        !isSameIndexFamily &&
+        !existingNameLower.includes(txNameLower) &&
+        !txNameLower.includes(existingNameLower);
+
+      if (namesConflict) {
+        // Heal the asset: restore name and recalculate based on the active transactions in the ledger
+        const isSp500 =
+          txNameLower.includes('sp500') ||
+          txNameLower.includes('s&p') ||
+          txNameLower.includes('500') ||
+          firstTx.concept.toLowerCase().includes('sp500');
+
+        const knownPrice =
+          (priceLookup ? priceLookup(txIdent) : undefined) ??
+          (isSp500 ? 82.97 : KNOWN_BENCHMARK_PRICES[key]);
+
+        let derivedShares = 1;
+        let derivedBuyPrice = totalInvested;
+        let derivedCurPrice = totalInvested;
+
+        if (knownPrice && knownPrice > 0 && knownPrice !== totalInvested) {
+          derivedShares = Number((totalInvested / knownPrice).toFixed(6));
+          derivedBuyPrice = knownPrice;
+          derivedCurPrice = knownPrice;
+        }
+
+        const currentValue = Number((derivedShares * derivedCurPrice).toFixed(2));
+        const pnl = Number((currentValue - totalInvested).toFixed(2));
+        const pnlPercentage = totalInvested > 0 ? Number(((pnl / totalInvested) * 100).toFixed(2)) : 0;
+        const nowIso = new Date().toISOString();
+        const platform = firstTx.brandId ? brandMap.get(firstTx.brandId) : existingAsset.platform;
+
+        const healedAsset: InvestmentAsset = {
+          ...existingAsset,
+          name: primaryTxName,
+          identifier: txIdent,
+          isin: isIsinFormat ? txIdent : existingAsset.isin,
+          ticker: !isIsinFormat ? txIdent : existingAsset.ticker,
+          shares: derivedShares,
+          averageBuyPrice: derivedBuyPrice,
+          averagePrice: derivedBuyPrice,
+          currentPrice: derivedCurPrice,
+          currentValue,
+          pnl,
+          pnlPercentage,
+          platform,
+          brandId: firstTx.brandId || existingAsset.brandId,
+          lastPriceUpdate: nowIso,
+          last_price_update: nowIso,
+          lastUpdated: 'Auto-reconciliado con movimientos',
+        };
+
+        reconciledAssets.push(healedAsset);
+        return;
+      }
+    }
+
+    reconciledAssets.push(existingAsset);
+  });
+
+  // 2. Generate missing assets for active transactions not present in existingAssets
   txsByKey.forEach((txs, key) => {
+    if (existingByIdent.has(key)) {
+      return;
+    }
+
     const firstTx = txs[0];
     const { name, identifier } = parseInvestmentConcept(firstTx.concept);
     const assetType = inferAssetTypeFromCategory(firstTx.categoryId, identifier);

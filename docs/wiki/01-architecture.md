@@ -326,6 +326,13 @@ Para garantizar que nunca exista discrepancia entre los movimientos registrados 
     $$\text{averageBuyPrice} = \text{unitPrice} \quad (82.97 \text{ €})$$
     $$\text{currentValue} = \text{shares} \times \text{unitPrice} \quad (209.81 \text{ €})$$
   - Se ejecuta de manera transparente al abrir la aplicación, en `syncStaleAssetQuotes`, en `refreshAllAssetPrices` y en `reconcileInvestments`, sincronizando la corrección a Supabase sin requerir que el usuario borre o vuelva a crear sus activos.
+- **Resolución y Auto-Sanación de Activos Eclipsados / Huérfanos**:
+  - Si un usuario borró un movimiento de inversión en el pasado pero el activo quedó registrado en la cartera o sustituyó a otro fondo existente que sí posee movimientos activos (ej. el usuario registró `"SP500 IE0007987690"` y la cartera retenía `"Vanguard European Stock"`), `reconcileAssetsFromTransactions` detecta la discrepancia de denominación con el libro de transacciones activo:
+    - Restaura automáticamente el nombre oficial del fondo activo (`primaryTxName`).
+    - Recalcula sus participaciones y precio unitario a partir del capital desembolsado y la cotización oficial de referencia (ej. 82.97 € para S&P 500).
+    - Purga de forma automática los activos autogenerados (`reconciled-asset-*`) cuyos movimientos asociados hayan sido eliminados del libro de transacciones.
+  - La acción de eliminación manual (`deleteAsset`) en [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts) dispara inmediatamente `reconcileInvestments()`, resucitando de forma reactiva cualquier posición eclipsada sin requerir recarga.
+  - En la interfaz [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx), el botón de papelera Liquid Glass se mantiene visible en dispositivos móviles y táctiles (`opacity-80 hover:opacity-100 active:scale-95`), permitiendo eliminar cualquier activo residual con un solo toque.
 
 ---
 

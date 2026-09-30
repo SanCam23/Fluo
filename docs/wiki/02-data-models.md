@@ -350,6 +350,12 @@ export function reconcileAssetsFromTransactions(
    - Si no restan títulos ($\le 0.0001$), el activo se **elimina automáticamente** de la cartera y de Supabase.
 3. **Modificación de Importe (`updateTransaction`)**:
    - Ajusta automáticamente las participaciones y el coste amortizado por el delta de la modificación.
+4. **Auto-Sanación de Activos Eclipsados (`reconcileAssetsFromTransactions`)**:
+   - Si un activo en cartera retiene una denominación obsoleta o sustituta (ej. "Vanguard European Stock") por haber compartido ISIN con un movimiento eliminado, y el libro de transacciones activo contiene movimientos para otro fondo (ej. "SP500 IE0007987690"), la función detecta la discrepancia y sana la posición de forma transparente: renombra al fondo activo y recalcula títulos y cotización oficial sin requerir reinicio ni recreación.
+   - Purga automáticamente activos autogenerados (`reconciled-asset-*`) cuyos movimientos asociados hayan sido eliminados.
+5. **Borrado Manual de Activos en Cartera (`deleteAsset`)**:
+   - Permite eliminar posiciones desde la interfaz de Inversiones mediante el botón de papelera visible en móvil (`opacity-80`).
+   - Dispara automáticamente `reconcileInvestments()` para resucitar de forma inmediata cualquier activo que estuviera eclipsado en el libro de transacciones.
 
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)

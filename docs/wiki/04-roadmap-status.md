@@ -43,6 +43,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Cálculo Exacto de Unidades & Auto-Corrección de Cartera** | ✅ Completado | Derivación estricta de títulos en modo importe total (`shares = total / price`), auto-reparación transparente de activos con `shares = 1` distorsionados (`autoCorrectAssetShares`) y sincronización atómica a Supabase |
 | **Nuevas Categorías de Gasto & Flujo Cajero** | ✅ Completado | 6 nuevas categorías (Estudios, Cajero, Bizum, Viajes, Regalos, Otros), auto-ingreso gemelo en efectivo en Cajero y restricción a 1 sola cuenta de efectivo |
 | **Selector Dual en Estadísticas (Periodo vs Mes)** | ✅ Completado | Conmutador Liquid Glass en `/stats`: selección por periodos relativos o mes específico con stepper, picker nativo y evolución diaria continua |
+| **Auto-Sanación de Fondos Eclipsados & Purga Huérfana** | ✅ Completado | Detección reactiva de discrepancias en `reconcileAssetsFromTransactions`, auto-renombrado y recálculo según movimientos activos, purga de `reconciled-asset-*` huérfanos y botón de borrado visible en móvil (`opacity-80`) |
 
 ---
 
@@ -930,3 +931,34 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - Vitest: 112/112 tests unitarios pasando (4 nuevos tests de acumulación y ciclo de vida de transacciones).
 - TypeScript: 0 errores (`npx tsc -b`).
 - Paridad: 100% en Web Desktop, Móvil standalone PWA y Local Dev Server.
+
+### v0.9.20 (Auto-Sanación de Fondos Eclipsados, Papelera Táctil en Móvil y Purga de Huérfanos)
+
+**Problemas Corregidos:**
+1. **Fondo Eclipsado por Movimiento Borrado en Estado Previo**:
+   - Un usuario tenía un movimiento activo en su libro de cuentas (ej. `"Inversión en SP500 IE0007987690"`), pero antes del parche de acumulación, un fondo introducido con el mismo ISIN o sustituido (`"Vanguard European Stock"`) había sobreescrito la posición en `state.assets`.
+   - Al borrar posteriormente el movimiento del fondo sustituto, este quedó huérfano en `assets`, ocupando la ranura de coincidencia (`existingByIdent.has('IE0007987690')`), lo que impedía que `reconcileAssetsFromTransactions` mostrara el fondo que sí tenía movimientos activos en la cuenta.
+2. **Detección de Cambios Silenciosa en `reconcileInvestments`**:
+   - `reconcileInvestments` solo invocaba `set({ assets: reconciled })` si cambiaba la longitud del array (`reconciled.length !== assets.length`). Si un activo era corregido/renombrado pero la cantidad de activos era la misma, los cambios no se persistían ni se sincronizaban a Supabase.
+3. **Inaccesibilidad del Botón de Papelera en Dispositivos Móviles**:
+   - En [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx), el botón de eliminar activo utilizaba `opacity-0 group-hover:opacity-100`, haciendo que en pantallas táctiles sin cursor de ratón fuera invisible e imposible de pulsar.
+
+**Soluciones Técnicas Implementadas:**
+- **[x] Auto-Sanación de Fondos Eclipsados en `reconcileAssetsFromTransactions`** ([`src/utils/finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)):
+  - Al escanear activos existentes contra el libro de transacciones, si se detecta un activo cuyo nombre contradice los movimientos activos asociados al mismo identificador (ej. el activo se llama "European Stock" mientras las transacciones son para "SP500"):
+    - Se restaura automáticamente el nombre del fondo según las transacciones reales (`primaryTxName`).
+    - Se recalculan de inmediato las participaciones (`shares`), precio medio de compra (`averageBuyPrice`) y cotización de referencia (82.97 € para S&P 500).
+    - Se actualiza `currentValue` y `pnl` latente a 0 €.
+- **[x] Purga Automática de Activos Autogenerados Huérfanos** ([`src/utils/finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)):
+  - Los activos con prefijo `reconciled-asset-*` que carezcan de transacciones activas en el libro son purgados automáticamente al reconciliar.
+- **[x] Detección Exhaustiva de Mutaciones en `reconcileInvestments`** ([`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+  - Ahora compara cambios propiedad por propiedad (`id`, `name`, `shares`, `averageBuyPrice`, `identifier`), persistiendo y sincronizando a Supabase en cuanto un activo es sanado.
+- **[x] Reconciliación Reactiva en `deleteAsset`** ([`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+  - Al borrar manualmente un activo de la cartera, se invoca de inmediato `reconcileInvestments()`, resucitando instantáneamente cualquier posición de movimientos activos que estuviera eclipsada.
+- **[x] Botón de Papelera Visible y Táctil en Móvil** ([`src/components/investments/InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx)):
+  - Modificado a `opacity-80 hover:opacity-100 active:scale-95`, accesible y visible en cualquier teléfono, tablet o pantalla táctil.
+
+**Validación de Calidad:**
+- Vitest: 115/115 tests unitarios pasando (+3 nuevos tests específicos para auto-sanación de activos eclipsados y ciclo de vida de `deleteAsset`).
+- TypeScript: 0 errores (`npx tsc -b`).
+- Producción: `npm run build` compilado exitosamente.

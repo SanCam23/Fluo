@@ -467,6 +467,120 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(updatedAsset.averageBuyPrice).toBe(82.97);
       expect(updatedAsset.currentValue).toBe(209.81);
     });
+
+    it('should heal and restore an asset whose name was overwritten by a deleted movement', () => {
+      // User has an active transaction for SP500 with ISIN IE0007987690
+      const txs = [
+        {
+          id: 'tx-sp500',
+          pillar: 'invest' as const,
+          type: 'expense' as const,
+          concept: 'Inversión en SP500 IE0007987690',
+          amount: 209.81,
+          date: '2026-09-29T10:00:00.000Z',
+          createdAt: 1727600000000,
+          categoryId: 'cat-invest',
+        },
+      ];
+
+      // In store/state, the asset had been overwritten by European Stock before its movement was deleted
+      const corruptedAssets = [
+        {
+          id: 'asset-corrupted-1',
+          name: 'Vanguard European Stock Index Fund EUR Acc',
+          identifier: 'IE0007987690',
+          isin: 'IE0007987690',
+          assetType: 'index_fund' as const,
+          shares: 1,
+          averageBuyPrice: 209.81,
+          currentPrice: 41.25,
+          currentValue: 41.25,
+          pnl: -168.56,
+          currency: 'EUR' as const,
+          lastUpdated: 'Recién añadido',
+        },
+      ];
+
+      useFinanceStore.setState({
+        transactions: txs,
+        assets: corruptedAssets,
+      });
+
+      // Run store reconciliation
+      useFinanceStore.getState().reconcileInvestments();
+
+      const assets = useFinanceStore.getState().assets;
+      expect(assets).toHaveLength(1);
+      const healed = assets[0];
+      // Name is restored to the active transaction fund (SP500)
+      expect(healed.name).toBe('SP500');
+      expect(healed.identifier).toBe('IE0007987690');
+      // Units are calculated accurately from the benchmark price (82.97 €)
+      expect(healed.shares).toBeCloseTo(2.528745, 4);
+      expect(healed.averageBuyPrice).toBe(82.97);
+      expect(healed.currentValue).toBe(209.81);
+      expect(healed.pnl).toBe(0);
+    });
+
+    it('should automatically remove orphaned auto-reconciled assets when their transaction is deleted', () => {
+      const orphanedAsset = {
+        id: 'reconciled-asset-tx-deleted',
+        name: 'Vanguard European Stock',
+        identifier: 'IE0007987690',
+        assetType: 'index_fund' as const,
+        shares: 1,
+        averageBuyPrice: 41.25,
+        currentPrice: 41.25,
+        currency: 'EUR' as const,
+        lastUpdated: 'Reconciliado de movimientos',
+      };
+
+      // Transactions are now empty (movement was deleted)
+      const reconciled = reconcileAssetsFromTransactions([], [orphanedAsset]);
+      expect(reconciled).toHaveLength(0);
+    });
+
+    it('should immediately re-reconcile on deleteAsset to resurrect any shadowed positions', () => {
+      // Transaction for SP500
+      const txs = [
+        {
+          id: 'tx-sp500-valid',
+          pillar: 'invest' as const,
+          type: 'expense' as const,
+          concept: 'Inversión en SP500 IE0032126645',
+          amount: 209.81,
+          date: '2026-09-29T10:00:00.000Z',
+          createdAt: 1727600000000,
+          categoryId: 'cat-invest',
+        },
+      ];
+
+      // A dummy asset that the user wants to delete
+      const dummyAsset = {
+        id: 'asset-to-delete',
+        name: 'Fondo Huérfano',
+        identifier: 'OLD_IDENTIFIER',
+        assetType: 'index_fund' as const,
+        shares: 1,
+        averageBuyPrice: 50,
+        currentPrice: 50,
+        currency: 'EUR' as const,
+        lastUpdated: 'Manual',
+      };
+
+      useFinanceStore.setState({
+        transactions: txs,
+        assets: [dummyAsset],
+      });
+
+      // User deletes dummy asset
+      useFinanceStore.getState().deleteAsset('asset-to-delete');
+
+      // deleteAsset triggers reconcileInvestments() which creates the asset for the active SP500 transaction
+      const stateAssets = useFinanceStore.getState().assets;
+      expect(stateAssets.some((a) => a.id === 'asset-to-delete')).toBe(false);
+      expect(stateAssets.some((a) => a.name.includes('SP500') || a.identifier === 'IE0032126645')).toBe(true);
+    });
   });
 
   describe('New Expense Categories & ATM (Cajero) Automated Cash Transfer', () => {
