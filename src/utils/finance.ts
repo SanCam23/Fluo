@@ -428,6 +428,21 @@ export function parseInvestmentConcept(concept: string): { name: string; identif
     };
   }
 
+  // Pattern matching: Embedded ISIN code anywhere in the concept (e.g. "Inversión en SP500 IE0007987690")
+  const isinMatch = clean.match(/\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b/i);
+  if (isinMatch) {
+    const isin = isinMatch[1].toUpperCase();
+    const cleanName = clean
+      .replace(/^(?:Inversi[oó]n\s+en\s+)/i, '')
+      .replace(new RegExp(`\\(?\\b${isin}\\b\\)?`, 'i'), '')
+      .replace(/[()]/g, '')
+      .trim();
+    return {
+      name: cleanName || isin,
+      identifier: isin,
+    };
+  }
+
   // Regex pattern matching: Inversión en NAME
   const prefixMatch = clean.match(/^Inversi[oó]n\s+en\s+(.+)$/i);
   if (prefixMatch) {
@@ -442,6 +457,54 @@ export function parseInvestmentConcept(concept: string): { name: string; identif
     name: clean,
     identifier: clean.toUpperCase(),
   };
+}
+
+/**
+ * Finds index of an asset in portfolio matching by ISIN, identifier, ticker, or name.
+ */
+export function findMatchingAssetIndex(
+  assets: InvestmentAsset[],
+  candidate: { identifier?: string; isin?: string; ticker?: string; name?: string; assetType?: AssetType }
+): number {
+  const cIdent = (candidate.identifier || '').trim().toUpperCase();
+  const cIsin = (candidate.isin || '').trim().toUpperCase();
+  const cTicker = (candidate.ticker || '').trim().toUpperCase();
+  const cName = (candidate.name || '').trim().toUpperCase();
+
+  // Extract embedded ISIN if present
+  const cEmbeddedIsin = cIdent.match(/\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b/)?.[1] ||
+    cName.match(/\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b/)?.[1] ||
+    cIsin;
+
+  return assets.findIndex((a) => {
+    const aIdent = (a.identifier || '').trim().toUpperCase();
+    const aIsin = (a.isin || '').trim().toUpperCase();
+    const aTicker = (a.ticker || '').trim().toUpperCase();
+    const aName = (a.name || '').trim().toUpperCase();
+    const aEmbeddedIsin = aIdent.match(/\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b/)?.[1] || aIsin;
+
+    // 1. ISIN match (direct or embedded)
+    if (cEmbeddedIsin && (aIsin === cEmbeddedIsin || aIdent === cEmbeddedIsin || aEmbeddedIsin === cEmbeddedIsin)) {
+      return true;
+    }
+
+    // 2. Direct identifier match
+    if (cIdent && (aIdent === cIdent || aTicker === cIdent)) {
+      return true;
+    }
+
+    // 3. Ticker match
+    if (cTicker && (aTicker === cTicker || aIdent === cTicker)) {
+      return true;
+    }
+
+    // 4. Exact name and assetType match
+    if (cName && aName === cName && (!candidate.assetType || a.assetType === candidate.assetType)) {
+      return true;
+    }
+
+    return false;
+  });
 }
 
 /**
@@ -596,22 +659,30 @@ export function reconcileAssetsFromTransactions(
 
   const reconciledAssets = Array.from(existingByIdent.values());
 
+  // Group transactions for missing assets by normalized identifier key
+  const txsByKey = new Map<string, Transaction[]>();
   investTransactions.forEach((tx) => {
-    const { name, identifier } = parseInvestmentConcept(tx.concept);
+    const { identifier } = parseInvestmentConcept(tx.concept);
     const key = identifier.toUpperCase();
-
-    // If an asset with this identifier already exists in portfolio, keep it
     if (existingByIdent.has(key)) {
       return;
     }
+    const list = txsByKey.get(key) || [];
+    list.push(tx);
+    txsByKey.set(key, list);
+  });
 
-    const assetType = inferAssetTypeFromCategory(tx.categoryId, identifier);
+  txsByKey.forEach((txs, key) => {
+    const firstTx = txs[0];
+    const { name, identifier } = parseInvestmentConcept(firstTx.concept);
+    const assetType = inferAssetTypeFromCategory(firstTx.categoryId, identifier);
     const nowIso = new Date().toISOString();
-    const platform = tx.brandId ? brandMap.get(tx.brandId) : undefined;
-    const acquisitionDate = tx.date ? tx.date.substring(0, 10) : nowIso.substring(0, 10);
-    const amount = Number(tx.amount);
-
+    const platform = firstTx.brandId ? brandMap.get(firstTx.brandId) : undefined;
+    const acquisitionDate = firstTx.date ? firstTx.date.substring(0, 10) : nowIso.substring(0, 10);
     const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(identifier);
+
+    // Sum total invested across all transactions for this asset
+    const totalInvested = txs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
     // Check if known market price exists for accurate units calculation
     const knownPrice =
@@ -620,21 +691,21 @@ export function reconcileAssetsFromTransactions(
       (key.includes('SP500') || key.includes('S&P') || name.toLowerCase().includes('us 500') || name.toLowerCase().includes('sp500') ? 82.97 : undefined);
 
     let derivedShares = 1;
-    let derivedBuyPrice = amount;
-    let derivedCurPrice = amount;
+    let derivedBuyPrice = totalInvested;
+    let derivedCurPrice = totalInvested;
 
-    if (knownPrice && knownPrice > 0 && knownPrice !== amount) {
-      derivedShares = Number((amount / knownPrice).toFixed(6));
+    if (knownPrice && knownPrice > 0 && knownPrice !== totalInvested) {
+      derivedShares = Number((totalInvested / knownPrice).toFixed(6));
       derivedBuyPrice = knownPrice;
       derivedCurPrice = knownPrice;
     }
 
     const currentValue = Number((derivedShares * derivedCurPrice).toFixed(2));
-    const pnl = Number((currentValue - amount).toFixed(2));
-    const pnlPercentage = amount > 0 ? Number(((pnl / amount) * 100).toFixed(2)) : 0;
+    const pnl = Number((currentValue - totalInvested).toFixed(2));
+    const pnlPercentage = totalInvested > 0 ? Number(((pnl / totalInvested) * 100).toFixed(2)) : 0;
 
     const newAsset: InvestmentAsset = {
-      id: `reconciled-asset-${tx.id}`,
+      id: `reconciled-asset-${firstTx.id}`,
       name,
       identifier,
       ticker: !isIsinFormat ? identifier : undefined,
@@ -649,7 +720,7 @@ export function reconcileAssetsFromTransactions(
       pnlPercentage,
       currency: 'EUR',
       platform,
-      brandId: tx.brandId,
+      brandId: firstTx.brandId,
       acquisitionDate,
       lastPriceUpdate: nowIso,
       last_price_update: nowIso,

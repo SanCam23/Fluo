@@ -901,7 +901,7 @@ export function findMatchingExistingAssets(
  *
  * In browser environments (mobile + desktop) routes through the Vercel /api/quote proxy
  * to avoid CORS restrictions from Yahoo Finance.
- * In non-browser environments (Vitest, Node) calls Yahoo directly.
+ * In non-browser environments (Vitest, Node) calls Yahoo directly with automatic search resolution.
  */
 async function fetchYahooChartQuote(
   symbol: string
@@ -913,7 +913,7 @@ async function fetchYahooChartQuote(
     let data: { price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null = null;
 
     if (typeof window !== 'undefined') {
-      // ── Browser (mobile + desktop): use our CORS-safe Vercel proxy ──
+      // ── Browser (mobile + desktop): use our CORS-safe proxy ──
       const proxyUrl = `/api/quote?symbol=${encodeURIComponent(symbol)}`;
       const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -924,12 +924,37 @@ async function fetchYahooChartQuote(
         price: Number(json.price),
         change24h: Number(json.change24h ?? 0),
         currency: json.currency === 'USD' ? 'USD' : 'EUR',
-        symbol,
+        symbol: json.symbol || symbol,
       };
     } else {
       // ── Non-browser (Node / Vitest): direct call to Yahoo ──
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
-      const res = await fetch(url, { signal: controller.signal });
+      const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(symbol.toUpperCase());
+      let targetSym = symbol;
+
+      if (isIsinFormat) {
+        try {
+          const sRes = await fetch(
+            `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}`,
+            { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: controller.signal }
+          );
+          if (sRes.ok) {
+            const sJson = await sRes.json();
+            const sQuote =
+              sJson.quotes?.find((q: any) => q.quoteType === 'MUTUALFUND' || (q.symbol && String(q.symbol).includes('.'))) ||
+              sJson.quotes?.[0];
+            if (sQuote?.symbol) targetSym = String(sQuote.symbol);
+          }
+        } catch {
+          // Continue with original symbol or equivalence
+        }
+      }
+
+      let url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(targetSym)}?range=1d&interval=1d`;
+      let res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: controller.signal });
+      if (!res.ok) {
+        url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(targetSym)}?range=1d&interval=1d`;
+        res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: controller.signal });
+      }
       clearTimeout(timeoutId);
       if (!res.ok) return null;
       const json = await res.json();
@@ -945,7 +970,7 @@ async function fetchYahooChartQuote(
         }
       }
       if (isNaN(price) || price <= 0) return null;
-      const prevClose = Number(meta.previousClose);
+      const prevClose = Number(meta.previousClose || meta.chartPreviousClose);
       let change24h = 0;
       if (!isNaN(prevClose) && prevClose > 0) {
         change24h = ((price - prevClose) / prevClose) * 100;
@@ -954,7 +979,7 @@ async function fetchYahooChartQuote(
         price: Number(price.toFixed(2)),
         change24h: Number(change24h.toFixed(2)),
         currency: meta.currency === 'USD' ? 'USD' : 'EUR',
-        symbol,
+        symbol: targetSym,
       };
     }
 
@@ -967,7 +992,7 @@ async function fetchYahooChartQuote(
 /**
  * Multi-route Quote Resolver for Mutual / Index Funds by ISIN
  *
- * Ruta 1: Resolves internal Yahoo Finance / Morningstar symbol (e.g. '0P00000SUJ.F') via search endpoint
+ * Ruta 1: Direct fetch via proxy (resolves Yahoo internal mutual fund symbol without CORS)
  * Ruta 2: Equivalence table to twin ETF / benchmark index (e.g. 'VUSA.AS' / 'VEUR.AS')
  * Ruta 3: Fallback Net Asset Value (NAV) with cut-off timestamp from persistent cache / baseline
  */
@@ -1010,52 +1035,28 @@ export async function resolveIsinQuote(
     }
   }
 
-  // 1. Ruta 1: Búsqueda previa en Yahoo Finance / Morningstar por ISIN
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-    const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanIsin)}`;
-    const searchRes = await fetch(searchUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (searchRes.ok) {
-      const searchData = await searchRes.json();
-      const quotesList = searchData?.quotes;
-      if (Array.isArray(quotesList) && quotesList.length > 0) {
-        // Prioritize mutual funds or symbols with European exchange suffixes (.F, .MC, .DE, .AS)
-        const bestQuote =
-          quotesList.find((q: any) => q.quoteType === 'MUTUALFUND' || (q.symbol && q.symbol.includes('.'))) ||
-          quotesList[0];
-
-        if (bestQuote?.symbol) {
-          const internalSymbol = String(bestQuote.symbol);
-          const chartQuote = await fetchYahooChartQuote(internalSymbol);
-          if (chartQuote && chartQuote.price > 0) {
-            const result: MarketQuoteResult = {
-              identifier: cleanIsin,
-              name: bestQuote.shortname || curated?.name || equivalence?.name || `Fondo ISIN ${cleanIsin}`,
-              ticker: internalSymbol,
-              isin: cleanIsin,
-              quoteTicker: internalSymbol,
-              price: chartQuote.price,
-              change24h: chartQuote.change24h,
-              currency: chartQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
-              lastUpdated: new Date().toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              }),
-              lastPriceUpdate: new Date().toISOString(),
-              isOfflineCached: false,
-            };
-            saveQuoteToCache(result);
-            return result;
-          }
-        }
-      }
-    }
-  } catch {
-    // Network or parse error: proceed smoothly to Ruta 2
+  // 1. Ruta 1: Direct ISIN quote via proxy (resolves internal Yahoo symbol e.g. 0P00000RQ8.F with 0 CORS issues)
+  const isinQuote = await fetchYahooChartQuote(cleanIsin);
+  if (isinQuote && isinQuote.price > 0) {
+    const result: MarketQuoteResult = {
+      identifier: cleanIsin,
+      name: curated?.name || equivalence?.name || cached?.name || `Fondo ISIN ${cleanIsin}`,
+      ticker: isinQuote.symbol || candidateTicker || equivalence?.referenceTicker,
+      isin: cleanIsin,
+      quoteTicker: isinQuote.symbol || candidateTicker || equivalence?.referenceTicker,
+      price: isinQuote.price,
+      change24h: isinQuote.change24h,
+      currency: isinQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
+      lastUpdated: new Date().toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+      lastPriceUpdate: new Date().toISOString(),
+      isOfflineCached: false,
+    };
+    saveQuoteToCache(result);
+    return result;
   }
 
   // 2. Ruta 2: Mapeo a Ticker / ETF Subyacente Equivalente
@@ -1124,9 +1125,10 @@ async function doFetchCurrentPrice(
   upperId: string,
   quoteTickerHint?: string
 ): Promise<MarketQuoteResult> {
-  // Check if identifier is an ISIN directly
-  if (isIsin(upperId)) {
-    return resolveIsinQuote(upperId, quoteTickerHint);
+  const embeddedIsin = upperId.match(/\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b/)?.[1];
+  // Check if identifier is an ISIN directly or contains an ISIN
+  if (isIsin(upperId) || embeddedIsin) {
+    return resolveIsinQuote(embeddedIsin || upperId, quoteTickerHint);
   }
 
   // Find asset configuration in curated catalog
@@ -1267,14 +1269,15 @@ async function doFetchCurrentPrice(
  */
 export async function fetchCurrentPrice(
   identifier: string,
-  quoteTickerHint?: string
+  quoteTickerHint?: string,
+  forceRefresh: boolean = false
 ): Promise<MarketQuoteResult> {
   const upperId = identifier.trim().toUpperCase();
 
-  // 1. SWR Freshness Check: If cached quote was refreshed recently, return immediately
+  // 1. SWR Freshness Check: If cached quote was refreshed recently, return immediately unless forced
   const cached = getQuoteFromCache(upperId);
   const lastFetched = swrQuoteTimestamps.get(upperId) || 0;
-  const isFresh = cached && Date.now() - lastFetched < SWR_FRESH_WINDOW_MS;
+  const isFresh = !forceRefresh && cached && !cached.isOfflineCached && Date.now() - lastFetched < SWR_FRESH_WINDOW_MS;
 
   if (isFresh && cached) {
     return cached;
@@ -1282,7 +1285,7 @@ export async function fetchCurrentPrice(
 
   // 2. In-flight Deduplication: If already fetching for this asset, reuse existing promise
   if (inFlightQuotePromises.has(upperId)) {
-    if (cached) {
+    if (!forceRefresh && cached && !cached.isOfflineCached) {
       return cached; // Return stale immediately while revalidation is in-flight
     }
     return inFlightQuotePromises.get(upperId)!;
@@ -1301,12 +1304,13 @@ export async function fetchCurrentPrice(
 
   inFlightQuotePromises.set(upperId, fetchPromise);
 
-  // If stale cached quote exists, return stale immediately while background refresh occurs (SWR)
-  if (cached) {
-    return cached;
+  // If forceRefresh, OR if cached quote is marked as offline, we MUST await live network fetch!
+  if (forceRefresh || !cached || cached.isOfflineCached) {
+    return fetchPromise;
   }
 
-  return fetchPromise;
+  // Otherwise return stale cached quote while revalidation occurs in background (standard SWR)
+  return cached;
 }
 
 export type BatchAssetQuery =
@@ -1317,7 +1321,8 @@ export type BatchAssetQuery =
  * Batch update market quotes for a list of identifiers or asset query objects.
  */
 export async function batchUpdateMarketQuotes(
-  assetsOrIds: BatchAssetQuery[]
+  assetsOrIds: BatchAssetQuery[],
+  forceRefresh: boolean = false
 ): Promise<Record<string, MarketQuoteResult>> {
   const results: Record<string, MarketQuoteResult> = {};
   await Promise.all(
@@ -1325,7 +1330,7 @@ export async function batchUpdateMarketQuotes(
       const id = typeof query === 'string' ? query : query.identifier;
       const hint = typeof query === 'object' ? query.quoteTicker : undefined;
       try {
-        const quote = await fetchCurrentPrice(id, hint);
+        const quote = await fetchCurrentPrice(id, hint, forceRefresh);
         results[id] = quote;
         if (typeof query === 'object' && query.isin) {
           results[query.isin] = quote;

@@ -21,7 +21,14 @@ import {
 } from '../data/initialMockData';
 import { batchUpdateMarketQuotes, pruneExpiredQuoteCache, resetSwrTimestamps } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
-import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions, autoCorrectAssetShares } from '../utils/finance';
+import {
+  computeFinancialSummary,
+  computeSourceBalance,
+  reconcileAssetsFromTransactions,
+  autoCorrectAssetShares,
+  findMatchingAssetIndex,
+  parseInvestmentConcept,
+} from '../utils/finance';
 import type { SourceBalanceInfo } from '../utils/finance';
 import { sortTransactionsDesc } from '../utils/dates';
 import {
@@ -503,14 +510,74 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       updateTransaction: (id, updatedFields) => {
-        const { userId } = get();
-        set((state) => ({
+        const { userId, transactions, assets } = get();
+        const oldTx = transactions.find((tx) => tx.id === id);
+
+        let nextAssets = assets;
+        if (oldTx && oldTx.pillar === 'invest' && updatedFields.amount !== undefined) {
+          const oldAmount = Number(oldTx.amount) || 0;
+          const newAmount = Number(updatedFields.amount) || 0;
+          const diff = newAmount - oldAmount;
+
+          if (diff !== 0) {
+            const { identifier: txIdent, name: txName } = parseInvestmentConcept(
+              updatedFields.concept || oldTx.concept
+            );
+            const assetIndex = findMatchingAssetIndex(assets, {
+              identifier: txIdent,
+              name: txName,
+            });
+
+            if (assetIndex !== -1) {
+              const targetAsset = assets[assetIndex];
+              const avgPrice = Number(targetAsset.averageBuyPrice) || Number(targetAsset.currentPrice) || 1;
+              const currentTotalCost = targetAsset.shares * avgPrice;
+              const newTotalCost = Math.max(0, currentTotalCost + diff);
+              const sharesDiff = avgPrice > 0 ? diff / avgPrice : 0;
+              const remainingShares = Number(Math.max(0, targetAsset.shares + sharesDiff).toFixed(6));
+
+              if (remainingShares <= 0.0001 || newTotalCost <= 0.05) {
+                nextAssets = assets.filter((_, idx) => idx !== assetIndex);
+                if (userId) {
+                  deleteCloudAsset(targetAsset.id, userId).catch(() => {});
+                }
+              } else {
+                const newAvgPrice =
+                  remainingShares > 0 ? Number((newTotalCost / remainingShares).toFixed(4)) : avgPrice;
+                const curPrice = targetAsset.currentPrice || newAvgPrice;
+                const currentValue = Number((remainingShares * curPrice).toFixed(2));
+                const pnl = Number((currentValue - newTotalCost).toFixed(2));
+                const pnlPercentage = newTotalCost > 0 ? Number(((pnl / newTotalCost) * 100).toFixed(2)) : 0;
+
+                const updatedAsset: InvestmentAsset = {
+                  ...targetAsset,
+                  shares: remainingShares,
+                  averageBuyPrice: newAvgPrice,
+                  averagePrice: newAvgPrice,
+                  currentValue,
+                  pnl,
+                  pnlPercentage,
+                  lastUpdated: 'Movimiento modificado',
+                };
+
+                nextAssets = [...assets];
+                nextAssets[assetIndex] = updatedAsset;
+                if (userId) {
+                  insertCloudAsset(updatedAsset, userId).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+
+        set({
           transactions: sortTransactionsDesc(
-            state.transactions.map((tx) =>
+            transactions.map((tx) =>
               tx.id === id ? { ...tx, ...updatedFields } : tx
             )
           ),
-        }));
+          assets: nextAssets,
+        });
 
         if (userId) {
           updateCloudTransaction(id, updatedFields, userId).catch((err) =>
@@ -520,10 +587,73 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       deleteTransaction: (id) => {
-        const { userId } = get();
-        set((state) => ({
-          transactions: state.transactions.filter((tx) => tx.id !== id),
-        }));
+        const { userId, transactions, assets } = get();
+        const txToDelete = transactions.find((tx) => tx.id === id);
+
+        // 1. If it's an investment movement, deduct or remove from portfolio
+        let nextAssets = assets;
+        if (txToDelete && txToDelete.pillar === 'invest') {
+          const { identifier: txIdent, name: txName } = parseInvestmentConcept(txToDelete.concept);
+          const assetIndex = findMatchingAssetIndex(assets, {
+            identifier: txIdent,
+            name: txName,
+          });
+
+          if (assetIndex !== -1) {
+            const targetAsset = assets[assetIndex];
+            const txAmount = Number(txToDelete.amount) || 0;
+            const avgPrice = Number(targetAsset.averageBuyPrice) || Number(targetAsset.currentPrice) || 1;
+            const currentTotalCost = targetAsset.shares * avgPrice;
+
+            // Shares corresponding to this transaction
+            const sharesToRemove = avgPrice > 0 ? txAmount / avgPrice : 0;
+            const remainingShares = Number(Math.max(0, targetAsset.shares - sharesToRemove).toFixed(6));
+            const remainingCost = Math.max(0, currentTotalCost - txAmount);
+
+            // If no shares remain (or was the only movement), delete asset from portfolio
+            if (remainingShares <= 0.0001 || remainingCost <= 0.05) {
+              nextAssets = assets.filter((_, idx) => idx !== assetIndex);
+              if (userId) {
+                deleteCloudAsset(targetAsset.id, userId).catch((err) =>
+                  console.warn('[Store] Cloud sync failed for deleteCloudAsset:', err)
+                );
+              }
+            } else {
+              // Deduct shares and cost from the asset
+              const newAvgPrice =
+                remainingShares > 0 ? Number((remainingCost / remainingShares).toFixed(4)) : avgPrice;
+              const curPrice = targetAsset.currentPrice || newAvgPrice;
+              const currentValue = Number((remainingShares * curPrice).toFixed(2));
+              const pnl = Number((currentValue - remainingCost).toFixed(2));
+              const pnlPercentage = remainingCost > 0 ? Number(((pnl / remainingCost) * 100).toFixed(2)) : 0;
+
+              const updatedAsset: InvestmentAsset = {
+                ...targetAsset,
+                shares: remainingShares,
+                averageBuyPrice: newAvgPrice,
+                averagePrice: newAvgPrice,
+                currentValue,
+                pnl,
+                pnlPercentage,
+                lastUpdated: 'Aportación eliminada',
+              };
+
+              nextAssets = [...assets];
+              nextAssets[assetIndex] = updatedAsset;
+
+              if (userId) {
+                insertCloudAsset(updatedAsset, userId).catch((err) =>
+                  console.warn('[Store] Cloud sync failed for updateCloudAsset on deleteTransaction:', err)
+                );
+              }
+            }
+          }
+        }
+
+        set({
+          transactions: transactions.filter((tx) => tx.id !== id),
+          assets: nextAssets,
+        });
 
         if (userId) {
           deleteCloudTransaction(id, userId).catch((err) =>
@@ -533,6 +663,64 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       addAsset: (assetData) => {
+        const { assets, userId } = get();
+        const existingIdx = findMatchingAssetIndex(assets, assetData);
+
+        if (existingIdx !== -1) {
+          // Accumulate into existing asset (sum shares & recalculate weighted average buy price)
+          const existing = assets[existingIdx];
+          const oldShares = Number(existing.shares) || 0;
+          const oldAvgPrice = Number(existing.averageBuyPrice) || 0;
+          const oldTotalCost = oldShares * oldAvgPrice;
+
+          const newShares = Number(assetData.shares) || 0;
+          const newBuyPrice = Number(assetData.averageBuyPrice) || 0;
+          const newTotalCost = newShares * newBuyPrice;
+
+          const combinedShares = Number((oldShares + newShares).toFixed(6));
+          const combinedTotalCost = oldTotalCost + newTotalCost;
+          const combinedAvgPrice =
+            combinedShares > 0 ? Number((combinedTotalCost / combinedShares).toFixed(4)) : newBuyPrice;
+          const latestPrice = Number(assetData.currentPrice) || Number(existing.currentPrice) || combinedAvgPrice;
+          const currentValue = Number((combinedShares * latestPrice).toFixed(2));
+          const pnl = Number((currentValue - combinedTotalCost).toFixed(2));
+          const pnlPercentage =
+            combinedTotalCost > 0 ? Number(((pnl / combinedTotalCost) * 100).toFixed(2)) : 0;
+          const combinedFee = (Number(existing.initialFee) || 0) + (Number(assetData.initialFee) || 0);
+          const nowIso = new Date().toISOString();
+
+          const updatedAsset: InvestmentAsset = {
+            ...existing,
+            shares: combinedShares,
+            averageBuyPrice: combinedAvgPrice,
+            averagePrice: combinedAvgPrice,
+            currentPrice: latestPrice,
+            currentValue,
+            pnl,
+            pnlPercentage,
+            initialFee: combinedFee > 0 ? combinedFee : undefined,
+            quoteTicker: assetData.quoteTicker || existing.quoteTicker,
+            quote_ticker: assetData.quote_ticker || existing.quote_ticker,
+            lastPriceUpdate: nowIso,
+            last_price_update: nowIso,
+            lastUpdated: 'Posición acumulada',
+            isOfflineCached:
+              assetData.isOfflineCached !== undefined ? assetData.isOfflineCached : existing.isOfflineCached,
+          };
+
+          const nextAssets = [...assets];
+          nextAssets[existingIdx] = updatedAsset;
+          set({ assets: nextAssets });
+
+          if (userId) {
+            insertCloudAsset(updatedAsset, userId).catch((err) =>
+              console.warn('[Store] Cloud sync failed for accumulate asset:', err)
+            );
+          }
+          return;
+        }
+
+        // New asset registration
         const shares = Number(assetData.shares) || 0;
         const buyPrice = Number(assetData.averageBuyPrice) || 0;
         const curPrice = Number(assetData.currentPrice) || buyPrice;
@@ -558,7 +746,6 @@ export const useFinanceStore = create<FinanceState>()(
           assets: [newAsset, ...state.assets],
         }));
 
-        const { userId } = get();
         if (userId) {
           insertCloudAsset(newAsset, userId).catch((err) =>
             console.warn('[Store] Cloud sync failed for addAsset:', err)
@@ -622,7 +809,7 @@ export const useFinanceStore = create<FinanceState>()(
             quoteTicker: a.quoteTicker || a.quote_ticker,
             isin: a.isin,
           }));
-          const quotes = await batchUpdateMarketQuotes(queries);
+          const quotes = await batchUpdateMarketQuotes(queries, true);
           const syncTime = new Date().toLocaleTimeString('es-ES', {
             hour: '2-digit',
             minute: '2-digit',
@@ -700,7 +887,7 @@ export const useFinanceStore = create<FinanceState>()(
             quoteTicker: a.quoteTicker || a.quote_ticker,
             isin: a.isin,
           }));
-          const quotes = await batchUpdateMarketQuotes(queries);
+          const quotes = await batchUpdateMarketQuotes(queries, true);
           const syncTime = new Date().toLocaleTimeString('es-ES', {
             hour: '2-digit',
             minute: '2-digit',

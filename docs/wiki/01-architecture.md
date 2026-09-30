@@ -247,10 +247,12 @@ Permite localizar cualquier instrumento mediante:
 ### 2. Pipeline Multiruta de Resolución y Sincronización Automática de Fondos por ISIN
 Los fondos indexados y fondos mutuos UCITS (ej. Vanguard US 500 con ISIN `IE0032126645` o Vanguard European Stock con ISIN `IE0007987690`) no son instrumentos de negociación continua en bolsa, por lo que carecen de tickers bursátiles directos. Fluo implementa un pipeline de resolución en 3 etapas:
 1. **Detección Inteligente de ISIN (`isIsin`)**:
-   - Identifica patrones internacionales estándar (12 caracteres alfanuméricos con código de país de 2 letras y dígito de control, ej. `/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`).
-2. **Ruta 1 (Identificador Interno Yahoo Finance / Morningstar)**:
-   - Consulta el endpoint de autocompletado y búsqueda de Yahoo Finance (`https://query1.finance.yahoo.com/v1/finance/search?q={ISIN}`).
-   - Extrae el símbolo interno oficial devuelto con sufijos de bolsa europea (ej. `0P00000SUJ.F` para Vanguard US 500 o `0P00000RQ8.F` para Vanguard European Stock) y consulta su precio y divisa mediante la API v8 Chart (`/v8/finance/chart/{symbol}`).
+   - Identifica patrones internacionales estándar (12 caracteres alfanuméricos con código de país de 2 letras y dígito de control, ej. `/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`). Detecta además ISINs embebidos en descripciones complejas como `"Inversión en SP500 IE0007987690"`.
+2. **Ruta 1 (Proxy Serverless Multi-Endpoint `/api/quote` & Dev Middleware)**:
+   - Para erradicar bloqueos de CORS en navegadores móviles (iOS Safari, Chrome Android) y desktop, las consultas viajan por `/api/quote?symbol={ISIN}`:
+     - En producción (Vercel Serverless Function) y en desarrollo local (`quoteDevProxyPlugin` en `vite.config.ts`), el proxy ejecuta la búsqueda en Yahoo (`query1` con failover a `query2`) desde Node.js sin restricciones de CORS.
+     - Extrae el símbolo interno oficial devuelto con sufijos de bolsa europea (ej. `0P00000SUJ.F` para Vanguard US 500 o `0P00000RQ8.F` para Vanguard European Stock) y consulta su precio y divisa en tiempo real mediante la API v8 Chart (`/v8/finance/chart/{symbol}`).
+     - Incluye cabeceras `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=120`.
 3. **Ruta 2 (Tabla de Equivalencias & Ticker Gemelo / ETF de Referencia)**:
    - Si la consulta de búsqueda no entrega cotización directa o se encuentra restringida, el motor consulta la tabla predefinida `FUND_ISIN_EQUIVALENCE_MAP`:
      - `IE0032126645` (Vanguard US 500 Index EUR) $\rightarrow$ Ticker de referencia: `VUSA.AS` / `VUAA.DE` (S&P 500 EUR).
@@ -264,7 +266,19 @@ Los fondos indexados y fondos mutuos UCITS (ej. Vanguard US 500 con ISIN `IE0032
      - `LU0996177134` / `LU0996179007` (Amundi MSCI World / S&P 500) $\rightarrow$ Ticker de referencia: `CW8.PA` / `VUSA.AS`.
    - Se almacena de forma persistente tanto el `isin` como el `quote_ticker` resuelto, permitiendo que las consultas intradiarias subsecuentes ataquen directamente el ticker activo.
 4. **Ruta 3 (Fallback de Valor Liquidativo con Fecha de Corte)**:
-   - Ante caídas de red, fines de semana o festivos bursátiles, el motor recupera la última cotización válida almacenada en caché local (`lastUpdated` y `lastPriceUpdate`), asegurando que jamás se devuelva 0 € ni se reseteen las métricas históricas de la cartera.
+   - Ante caídas de red, fines de semana o festivos bursátiles, el motor recupera la última cotización válida almacenada en caché local (`lastUpdated` y `lastPriceUpdate`), asegurando que jamás se devuelva 0 € ni se reseteen las métricas históricas de la cartera. Cuando se produce una llamada con `forceRefresh = true` (botón de refresco manual), se omite el retorno prematuro de datos en caché para garantizar la adquisición del valor en vivo.
+5. **Acumulación de Posiciones & Precio Medio de Compra (PMC)**:
+   - Al registrar una aportación adicional sobre un fondo ya existente, el sistema no duplica ni sobreescribe el activo:
+     - Suma las participaciones: $\text{shares}_{\text{total}} = \text{shares}_{\text{ant}} + \text{shares}_{\text{nuevas}}$.
+     - Recalcula el Precio Medio de Compra ponderado:
+       $$\text{PMC} = \frac{(\text{shares}_{\text{ant}} \times \text{PMC}_{\text{ant}}) + (\text{shares}_{\text{nuevas}} \times \text{Precio}_{\text{nuevo}})}{\text{shares}_{\text{total}}}$$
+     - Actualiza el valor de mercado, el P&L latente y sincroniza atómicamente a Supabase.
+6. **Deducción y Eliminación Automática al Borrar Movimientos**:
+   - Al eliminar un movimiento de inversión (`pillar: 'invest'`) vía `deleteTransaction(id)`:
+     - El sistema localiza el activo asociado mediante `findMatchingAssetIndex`.
+     - Deduce las participaciones y el coste aportado por dicho movimiento.
+     - Si la posición residual es nula o menor a 0.0001 títulos, el fondo se **elimina por completo** de la cartera y de Supabase.
+     - Si restan títulos de compras previas, actualiza la posición con el capital e importe neto remanente.
 
 ### 3. Sincronización Silenciosa en Segundo Plano (`syncStaleAssetQuotes`)
 - Al montar el Dashboard principal o abrir la pestaña de Inversiones, el store dispara automáticamente `syncStaleAssetQuotes(6)`:

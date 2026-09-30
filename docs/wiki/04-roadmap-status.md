@@ -894,3 +894,39 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Vitest: 108/108 tests unitarios pasando.
   - TypeScript: 0 errores (`tsc -b`).
   - Tests de `marketDataService.ts` (live fetch via Vitest → Node, no CORS): 19/19 ✅.
+
+### v0.9.19 (Acumulación Atómica de Fondos, Deducción al Borrar y Proxy Universal de Cotizaciones)
+
+**Problemas Corregidos:**
+1. Indicador "Dato offline / en caché" persistía en móvil y desktop debido a:
+   - SWR early return: `fetchCurrentPrice` devolvía la entrada en caché prematuramente incluso al pulsar "Recargar cotizaciones" si la promesa en segundo plano aún estaba en vuelo.
+   - Vite dev server no ejecutaba `/api/quote`, devolviendo `index.html` en pruebas locales y móviles sobre red local WiFi.
+   - Ruta 1 ejecutaba consulta directa a Yahoo Finance Search desde el cliente expuesta a bloqueo CORS.
+   - ISINs directos (`IE0007987690`) fallaban en Yahoo v8 Chart si no se resolvía previamente su ticker interno (`0P00000RQ8.F`).
+2. Al dar de alta una nueva aportación sobre un fondo existente, se sustituía en lugar de sumarse y promediar el precio de compra.
+3. Al borrar un movimiento de inversión, el fondo mantenía la cantidad aportada sin deducirla ni eliminarse.
+
+**Soluciones Técnicas Implementadas:**
+- **[x] Proxy Universal con Failover Dual y Resolución de ISINs** ([`api/quote.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/api/quote.ts)):
+  - Detección automática de formato ISIN (`/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`).
+  - Consulta del ticker interno mediante Yahoo Search API en entorno Node (`query1.finance.yahoo.com` con failover a `query2.finance.yahoo.com`).
+  - Fallback automático a ticker gemelo (`FUND_ISIN_EQUIVALENCE_MAP`).
+- **[x] Middleware Dev Server en Vite** ([`vite.config.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/vite.config.ts)):
+  - Plugin `quoteDevProxyPlugin()` que atiende `/api/quote` localmente (`localhost` y red WiFi `192.168.x.x:5173`), garantizando que las pruebas en móvil local funcionen de inmediato sin depender de despliegue en Vercel.
+- **[x] Bypass Forzado de Caché & SWR Offline Unlatching** ([`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts)):
+  - `forceRefresh = true` en `fetchCurrentPrice` y `batchUpdateMarketQuotes`: omite el retorno de caché y aguarda la resolución en red.
+  - Detección de ISIN embebido en nombres/conceptos complejos (ej. `"SP500 IE0007987690"`).
+- **[x] Acumulación Ponderada de Fondos (PMC)** ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), [`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)):
+  - Función `findMatchingAssetIndex` para localizar posiciones existentes por ISIN, ticker o nombre.
+  - `addAsset`: si la posición ya existe, suma participaciones ($\text{shares}_{\text{total}} = \text{shares}_{\text{ant}} + \text{shares}_{\text{nuevas}}$) y recalcula el precio medio ponderado de adquisición.
+- **[x] Deducción y Eliminación Automática al Borrar Transacción** ([`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+  - `deleteTransaction`: localiza el activo asociado a la transacción `pillar === 'invest'`, deduce los títulos y el importe aportado.
+  - Si no restan títulos ($\le 0.0001$), elimina el activo por completo de la cartera y de Supabase (`deleteCloudAsset`).
+  - `updateTransaction`: si se modifica el importe de un movimiento de inversión, reajusta las participaciones y el coste proporcionalmente.
+- **[x] Reconciliación Multi-Movimiento** ([`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)):
+  - `reconcileAssetsFromTransactions` ahora agrupa y totaliza múltiples compras del mismo activo en lugar de descartar las transacciones posteriores.
+
+**Validación de Calidad:**
+- Vitest: 112/112 tests unitarios pasando (4 nuevos tests de acumulación y ciclo de vida de transacciones).
+- TypeScript: 0 errores (`npx tsc -b`).
+- Paridad: 100% en Web Desktop, Móvil standalone PWA y Local Dev Server.

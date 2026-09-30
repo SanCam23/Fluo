@@ -7,9 +7,99 @@ import compression from 'vite-plugin-compression'
 
 const viteCompression = compression as unknown as (options?: Record<string, unknown>) => PluginOption
 
+function quoteDevProxyPlugin(): PluginOption {
+  return {
+    name: 'quote-dev-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/quote', async (req, res) => {
+        try {
+          const urlObj = new URL(req.url || '', 'http://localhost');
+          const rawSymbol = urlObj.searchParams.get('symbol')?.trim() || '';
+          if (!rawSymbol) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Missing symbol' }));
+            return;
+          }
+
+          const cleanInput = rawSymbol.toUpperCase();
+          const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(cleanInput);
+          let targetSymbol = rawSymbol;
+
+          if (isIsinFormat) {
+            try {
+              const sRes = await fetch(
+                `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanInput)}`,
+                { headers: { 'User-Agent': 'Mozilla/5.0' } }
+              );
+              if (sRes.ok) {
+                const sData = (await sRes.json()) as any;
+                const q = sData?.quotes?.[0]?.symbol;
+                if (q) targetSymbol = String(q);
+              }
+            } catch {
+              // Ignore search failure
+            }
+          }
+
+          let cRes = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(targetSymbol)}?range=1d&interval=1d`,
+            { headers: { 'User-Agent': 'Mozilla/5.0' } }
+          );
+
+          if (!cRes.ok) {
+            cRes = await fetch(
+              `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(targetSymbol)}?range=1d&interval=1d`,
+              { headers: { 'User-Agent': 'Mozilla/5.0' } }
+            );
+          }
+
+          if (!cRes.ok) {
+            res.statusCode = 502;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `Upstream error ${cRes.status}` }));
+            return;
+          }
+
+          const cData = (await cRes.json()) as any;
+          const result = cData?.chart?.result?.[0];
+          const meta = result?.meta;
+          let price = Number(meta?.regularMarketPrice);
+          if (isNaN(price) || price <= 0) {
+            const closeList = result?.indicators?.quote?.[0]?.close;
+            if (Array.isArray(closeList) && closeList.length > 0) {
+              const valid = closeList.filter((p: unknown) => typeof p === 'number' && !isNaN(p as number) && (p as number) > 0);
+              if (valid.length > 0) price = valid[valid.length - 1] as number;
+            }
+          }
+
+          const prevClose = Number(meta?.previousClose || meta?.chartPreviousClose);
+          const change24h = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+          const currency = meta?.currency === 'USD' ? 'USD' : 'EUR';
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              price: Number(price.toFixed(2)),
+              change24h: Number(change24h.toFixed(2)),
+              currency,
+              symbol: targetSymbol,
+            })
+          );
+        } catch (err: unknown) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    quoteDevProxyPlugin(),
     react(),
     tailwindcss(),
     viteCompression({

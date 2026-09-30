@@ -614,4 +614,165 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(txs[0].amount).toBe(40);
     });
   });
+
+  describe('Investment Accumulation, Weighted Average Buy Price & Movement Deletion', () => {
+    it('should accumulate shares and calculate weighted average buy price (PMC) when adding to an existing fund', () => {
+      const store = useFinanceStore.getState();
+      useFinanceStore.setState({
+        assets: [],
+        transactions: [],
+      });
+
+      // 1. Initial purchase: 10 shares @ 40 € = 400 €
+      store.addAsset({
+        name: 'Vanguard European Stock',
+        identifier: 'IE0007987690',
+        isin: 'IE0007987690',
+        assetType: 'index_fund',
+        shares: 10,
+        averageBuyPrice: 40,
+        currentPrice: 42,
+        currency: 'EUR',
+      });
+
+      let assets = useFinanceStore.getState().assets;
+      expect(assets).toHaveLength(1);
+      expect(assets[0].shares).toBe(10);
+      expect(assets[0].averageBuyPrice).toBe(40);
+      expect(assets[0].currentValue).toBe(420); // 10 * 42
+
+      // 2. Second purchase into same fund: 10 shares @ 60 € = 600 €
+      store.addAsset({
+        name: 'Vanguard European Stock',
+        identifier: 'IE0007987690',
+        isin: 'IE0007987690',
+        assetType: 'index_fund',
+        shares: 10,
+        averageBuyPrice: 60,
+        currentPrice: 45,
+        currency: 'EUR',
+      });
+
+      assets = useFinanceStore.getState().assets;
+      // MUST NOT REPLACE OR DUPLICATE: Must maintain 1 single consolidated asset
+      expect(assets).toHaveLength(1);
+      // Combined shares: 10 + 10 = 20
+      expect(assets[0].shares).toBe(20);
+      // Weighted average buy price: (10 * 40 + 10 * 60) / 20 = 1000 / 20 = 50 €
+      expect(assets[0].averageBuyPrice).toBe(50);
+      // Latest market value: 20 * 45 = 900 €
+      expect(assets[0].currentValue).toBe(900);
+      // PnL: 900 - 1000 = -100 €
+      expect(assets[0].pnl).toBe(-100);
+      // PnL %: (-100 / 1000) * 100 = -10%
+      expect(assets[0].pnlPercentage).toBe(-10);
+      expect(assets[0].lastUpdated).toBe('Posición acumulada');
+    });
+
+    it('should deduct shares and invested amount from the asset when an invest transaction is deleted', () => {
+      const store = useFinanceStore.getState();
+      useFinanceStore.setState({
+        assets: [
+          {
+            id: 'asset-fund-1',
+            name: 'Vanguard European Stock',
+            identifier: 'IE0007987690',
+            isin: 'IE0007987690',
+            assetType: 'index_fund',
+            shares: 20,
+            averageBuyPrice: 50,
+            currentPrice: 50,
+            currentValue: 1000,
+            pnl: 0,
+            pnlPercentage: 0,
+            currency: 'EUR',
+            lastUpdated: 'Recién añadido',
+          },
+        ],
+        transactions: [
+          {
+            id: 'tx-invest-1',
+            amount: 500,
+            pillar: 'invest',
+            categoryId: 'cat-etf',
+            concept: 'Inversión en Vanguard European Stock (IE0007987690)',
+            date: '2026-09-01T12:00:00.000Z',
+            createdAt: 1,
+          },
+          {
+            id: 'tx-invest-2',
+            amount: 500,
+            pillar: 'invest',
+            categoryId: 'cat-etf',
+            concept: 'Inversión en Vanguard European Stock (IE0007987690)',
+            date: '2026-09-15T12:00:00.000Z',
+            createdAt: 2,
+          },
+        ],
+      });
+
+      // Delete tx-invest-2 (500 € = 10 shares @ 50 €)
+      store.deleteTransaction('tx-invest-2');
+
+      const txs = useFinanceStore.getState().transactions;
+      expect(txs).toHaveLength(1);
+      expect(txs[0].id).toBe('tx-invest-1');
+
+      const assets = useFinanceStore.getState().assets;
+      expect(assets).toHaveLength(1);
+      // Shares should be deducted from 20 to 10
+      expect(assets[0].shares).toBe(10);
+      expect(assets[0].currentValue).toBe(500); // 10 * 50
+    });
+
+    it('should completely remove the fund when its only investment transaction is deleted', () => {
+      const store = useFinanceStore.getState();
+      useFinanceStore.setState({
+        assets: [
+          {
+            id: 'asset-sp500',
+            name: 'S&P 500',
+            identifier: 'IE0032126645',
+            isin: 'IE0032126645',
+            assetType: 'index_fund',
+            shares: 5,
+            averageBuyPrice: 80,
+            currentPrice: 80,
+            currentValue: 400,
+            pnl: 0,
+            pnlPercentage: 0,
+            currency: 'EUR',
+            lastUpdated: 'Recién añadido',
+          },
+        ],
+        transactions: [
+          {
+            id: 'tx-sp500-only',
+            amount: 400,
+            pillar: 'invest',
+            categoryId: 'cat-etf',
+            concept: 'Inversión en S&P 500 (IE0032126645)',
+            date: '2026-09-20T12:00:00.000Z',
+            createdAt: 10,
+          },
+        ],
+      });
+
+      // Delete the only transaction for S&P 500
+      store.deleteTransaction('tx-sp500-only');
+
+      const txs = useFinanceStore.getState().transactions;
+      expect(txs).toHaveLength(0);
+
+      const assets = useFinanceStore.getState().assets;
+      // Asset must be completely removed from portfolio
+      expect(assets).toHaveLength(0);
+    });
+
+    it('should correctly parse concept with embedded ISIN without parentheses', () => {
+      const parsed = parseInvestmentConcept('Inversión en SP500 IE0007987690');
+      expect(parsed.identifier).toBe('IE0007987690');
+      expect(parsed.name).toBe('SP500');
+    });
+  });
 });

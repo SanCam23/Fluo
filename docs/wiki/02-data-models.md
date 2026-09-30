@@ -320,7 +320,14 @@ export interface InvestmentAsset {
 
 > **Nota Arquitectónica**: `average_buy_price` nunca se sobreescribe durante las actualizaciones periódicas de mercado. `current_value`, `pnl` y `pnl_percentage` se calculan dinámicamente tanto en cliente como en store, reflejando fielmente la rentabilidad viva de la cartera sin alterar la inversión inicial. La persistencia en `public.investments` implementa inserción adaptativa para soportar tanto instalaciones con columna `identifier` como instalaciones con `symbol_or_isin`.
 
+### Funciones de Ayuda y Ciclo de Vida Transacción ↔ Activo (`finance.ts`)
+
+```typescript
 export function parseInvestmentConcept(concept: string): { name: string; identifier: string };
+export function findMatchingAssetIndex(
+  assets: InvestmentAsset[],
+  candidate: { identifier?: string; isin?: string; ticker?: string; name?: string; assetType?: AssetType }
+): number;
 export function inferAssetTypeFromCategory(categoryId?: string, identifier?: string): AssetType;
 export function autoCorrectAssetShares(
   asset: InvestmentAsset,
@@ -333,6 +340,17 @@ export function reconcileAssetsFromTransactions(
   priceLookup?: (identifier: string) => number | undefined
 ): InvestmentAsset[];
 ```
+
+#### Ciclo de Vida Reactivo de Posiciones:
+1. **Alta o Compra Adicional (`addAsset`)**:
+   - Si no existe: da de alta una nueva posición con su `id` único.
+   - Si ya existe (mismo ISIN, identifier, ticker o nombre): **acumula** títulos ($\text{shares} = \text{shares}_{\text{prev}} + \text{shares}_{\text{add}}$) y recalcula el **Precio Medio de Compra ponderado (PMC)** manteniendo una única posición consolidada.
+2. **Borrado de Movimientos (`deleteTransaction`)**:
+   - Al eliminar una transacción `pillar === 'invest'`, deduce proporcionalmente los títulos y el capital aportado por dicho movimiento del activo correspondiente.
+   - Si no restan títulos ($\le 0.0001$), el activo se **elimina automáticamente** de la cartera y de Supabase.
+3. **Modificación de Importe (`updateTransaction`)**:
+   - Ajusta automáticamente las participaciones y el coste amortizado por el delta de la modificación.
+
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
 Gestiona el catálogo de activos financieros, resolución de símbolos y fallback resiliente:
