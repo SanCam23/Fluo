@@ -19,7 +19,7 @@ import {
   INITIAL_RECURRENCE_RULES,
   INITIAL_SOURCE_ACCOUNTS,
 } from '../data/initialMockData';
-import { batchUpdateMarketQuotes } from '../services/marketDataService';
+import { batchUpdateMarketQuotes, pruneExpiredQuoteCache } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
 import { computeFinancialSummary, computeSourceBalance, reconcileAssetsFromTransactions, autoCorrectAssetShares } from '../utils/finance';
 import type { SourceBalanceInfo } from '../utils/finance';
@@ -316,6 +316,10 @@ export const useFinanceStore = create<FinanceState>()(
               hasHydratedFromCloud: true,
               cloudSyncError: null,
             });
+
+            // Purge stale entries from the market quote localStorage cache (>23h or legacy without cachedAt)
+            // This ensures ISINs like IE0007987690 always get a fresh live fetch on a new day.
+            pruneExpiredQuoteCache();
 
             // Trigger background quote refresh for stale/reconciled assets
             get().syncStaleAssetQuotes(6).catch(() => {});
@@ -726,6 +730,12 @@ export const useFinanceStore = create<FinanceState>()(
                   insertCloudAsset(correctedAsset, get().userId!).catch(() => {});
                 }
 
+                // Only advance the lastPriceUpdate timestamp when we got a LIVE price.
+                // If the quote is offline-cached (network failed), keep the old timestamp
+                // so the asset remains stale and gets retried on the next session/boot.
+                const gotLivePrice = !quote.isOfflineCached;
+                const newLastPriceUpdate = gotLivePrice ? nowIso : (asset.lastPriceUpdate || asset.last_price_update);
+
                 return {
                   ...correctedAsset,
                   currentPrice: curPrice,
@@ -734,8 +744,8 @@ export const useFinanceStore = create<FinanceState>()(
                   pnlPercentage,
                   quoteTicker: resolvedTicker,
                   quote_ticker: resolvedTicker,
-                  lastPriceUpdate: nowIso,
-                  last_price_update: nowIso,
+                  lastPriceUpdate: newLastPriceUpdate,
+                  last_price_update: newLastPriceUpdate,
                   change24h: quote.change24h,
                   isOfflineCached: quote.isOfflineCached,
                   lastUpdated: quote.isOfflineCached
