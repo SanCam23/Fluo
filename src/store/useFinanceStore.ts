@@ -76,7 +76,7 @@ interface FinanceState {
   setTransactions: (transactions: Transaction[]) => void;
   setAssets: (assets: InvestmentAsset[]) => void;
   setSources: (sources: SourceAccount[]) => void;
-  addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
   updateTransaction: (id: string, updatedFields: Partial<Omit<Transaction, 'id' | 'createdAt'>>) => void;
   deleteTransaction: (id: string) => void;
   addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
@@ -85,7 +85,8 @@ interface FinanceState {
   refreshAllAssetPrices: () => Promise<void>;
   syncStaleAssetQuotes: (maxAgeHours?: number) => Promise<void>;
   reconcileInvestments: () => void;
-  addRecurrence: (rule: Omit<RecurrenceRule, 'id'>) => void;
+  addRecurrence: (rule: Omit<RecurrenceRule, 'id'> & { id?: string }) => void;
+  deleteRecurrence: (id: string) => void;
   toggleRecurrence: (id: string) => void;
   setTimeRange: (range: TimeRangeFilter) => void;
   setActiveTab: (tab: 'home' | 'stats' | 'invest' | 'add') => void;
@@ -471,8 +472,8 @@ export const useFinanceStore = create<FinanceState>()(
       addTransaction: (txData) => {
         const newTx: Transaction = {
           ...txData,
-          id: generateId('tx'),
-          createdAt: Date.now(),
+          id: txData.id || generateId('tx'),
+          createdAt: txData.createdAt || Date.now(),
         };
 
         const { sources, userId } = get();
@@ -654,9 +655,30 @@ export const useFinanceStore = create<FinanceState>()(
           }
         }
 
+        // 2. If it's a recurring movement, check and handle associated recurrence rule
+        let nextRecurrences = get().recurrences;
+        if (txToDelete && (txToDelete.isRecurring || txToDelete.recurrenceId)) {
+          const matchedRule = txToDelete.recurrenceId
+            ? nextRecurrences.find((r) => r.id === txToDelete.recurrenceId)
+            : nextRecurrences.find(
+                (r) =>
+                  r.pillar === txToDelete.pillar &&
+                  r.amount === txToDelete.amount &&
+                  (r.title.toLowerCase() === txToDelete.concept.toLowerCase() ||
+                    txToDelete.concept.toLowerCase().includes(r.title.toLowerCase()))
+              );
+
+          if (matchedRule) {
+            // Al eliminar cualquiera de las transacciones de una serie recurrente (primera, segunda o posteriores),
+            // se cancela/elimina la regla de recurrencia para que no se generen movimientos futuros.
+            nextRecurrences = nextRecurrences.filter((r) => r.id !== matchedRule.id);
+          }
+        }
+
         set({
           transactions: transactions.filter((tx) => tx.id !== id),
           assets: nextAssets,
+          recurrences: nextRecurrences,
         });
 
         if (userId) {
@@ -1001,7 +1023,7 @@ export const useFinanceStore = create<FinanceState>()(
       addRecurrence: (ruleData) => {
         const newRule: RecurrenceRule = {
           ...ruleData,
-          id: `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: ruleData.id || `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           isActive: true,
           autoCharge: ruleData.autoCharge !== false,
         };
@@ -1010,11 +1032,42 @@ export const useFinanceStore = create<FinanceState>()(
         }));
       },
 
+      deleteRecurrence: (id) => {
+        set((state) => ({
+          recurrences: state.recurrences.filter((r) => r.id !== id),
+        }));
+      },
+
+      toggleRecurrence: (id) => {
+        set((state) => ({
+          recurrences: state.recurrences.map((r) =>
+            r.id === id ? { ...r, isActive: !r.isActive } : r
+          ),
+        }));
+      },
+
       triggerRecurrencesCheck: (asOfDate) => {
         const { recurrences, transactions, simulatedTimeOffsetDays } = get();
+
+        // Self-healing: Purge any orphaned recurrence rules that have 0 transactions in the ledger
+        // (Cleans up recurrences where the initial transaction was deleted prior to this update)
+        const healedRecurrences = recurrences.filter((rule) => {
+          if (INITIAL_RECURRENCE_RULES.some((d) => d.id === rule.id)) {
+            return true;
+          }
+          const hasMatchingTx = transactions.some(
+            (t) =>
+              t.recurrenceId === rule.id ||
+              (t.pillar === rule.pillar &&
+                t.amount === rule.amount &&
+                t.concept.toLowerCase() === rule.title.toLowerCase())
+          );
+          return hasMatchingTx;
+        });
+
         const targetDate = asOfDate || new Date(Date.now() + simulatedTimeOffsetDays * 86400000);
         const { generatedTransactions, updatedRules } = processDueRecurrences(
-          recurrences,
+          healedRecurrences,
           transactions,
           targetDate
         );
@@ -1049,14 +1102,6 @@ export const useFinanceStore = create<FinanceState>()(
 
       resetSimulatedTime: () => {
         set({ simulatedTimeOffsetDays: 0 });
-      },
-
-      toggleRecurrence: (id) => {
-        set((state) => ({
-          recurrences: state.recurrences.map((r) =>
-            r.id === id ? { ...r, isActive: !r.isActive } : r
-          ),
-        }));
       },
 
       setTimeRange: (range) => set({ timeRange: range }),

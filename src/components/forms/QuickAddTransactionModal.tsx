@@ -572,6 +572,10 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       });
 
       // 2. Register monetary transaction in ledger
+      const recurrenceId = isRecurring
+        ? `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+        : undefined;
+
       addTransaction({
         amount: totalAmount,
         pillar: 'invest',
@@ -581,10 +585,11 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         concept: `Inversión en ${assetName.trim()} (${identifier.trim().toUpperCase()})`,
         date: txDate,
         isRecurring,
+        recurrenceId,
       });
 
       // 3. Register recurring DCA rule if configured
-      if (isRecurring) {
+      if (isRecurring && recurrenceId) {
         const nextDue = calculateFirstNextDueDate(new Date(txDate), {
           frequency,
           dayOfWeek: frequency === 'weekly' ? dayOfWeek : undefined,
@@ -593,6 +598,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         });
 
         addRecurrence({
+          id: recurrenceId,
           title: `Aportación periódica ${assetName.trim()}`,
           amount: totalAmount,
           pillar: 'invest',
@@ -662,6 +668,10 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       txDate = new Date().toISOString();
     }
 
+    const recurrenceId = isRecurring
+      ? `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+      : undefined;
+
     addTransaction({
       amount: numAmount,
       pillar,
@@ -671,9 +681,10 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       concept: concept.trim(),
       date: txDate,
       isRecurring,
+      recurrenceId,
     });
 
-    if (isRecurring) {
+    if (isRecurring && recurrenceId) {
       const nextDue = calculateFirstNextDueDate(new Date(txDate), {
         frequency,
         dayOfWeek: frequency === 'weekly' ? dayOfWeek : undefined,
@@ -682,6 +693,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       });
 
       addRecurrence({
+        id: recurrenceId,
         title: concept.trim(),
         amount: numAmount,
         pillar,

@@ -44,6 +44,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Nuevas Categorías de Gasto & Flujo Cajero** | ✅ Completado | 6 nuevas categorías (Estudios, Cajero, Bizum, Viajes, Regalos, Otros), auto-ingreso gemelo en efectivo en Cajero y restricción a 1 sola cuenta de efectivo |
 | **Selector Dual en Estadísticas (Periodo vs Mes)** | ✅ Completado | Conmutador Liquid Glass en `/stats`: selección por periodos relativos o mes específico con stepper, picker nativo y evolución diaria continua |
 | **Auto-Sanación de Fondos Eclipsados & Purga Huérfana** | ✅ Completado | Detección reactiva de discrepancias en `reconcileAssetsFromTransactions`, auto-renombrado y recálculo según movimientos activos, purga de `reconciled-asset-*` huérfanos y botón de borrado visible en móvil (`opacity-80`) |
+| **Ciclo de Vida de Recurrencias & Auto-Sanación de Reglas** | ✅ Completado | Enlace bidireccional `recurrenceId`, cascada al borrar apunte inicial, preservación de regla en recurrencias subsiguientes (2ª+), purga de reglas huérfanas en arranque y botón de cancelación en widget |
 
 ---
 
@@ -960,5 +961,33 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 
 **Validación de Calidad:**
 - Vitest: 115/115 tests unitarios pasando (+3 nuevos tests específicos para auto-sanación de activos eclipsados y ciclo de vida de `deleteAsset`).
+- TypeScript: 0 errores (`npx tsc -b`).
+- Producción: `npm run build` compilado exitosamente.
+
+### v0.9.25 (Ciclo de Vida de Recurrencias, Eliminación en Cascada y Auto-Sanación de Reglas Huérfanas)
+
+**Problemas Corregidos:**
+1. **Regla de Recurrencia Huérfana al Borrar la Transacción Inicial**:
+   - Al crear un ingreso o gasto con recurrencia activa y eliminar posteriormente la transacción, la regla quedaba activa en `state.recurrences`. En consecuencia, al vencer los plazos futuros el motor de recurrencias continuaba generando de forma automática nuevos apuntes contables no deseados.
+2. **Ambigüedad en la Eliminación de Recurrencias Subsiguientes (2ª en adelante)**:
+   - Necesidad de definir si al eliminar una recurrencia devengada en un mes puntual (ej. mes 2) se debía o no eliminar la regla recurrente global.
+3. **Persistencia Residual en Instalaciones Previas a la Actualización**:
+   - Si un usuario ya había creado y eliminado una transacción recurrente en su app antes de esta corrección, la regla de recurrencia permanecía guardada en `fluo_finance_storage_v3` en su navegador o móvil sin un movimiento visible asociado.
+
+**Soluciones Técnicas Implementadas:**
+- **[x] Enlace Explícito y Atómico con `recurrenceId`** ([`src/components/forms/QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx)):
+  - Al registrar transacciones con periodicidad (tanto estándar como aportaciones DCA en inversiones), se pre-genera `recurrenceId` compartido por la transacción contable inicial y la regla periódica registrada en Zustand (`addRecurrence`).
+- **[x] Eliminación en Cascada de Recurrencias en `deleteTransaction`** ([`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+  - Al borrar **cualquiera de las transacciones** pertenecientes a una serie recurrente (sea la inicial o cualquier recurrencia posterior):
+    - Se elimina el apunte contable seleccionado.
+    - Se cancela y **elimina automáticamente la regla de recurrencia** (`nextRecurrences = nextRecurrences.filter(...)`), garantizando que **no se generen más movimientos futuros** para dicha serie. Los apuntes anteriores ya devengados se mantienen como histórico en la cuenta.
+- **[x] Auto-Sanación en Arranque (`triggerRecurrencesCheck`) para Estados Previos** ([`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)):
+  - Al rehidratar el store al abrir la app (`onRehydrateStorage`), `triggerRecurrencesCheck` filtra y purga automáticamente cualquier regla periódica de usuario (excluyendo reglas de demostración `INITIAL_RECURRENCE_RULES`) que no posea ningún apunte asociado en el libro de transacciones (`transactions.some(...) === false`).
+  - La purga se persiste de inmediato en `localStorage`, saneando la base de datos local de la versión anterior sin requerir ninguna acción por parte del usuario.
+- **[x] Botón de Cancelación Directa en Widget de Home** ([`src/components/home/RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx)):
+  - Se añadió un botón de papelera Liquid Glass con diálogo nativo de confirmación a cada tarjeta de cobro/pago próximo, permitiendo a los usuarios cancelar cualquier serie periódica directamente sin necesidad de borrar movimientos contables pasados.
+
+**Validación de Calidad:**
+- Vitest: 119/119 tests unitarios pasando (+4 nuevos tests para ciclo de vida de recurrencias, cascada al borrar apunte inicial, preservación en la 2ª recurrencia y auto-sanación de reglas huérfanas en `useFinanceStore.test.ts`).
 - TypeScript: 0 errores (`npx tsc -b`).
 - Producción: `npm run build` compilado exitosamente.

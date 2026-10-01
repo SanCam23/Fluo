@@ -704,6 +704,29 @@ Fluo cuenta con una capa de cabeceras HTTP de servidor configurada para la máxi
 - La regla se preserva en Supabase (`insertCloudTransaction`) y se refleja en el recálculo instantáneo de saldo de la billetera.
 - **Restricción de Billetera Única**: El usuario solo puede poseer un máximo de una cuenta en efectivo (`type: 'cash'`), validada de forma estricta tanto en `addSource` como en `updateSource`.
 
+---
+
+## 18. Ciclo de Vida de Recurrencias: Enlace Bidireccional, Eliminación en Cascada y Auto-Sanación de Reglas Huérfanas
+
+Para garantizar consistencia absoluta entre los movimientos del libro contable y las reglas automáticas de cobro/ingreso periódico:
+
+### 1. Enlace Explícito Mediante `recurrenceId`
+- Al crear una transacción con recurrencia activa en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) (tanto en ingresos/gastos estándar como en aportaciones periódicas de inversión DCA), se pre-genera un identificador único `recurrenceId = rec-${Date.now()}-${random}`.
+- Este ID se asigna simultáneamente al apunte contable inicial (`Transaction.recurrenceId`) y a la regla periódica registrada en Zustand (`RecurrenceRule.id`), estableciendo un vínculo directo e inequívoco.
+
+### 2. Eliminación en Cascada de Recurrencias (`deleteTransaction`)
+- Al eliminar **cualquiera de las transacciones** pertenecientes a una serie periódica (sea el apunte inicial o cualquiera de las recurrencias posteriores generadas automáticamente):
+  - Se elimina el apunte contable seleccionado del historial.
+  - Se elimina automáticamente la regla de recurrencia en `state.recurrences`, cancelando la serie para que **no se generen futuros movimientos automáticos**. Los apuntes previos que no hayan sido eliminados se preservan como histórico contable.
+
+### 3. Auto-Sanación en Arranque para Versiones Previas (`triggerRecurrencesCheck`)
+- En versiones anteriores a la actualización, eliminar una transacción inicial dejaba la regla huérfana en `state.recurrences`.
+- En el arranque (`onRehydrateStorage`), `triggerRecurrencesCheck()` evalúa las reglas activas: cualquier regla de usuario (no perteneciente al catálogo demo `INITIAL_RECURRENCE_RULES`) que posea 0 transacciones asociadas en el libro contable es **purgada automáticamente de la memoria y del almacenamiento local**.
+- Esto limpia de manera transparente y sin intervención del usuario el estado previo de su aplicación.
+
+### 4. Cancelación Directa de Recurrencias (`RecurrenceSummaryWidget.tsx`)
+- En el widget de la pantalla de inicio ([`RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx)), cada tarjeta de pago/cobro próximo cuenta con un botón de papelera Liquid Glass que invoca `deleteRecurrence(id)` previa confirmación del usuario, permitiendo cancelar cualquier serie futura sin necesidad de tocar los movimientos ya registrados en el historial.
+
 
 
 

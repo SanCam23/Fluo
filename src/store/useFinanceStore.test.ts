@@ -889,4 +889,169 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(parsed.name).toBe('SP500');
     });
   });
+
+  describe('Recurrence Lifecycle & Cascading Deletion', () => {
+    it('should delete the recurrence rule when the initial/sole recurring transaction is deleted', () => {
+      const store = useFinanceStore.getState();
+      const recId = 'rec-test-income-1';
+
+      store.addRecurrence({
+        id: recId,
+        title: 'Nómina Secundaria',
+        amount: 1500,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        frequency: 'monthly',
+        startDate: '2026-09-01T12:00:00.000Z',
+        nextDueDate: '2026-10-01T12:00:00.000Z',
+        isActive: true,
+        autoCharge: true,
+      });
+
+      store.addTransaction({
+        id: 'tx-income-rec-1',
+        amount: 1500,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        concept: 'Nómina Secundaria',
+        date: '2026-09-01T12:00:00.000Z',
+        isRecurring: true,
+        recurrenceId: recId,
+      });
+
+      expect(useFinanceStore.getState().recurrences).toHaveLength(1);
+      expect(useFinanceStore.getState().transactions).toHaveLength(1);
+
+      // Delete the initial transaction
+      store.deleteTransaction('tx-income-rec-1');
+
+      // Both transaction and recurrence rule should be deleted
+      expect(useFinanceStore.getState().transactions).toHaveLength(0);
+      expect(useFinanceStore.getState().recurrences).toHaveLength(0);
+    });
+
+    it('should delete the recurrence rule when deleting a subsequent (second) recurrence transaction', () => {
+      const store = useFinanceStore.getState();
+      const recId = 'rec-test-salary-2';
+
+      store.addRecurrence({
+        id: recId,
+        title: 'Nómina Consultor',
+        amount: 2000,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        frequency: 'monthly',
+        startDate: '2026-08-01T12:00:00.000Z',
+        nextDueDate: '2026-10-01T12:00:00.000Z',
+        isActive: true,
+        autoCharge: true,
+      });
+
+      // Month 1 (initial)
+      store.addTransaction({
+        id: 'tx-month-1',
+        amount: 2000,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        concept: 'Nómina Consultor',
+        date: '2026-08-01T12:00:00.000Z',
+        isRecurring: true,
+        recurrenceId: recId,
+      });
+
+      // Month 2 (generated recurrence)
+      store.addTransaction({
+        id: 'tx-month-2',
+        amount: 2000,
+        pillar: 'income',
+        categoryId: 'cat-salary',
+        concept: 'Nómina Consultor',
+        date: '2026-09-01T12:00:00.000Z',
+        isRecurring: true,
+        isRecurringGenerated: true,
+        recurrenceId: recId,
+      });
+
+      expect(useFinanceStore.getState().transactions).toHaveLength(2);
+      expect(useFinanceStore.getState().recurrences).toHaveLength(1);
+
+      // User deletes the second occurrence (tx-month-2)
+      store.deleteTransaction('tx-month-2');
+
+      const currentTxs = useFinanceStore.getState().transactions;
+      const currentRecs = useFinanceStore.getState().recurrences;
+
+      // Only tx-month-2 was deleted; tx-month-1 remains in ledger history
+      expect(currentTxs).toHaveLength(1);
+      expect(currentTxs[0].id).toBe('tx-month-1');
+
+      // The recurrence rule is deleted so no future months will be generated!
+      expect(currentRecs).toHaveLength(0);
+    });
+
+    it('should self-heal pre-update state by purging orphaned recurrence rules that have 0 transactions', () => {
+      // Simulate user state from BEFORE the update:
+      // The user created a recurrence rule, but had already deleted the transaction.
+      // Thus, recurrences has the rule, but transactions has 0 matching transactions.
+      const orphanedRuleId = 'rec-user-orphaned-123';
+      useFinanceStore.setState({
+        recurrences: [
+          {
+            id: orphanedRuleId,
+            title: 'Ingreso Huérfano Eliminado Pre-Actualización',
+            amount: 800,
+            pillar: 'income',
+            categoryId: 'cat-salary',
+            frequency: 'monthly',
+            startDate: '2026-08-15T12:00:00.000Z',
+            nextDueDate: '2026-09-15T12:00:00.000Z',
+            isActive: true,
+            autoCharge: true,
+          },
+        ],
+        transactions: [], // 0 transactions exist
+      });
+
+      expect(useFinanceStore.getState().recurrences).toHaveLength(1);
+
+      // On startup/rehydrate, triggerRecurrencesCheck is called automatically
+      useFinanceStore.getState().triggerRecurrencesCheck();
+
+      // The orphaned rule must be completely purged
+      const recs = useFinanceStore.getState().recurrences;
+      expect(recs).toHaveLength(0);
+    });
+
+    it('should delete and toggle recurrence rules via direct actions', () => {
+      const store = useFinanceStore.getState();
+      const recId = 'rec-direct-actions';
+
+      store.addRecurrence({
+        id: recId,
+        title: 'Gimnasio',
+        amount: 35,
+        pillar: 'expense',
+        categoryId: 'cat-sports',
+        frequency: 'monthly',
+        startDate: '2026-09-01T12:00:00.000Z',
+        nextDueDate: '2026-10-01T12:00:00.000Z',
+        isActive: true,
+        autoCharge: true,
+      });
+
+      expect(useFinanceStore.getState().recurrences[0].isActive).toBe(true);
+
+      // Toggle off
+      store.toggleRecurrence(recId);
+      expect(useFinanceStore.getState().recurrences[0].isActive).toBe(false);
+
+      // Toggle on
+      store.toggleRecurrence(recId);
+      expect(useFinanceStore.getState().recurrences[0].isActive).toBe(true);
+
+      // Direct delete
+      store.deleteRecurrence(recId);
+      expect(useFinanceStore.getState().recurrences).toHaveLength(0);
+    });
+  });
 });

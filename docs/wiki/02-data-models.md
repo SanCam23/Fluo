@@ -463,6 +463,14 @@ export function processDueRecurrences(rules: RecurrenceRule[], existingTransacti
 - **Ajuste de Fin de Mes (Clamping)**: Si una regla mensual tiene `dayOfMonth: 31`, en meses de 28, 29 o 30 días el motor clampea el cobro al último día disponible de dicho mes para evitar omitir transacciones.
 - **Catch-up Idempotente**: Si transcurren periodos sin abrir la app, el motor genera todas las ejecuciones atrasadas (`isRecurringGenerated: true`) evitando duplicados mediante firmas únicas `ruleId_YYYY-MM-DD`.
 
+### Ciclo de Vida y Eliminación en Cascada de Recurrencias
+1. **Vinculación Explícita (`recurrenceId`)**: Al crear una transacción con recurrencia, se genera previamente un `recurrenceId` que comparten de forma atómica el apunte contable y la regla de recurrencia.
+2. **Eliminación de Cualquier Transacción de la Serie (`deleteTransaction`)**: Al eliminar cualquiera de los movimientos vinculados a una recurrencia (sea el inicial o cualquier mes posterior), se cancela y elimina automáticamente la regla `RecurrenceRule` para que **no se generen futuros movimientos automáticos**, preservando los apuntes anteriores en el historial contable.
+3. **Auto-Sanación de Reglas Huérfanas (`triggerRecurrencesCheck`)**: Al rehidratar el store en arranque, las reglas de recurrencia que tengan 0 transacciones asociadas en el libro contable son purgadas automáticamente.
+5. **Acciones Directas en Store**:
+   - `deleteRecurrence(id: string)`: Elimina la regla del store inmediatamente.
+   - `toggleRecurrence(id: string)`: Pausa o activa la regla periódica sin borrarla.
+
 ---
 
 ## 6. Filtros y Resumen Financiero (`FinancialSummary`)
