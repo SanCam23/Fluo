@@ -23,49 +23,62 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Memoized shallow store selectors to avoid re-renders when unrelated store slices update
-  const { transactions, sources, activeSourceId, deleteTransaction, getCategoryById, getBrandById } =
+  const { transactions, activeSourceId, deleteTransaction, getCategoryById, getBrandById, getSourceById } =
     useFinanceStore(
       useShallow((state) => ({
         transactions: state.transactions,
-        sources: state.sources,
         activeSourceId: state.activeSourceId,
         deleteTransaction: state.deleteTransaction,
         getCategoryById: state.getCategoryById,
         getBrandById: state.getBrandById,
+        getSourceById: state.getSourceById,
       }))
     );
 
   const activeSource = useMemo(
-    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
-    [sources, activeSourceId]
+    () => (activeSourceId ? getSourceById(activeSourceId) : null),
+    [getSourceById, activeSourceId]
   );
 
-  // Isolate transactions to active source account, or show global if activeSourceId is null
-  const sourceScopedTransactions = useMemo(() => {
-    if (!activeSourceId) return transactions;
-    return transactions.filter((tx) => tx.sourceId === activeSourceId);
+  const sourceScopedCount = useMemo(() => {
+    if (!activeSourceId) return transactions.length;
+    let count = 0;
+    for (let i = 0; i < transactions.length; i++) {
+      if (transactions[i].sourceId === activeSourceId) count++;
+    }
+    return count;
   }, [transactions, activeSourceId]);
 
-  // Filter transactions according to selected pillar and search query (memoized)
+  // Consolidated filter pass: source scoping + pillar filtering + search query in a single pass
   const filteredTransactions = useMemo(() => {
-    let result = sourceScopedTransactions;
-    if (selectedPillar !== 'all') {
-      result = result.filter((tx) => tx.pillar === selectedPillar);
-    }
     const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      result = result.filter((tx) => {
+    const hasSearch = q.length > 0;
+    const filterPillar = selectedPillar !== 'all';
+
+    return transactions.filter((tx) => {
+      // 1. Source scoping
+      if (activeSourceId && tx.sourceId !== activeSourceId) {
+        return false;
+      }
+      // 2. Pillar filtering
+      if (filterPillar && tx.pillar !== selectedPillar) {
+        return false;
+      }
+      // 3. Search query
+      if (hasSearch) {
         const cat = getCategoryById(tx.categoryId);
         const br = getBrandById(tx.brandId);
         const conceptMatch = tx.concept.toLowerCase().includes(q);
         const brandMatch = br ? br.name.toLowerCase().includes(q) : false;
         const categoryMatch = cat ? cat.name.toLowerCase().includes(q) : false;
         const amountMatch = tx.amount.toString().includes(q);
-        return conceptMatch || brandMatch || categoryMatch || amountMatch;
-      });
-    }
-    return result;
-  }, [sourceScopedTransactions, selectedPillar, searchQuery, getCategoryById, getBrandById]);
+        if (!conceptMatch && !brandMatch && !categoryMatch && !amountMatch) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [transactions, activeSourceId, selectedPillar, searchQuery, getCategoryById, getBrandById]);
 
   // Windowed visible slice for sub-second layout and instant 60/120fps scrolling
   const visibleTransactions = useMemo(() => {
@@ -163,7 +176,7 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
 
       {/* List of items with Swipe-to-Delete and GPU viewport skipping (cv-auto) */}
       <div className="flex flex-col gap-2.5">
-        {sourceScopedTransactions.length === 0 ? (
+        {sourceScopedCount === 0 ? (
           <div className="py-10 px-5 text-center rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/10 flex flex-col items-center justify-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-400 shadow-inner">
               <Receipt className="h-6 w-6 text-slate-400 opacity-70" />

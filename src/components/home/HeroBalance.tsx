@@ -15,7 +15,7 @@ import {
 import { useFinanceStore, useFinancialSummary } from '../../store/useFinanceStore';
 import type { PillarType, Transaction, SourceAccount } from '../../types/finance';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
-import { computeSourceBalance } from '../../utils/finance';
+import { computeSourceBalance, computeAllSourceBalances } from '../../utils/finance';
 import { SourceAvatar } from '../common/SourceAvatar';
 
 interface HeroBalanceProps {
@@ -41,6 +41,11 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
   const sortedSources = useMemo(
     () => [...sources].sort((a, b) => a.orderIndex - b.orderIndex),
     [sources]
+  );
+
+  const sourceBalancesMap = useMemo(
+    () => computeAllSourceBalances(sortedSources, transactions),
+    [sortedSources, transactions]
   );
 
   const totalSlides = 1 + sortedSources.length;
@@ -99,46 +104,48 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
     setActiveSourceId(newSourceId);
   };
 
-  // Pillar-specific calculations for Slide 0
-  const incomeTxs = useMemo(
-    () => transactions.filter((tx) => tx.pillar === 'income'),
-    [transactions]
-  );
-  const recurringIncome = useMemo(
-    () =>
-      incomeTxs
-        .filter((tx) => tx.isRecurring || tx.isRecurringGenerated)
-        .reduce((sum, tx) => sum + tx.amount, 0),
-    [incomeTxs]
-  );
-  const recurringIncomeCount = useMemo(
-    () => incomeTxs.filter((tx) => tx.isRecurring || tx.isRecurringGenerated).length,
-    [incomeTxs]
-  );
-  const maxIncomeTx = useMemo(
-    () =>
-      incomeTxs.reduce<Transaction | null>(
-        (max, tx) => (!max || tx.amount > max.amount ? tx : max),
-        null
-      ),
-    [incomeTxs]
-  );
+  // Pillar-specific calculations for Slide 0 (Consolidated in a single pass)
+  const {
+    recurringIncome,
+    recurringIncomeCount,
+    maxIncomeTx,
+    recurringExpense,
+    recurringExpenseCount,
+  } = useMemo(() => {
+    let recIncome = 0;
+    let recIncomeCount = 0;
+    let maxIncome: Transaction | null = null;
+    let recExpense = 0;
+    let recExpenseCount = 0;
 
-  const expenseTxs = useMemo(
-    () => transactions.filter((tx) => tx.pillar === 'expense'),
-    [transactions]
-  );
-  const recurringExpense = useMemo(
-    () =>
-      expenseTxs
-        .filter((tx) => tx.isRecurring || tx.isRecurringGenerated)
-        .reduce((sum, tx) => sum + tx.amount, 0),
-    [expenseTxs]
-  );
-  const recurringExpenseCount = useMemo(
-    () => expenseTxs.filter((tx) => tx.isRecurring || tx.isRecurringGenerated).length,
-    [expenseTxs]
-  );
+    for (let i = 0; i < transactions.length; i++) {
+      const tx = transactions[i];
+      if (tx.pillar === 'income') {
+        const isRec = tx.isRecurring || tx.isRecurringGenerated;
+        if (isRec) {
+          recIncome += tx.amount;
+          recIncomeCount++;
+        }
+        if (!maxIncome || tx.amount > maxIncome.amount) {
+          maxIncome = tx;
+        }
+      } else if (tx.pillar === 'expense') {
+        const isRec = tx.isRecurring || tx.isRecurringGenerated;
+        if (isRec) {
+          recExpense += tx.amount;
+          recExpenseCount++;
+        }
+      }
+    }
+
+    return {
+      recurringIncome: recIncome,
+      recurringIncomeCount: recIncomeCount,
+      maxIncomeTx: maxIncome,
+      recurringExpense: recExpense,
+      recurringExpenseCount: recExpenseCount,
+    };
+  }, [transactions]);
   const dailyAverageExpense = useMemo(() => {
     const daysPassed = Math.max(1, new Date().getDate());
     return summary.totalExpense / daysPassed;
@@ -326,7 +333,7 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
 
   // ── Source card content (shared between mobile carousel slide & desktop grid card) ──
   const SourceCardContent = ({ source }: { source: SourceAccount }) => {
-    const balanceInfo = computeSourceBalance(source, transactions);
+    const balanceInfo = sourceBalancesMap.get(source.id) ?? computeSourceBalance(source, transactions);
     const formattedSourceBalance = formatCurrency(balanceInfo.netBalance);
     const [sourceInt, sourceDec] = formattedSourceBalance.split(',');
     const isPositive = balanceInfo.netBalance >= 0;

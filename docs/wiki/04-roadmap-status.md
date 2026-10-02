@@ -45,6 +45,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Selector Dual en Estadísticas (Periodo vs Mes)** | ✅ Completado | Conmutador Liquid Glass en `/stats`: selección por periodos relativos o mes específico con stepper, picker nativo y evolución diaria continua |
 | **Auto-Sanación de Fondos Eclipsados & Purga Huérfana** | ✅ Completado | Detección reactiva de discrepancias en `reconcileAssetsFromTransactions`, auto-renombrado y recálculo según movimientos activos, purga de `reconciled-asset-*` huérfanos y botón de borrado visible en móvil (`opacity-80`) |
 | **Ciclo de Vida de Recurrencias & Auto-Sanación de Reglas** | ✅ Completado | Enlace bidireccional `recurrenceId`, cascada al borrar apunte inicial, preservación de regla en recurrencias subsiguientes (2ª+), purga de reglas huérfanas en arranque y botón de cancelación en widget |
+| **Optimización Integral & Consolidación** | ✅ Completado | Eliminación de código muerto (5 archivos), importación dinámica de mock data, Mapas O(1) en store y vistas, y consolidación de bucles en una sola pasada |
 
 ---
 
@@ -991,3 +992,39 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - Vitest: 119/119 tests unitarios pasando (+4 nuevos tests para ciclo de vida de recurrencias, cascada al borrar apunte inicial, preservación en la 2ª recurrencia y auto-sanación de reglas huérfanas en `useFinanceStore.test.ts`).
 - TypeScript: 0 errores (`npx tsc -b`).
 - Producción: `npm run build` compilado exitosamente.
+
+### v0.9.30 (Optimización Exhaustiva: Eliminación de Código Muerto, Importación Dinámica, Búsquedas O(1) y Consolidación de Bucles)
+
+**Áreas Optimizadas:**
+1. **Eliminación de Código Muerto (Dead Code Elimination)**:
+   - Se eliminaron 5 archivos obsoletos/no referenciados en producción:
+     - `src/services/priceFeedService.ts` (puente legado sustituido por `marketDataService.ts`).
+     - `src/components/investments/AddAssetModal.tsx` (35.7 KB de modal independiente reemplazado por el flujo unificado `QuickAddTransactionModal.tsx`).
+     - `src/components/common/GlassButton.tsx`, `src/components/common/GlassCard.tsx` y `src/components/common/PillarBadge.tsx` (primitivas legadas no consumidas).
+2. **Importación Dinámica de Datos Demo (Code Splitting)**:
+   - Se desacopló la importación estática de `initialMockData.ts` de [`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts).
+   - `loadDemoData` y `resetToInitialData` ahora cargan los 527 registros de demo bajo demanda mediante `await import('../data/initialMockData')`.
+   - El bundle de demo (~9 kB / 2.2 kB gzip) queda completamente aislado en un chunk perezoso independiente, sin penalizar el tiempo de carga ni el consumo de datos de usuarios reales.
+   - En `triggerRecurrencesCheck`, las reglas de demo se protegen mediante `DEMO_RECURRENCE_IDS = new Set(...)` en tiempo de ejecución.
+3. **Mapas para Búsquedas O(1) en Memoria**:
+   - En [`src/store/useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), se crearon mapas de consulta en nivel de módulo (`getCategoryLookup`, `getBrandLookup`, `getSourceLookup`) que se re-indexan únicamente cuando las referencias de los arrays cambian.
+   - `getCategoryById`, `getBrandById` y `getSourceById` se transformaron de escaneos lineales $O(N)$ repetidos en cada render de lista a accesos $O(1)$ inmediatos.
+   - En [`src/components/home/RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx), la cuenta activa se resuelve vía `getSourceById` en $O(1)$.
+   - En [`src/components/analytics/AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx), `categoryChartData` y `sortedBrands` consumen directamente las búsquedas por Map $O(1)$.
+4. **Consolidación de Bucles en Pasadas Únicas**:
+   - En [`src/utils/finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts):
+     - Nueva función `computeAllSourceBalances`: calcula los saldos y conteos de todas las fuentes en una sola pasada $O(N)$ sobre `transactions`.
+     - `generateSavingsEvolution`: se erradicaron los bucles anidados en `last_3_months` y `last_6_months / this_year / all`, agrupando transacciones en intervalos precalculados en una sola pasada.
+     - `reconcileAssetsFromTransactions`: filtrado de transacciones de inversión y agrupación por clave de activo consolidados en un único bucle.
+   - En [`src/components/home/HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx):
+     - 11 pasadas separadas de `.filter()`, `.reduce()` y `.length` para ingresos y gastos recurrentes y máximos consolidadas en un único `for` sobre `transactions`.
+     - Las diapositivas de fuentes reutilizan el mapa precalculado de `computeAllSourceBalances`.
+   - En [`src/components/home/RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx):
+     - 3 pasadas encadenadas de `.filter()` consolidadas en una sola con evaluación temprana y conteo de fuente sin asignación de arrays intermedios.
+   - En [`src/components/analytics/AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx):
+     - Consolidación del filtrado temporal y acumulación de métricas en una única pasada con umbrales temporales precalculados fuera del bucle.
+
+**Validación de Calidad:**
+- Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
+- TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
+- Producción: `npm run build` compilado exitosamente con code splitting verificado (`initialMockData` en chunk perezoso independiente).

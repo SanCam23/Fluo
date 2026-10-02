@@ -157,12 +157,13 @@ export const AnalyticsView: React.FC = () => {
   const timeRange = useFinanceStore((state) => state.timeRange);
   const setTimeRange = useFinanceStore((state) => state.setTimeRange);
   const transactions = useFinanceStore((state) => state.transactions);
-  const categories = useFinanceStore((state) => state.categories);
-  const brands = useFinanceStore((state) => state.brands);
   const assets = useFinanceStore((state) => state.assets);
   const sources = useFinanceStore((state) => state.sources);
   const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const setActiveSourceId = useFinanceStore((state) => state.setActiveSourceId);
+  const getSourceById = useFinanceStore((state) => state.getSourceById);
+  const getCategoryById = useFinanceStore((state) => state.getCategoryById);
+  const getBrandById = useFinanceStore((state) => state.getBrandById);
 
   // Filter mode: 'period' (relative timeRange) vs 'month' (specific YYYY-MM)
   const [filterType, setFilterType] = useState<'period' | 'month'>('period');
@@ -175,8 +176,8 @@ export const AnalyticsView: React.FC = () => {
   const [savingsChartMode, setSavingsChartMode] = useState<'accumulated' | 'net'>('accumulated');
 
   const activeSource = useMemo(
-    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
-    [sources, activeSourceId]
+    () => (activeSourceId ? getSourceById(activeSourceId) : null),
+    [getSourceById, activeSourceId]
   );
 
   // Isolate transactions to selected source account or show global if null
@@ -207,7 +208,7 @@ export const AnalyticsView: React.FC = () => {
     { range: 'all', label: 'Todo' },
   ];
 
-  // Aggregated data for active period or selected month
+  // Aggregated data for active period or selected month (consolidated in a single pass)
   const {
     periodIncome,
     periodExpense,
@@ -220,37 +221,35 @@ export const AnalyticsView: React.FC = () => {
     const startOfSelMonth = new Date(selYear, selMonth - 1, 1).getTime();
     const startOfNextMonth = new Date(selYear, selMonth, 1).getTime();
 
-    const filtered = sourceScopedTransactions.filter((tx) => {
-      if (!tx || !tx.date) return false;
-      const txTime = new Date(tx.date).getTime();
+    let minTime = -Infinity;
+    let maxTime = Infinity;
 
-      if (filterType === 'month') {
-        return txTime >= startOfSelMonth && txTime < startOfNextMonth;
-      }
-
-      // filterType === 'period'
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-      const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
-      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
-      const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-
+    if (filterType === 'month') {
+      minTime = startOfSelMonth;
+      maxTime = startOfNextMonth;
+    } else {
       switch (timeRange) {
         case 'this_month':
-          return txTime >= startOfMonth;
+          minTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          break;
         case 'last_month':
-          return txTime >= startOfLastMonth && txTime < startOfMonth;
+          minTime = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+          maxTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          break;
         case 'last_3_months':
-          return txTime >= threeMonthsAgo;
+          minTime = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
+          break;
         case 'last_6_months':
-          return txTime >= sixMonthsAgo;
+          minTime = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
+          break;
         case 'this_year':
-          return txTime >= startOfYear;
+          minTime = new Date(now.getFullYear(), 0, 1).getTime();
+          break;
         case 'all':
         default:
-          return true;
+          break;
       }
-    });
+    }
 
     let inc = 0;
     let exp = 0;
@@ -258,7 +257,12 @@ export const AnalyticsView: React.FC = () => {
     const byCat: Record<string, number> = {};
     const byBrand: Record<string, { total: number; count: number }> = {};
 
-    filtered.forEach((tx) => {
+    for (let i = 0; i < sourceScopedTransactions.length; i++) {
+      const tx = sourceScopedTransactions[i];
+      if (!tx || !tx.date) continue;
+      const txTime = new Date(tx.date).getTime();
+      if (txTime < minTime || txTime >= maxTime) continue;
+
       if (tx.pillar === 'income') {
         inc += tx.amount;
       } else if (tx.pillar === 'expense') {
@@ -266,16 +270,18 @@ export const AnalyticsView: React.FC = () => {
         byCat[tx.categoryId] = (byCat[tx.categoryId] || 0) + tx.amount;
 
         if (tx.brandId) {
-          if (!byBrand[tx.brandId]) {
-            byBrand[tx.brandId] = { total: 0, count: 0 };
+          let bEntry = byBrand[tx.brandId];
+          if (!bEntry) {
+            bEntry = { total: 0, count: 0 };
+            byBrand[tx.brandId] = bEntry;
           }
-          byBrand[tx.brandId].total += tx.amount;
-          byBrand[tx.brandId].count += 1;
+          bEntry.total += tx.amount;
+          bEntry.count += 1;
         }
       } else if (tx.pillar === 'invest') {
         inv += tx.amount;
       }
-    });
+    }
 
     let days = 120;
     if (filterType === 'month') {
@@ -358,7 +364,7 @@ export const AnalyticsView: React.FC = () => {
   const categoryChartData = useMemo(() => {
     return Object.entries(expensesByCategory)
       .map(([catId, amount]) => {
-        const cat = categories.find((c) => c.id === catId);
+        const cat = getCategoryById(catId);
         const percentage = periodExpense > 0 ? (amount / periodExpense) * 100 : 0;
         return {
           id: catId,
@@ -369,7 +375,7 @@ export const AnalyticsView: React.FC = () => {
         };
       })
       .sort((a, b) => b.value - a.value);
-  }, [expensesByCategory, categories, periodExpense]);
+  }, [expensesByCategory, getCategoryById, periodExpense]);
 
   // Bar Chart data: Monthly comparison (Last 5 months)
   const monthlyComparisonData = useMemo(() => {
@@ -435,7 +441,7 @@ export const AnalyticsView: React.FC = () => {
   const sortedBrands = useMemo(() => {
     return Object.entries(expensesByBrand)
       .map(([brandId, data]) => {
-        const brand = brands.find((b) => b.id === brandId);
+        const brand = getBrandById(brandId);
         const percentage = periodExpense > 0 ? (data.total / periodExpense) * 100 : 0;
         return {
           id: brandId,
@@ -448,7 +454,7 @@ export const AnalyticsView: React.FC = () => {
       })
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [expensesByBrand, brands, periodExpense]);
+  }, [expensesByBrand, getBrandById, periodExpense]);
 
   const maxBrandTotal = sortedBrands[0]?.total || 1;
 

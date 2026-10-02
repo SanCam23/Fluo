@@ -53,11 +53,8 @@ Fluo/
 │   │   │   ├── BrandAvatar.tsx     # Avatar de marca con cascada SVG y fallback
 │   │   │   ├── CategoryIcon.tsx    # Icono Lucide de categoría con badge vítreo
 │   │   │   ├── ErrorBoundary.tsx   # Escudo contra errores de renderizado
-│   │   │   ├── GlassButton.tsx     # Botón háptico con material translúcido
-│   │   │   ├── GlassCard.tsx       # Contenedor refractante con luz perimetral
 │   │   │   ├── GlassSelect.tsx     # Selector dropdown modal Liquid Glass
 │   │   │   ├── InitialSourceModal.tsx # Onboarding guiado obligatorio de primera cuenta
-│   │   │   ├── PillarBadge.tsx     # Insignia semántica de pilar financiero
 │   │   │   ├── PWAInstallPrompt.tsx # Banner inteligente de instalación PWA (Android / iOS)
 │   │   │   └── SourceAvatar.tsx    # Avatar Liquid Glass para fuentes con logo bancario o billetera
 │   │   ├── profile/                # Centro de control de usuario y ajustes
@@ -74,7 +71,6 @@ Fluo/
 │   │   │   ├── SwipeableTransactionItem.tsx # Elemento deslizable bidireccional (derecha: editar, izquierda: eliminar)
 │   │   │   └── RecurrenceSummaryWidget.tsx # Widget de pagos y cobros próximos recurrentes
 │   │   ├── investments/            # Vista de Cartera de Inversiones
-│   │   │   ├── AddAssetModal.tsx   # Modal legado/independiente de alta de activos
 │   │   │   └── InvestmentsView.tsx # Tarjetas de activos, rentabilidad P&L y filtros
 │   │   ├── analytics/              # Vista de Estadísticas Financieras
 │   │   │   └── AnalyticsView.tsx   # Selector de periodos, distribución y top marcas
@@ -85,17 +81,16 @@ Fluo/
 │   │   └── AuthContext.tsx         # Gestión global de sesión Supabase y estado de auth
 │   ├── data/
 │   │   ├── categoriesAndBrands.ts  # Catálogo oficial de categorías y 40+ marcas
-│   │   └── initialMockData.ts      # Semilla inicial con transacciones y activos
+│   │   └── initialMockData.ts      # Semilla inicial con transacciones y activos (importación dinámica bajo demanda)
 │   ├── lib/
 │   │   └── supabaseClient.ts       # Cliente Supabase tipado y mapeadores DB ↔ Frontend
 │   ├── services/
 │   │   ├── cloudSyncService.ts     # Sincronización reactiva bidireccional y CRUD en la nube
 │   │   ├── companySearchService.ts # Motor de búsqueda global de empresas (Clearbit 25M+)
 │   │   ├── marketDataService.ts    # Motor de búsqueda semántica, cotizaciones en vivo y caché resiliente
-│   │   ├── priceFeedService.ts     # Puente compatible de cotizaciones
 │   │   └── recurrenceEngine.ts     # Motor de cálculo de periodicidad y vencimientos
 │   ├── store/
-│   │   └── useFinanceStore.ts      # Store central Zustand con persistencia y selector memoizado
+│   │   └── useFinanceStore.ts      # Store central Zustand con persistencia, Mapas O(1) en memoria y selectores optimizados
 │   ├── types/
 │   │   └── finance.ts              # Modelado TypeScript exhaustivo de entidades
 │   ├── utils/

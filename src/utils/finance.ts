@@ -49,6 +49,52 @@ export function computeSourceBalance(
   };
 }
 
+/**
+ * Computes balance information for all sources in a single consolidated pass over transactions.
+ */
+export function computeAllSourceBalances(
+  sources: SourceAccount[],
+  transactions: Transaction[] = []
+): Map<string, SourceBalanceInfo> {
+  const map = new Map<string, { income: number; expense: number; investExpense: number; count: number }>();
+  for (let i = 0; i < sources.length; i++) {
+    map.set(sources[i].id, { income: 0, expense: 0, investExpense: 0, count: 0 });
+  }
+
+  const txList = Array.isArray(transactions) ? transactions : [];
+  for (let i = 0; i < txList.length; i++) {
+    const tx = txList[i];
+    if (!tx || !tx.sourceId) continue;
+    const bucket = map.get(tx.sourceId);
+    if (!bucket) continue;
+    bucket.count++;
+    const amt = tx.amount;
+    if (typeof amt !== 'number' || isNaN(amt)) continue;
+    if (tx.pillar === 'income') bucket.income += amt;
+    else if (tx.pillar === 'expense') bucket.expense += amt;
+    else if (tx.pillar === 'invest') bucket.investExpense += amt;
+  }
+
+  const result = new Map<string, SourceBalanceInfo>();
+  for (let i = 0; i < sources.length; i++) {
+    const s = sources[i];
+    const data = map.get(s.id) || { income: 0, expense: 0, investExpense: 0, count: 0 };
+    const initial = typeof s.initialBalance === 'number' && !isNaN(s.initialBalance) ? s.initialBalance : 0;
+    const netBalance = initial + data.income - data.expense - data.investExpense;
+    result.set(s.id, {
+      sourceId: s.id,
+      name: s.name,
+      initialBalance: initial,
+      income: data.income,
+      expense: data.expense,
+      investExpense: data.investExpense,
+      netBalance,
+      transactionCount: data.count,
+    });
+  }
+  return result;
+}
+
 export function computeFinancialSummary(
   transactions: Transaction[] = [],
   assets: InvestmentAsset[] = [],
@@ -332,31 +378,42 @@ export function generateSavingsEvolution(
     let runningAccumulated = 0;
     const startDate = new Date(currentYear, currentMonth - 2, 1);
     const intervalDays = 15;
+    const intervalMs = intervalDays * 86400000;
+    const startMs = startDate.getTime();
+
+    const periodData = Array.from({ length: periodsCount }, (_, i) => {
+      const pStart = new Date(startMs + i * intervalMs);
+      return {
+        pStart,
+        startTime: pStart.getTime(),
+        endTime: pStart.getTime() + intervalMs,
+        income: 0,
+        expense: 0,
+      };
+    });
+
+    for (let j = 0; j < txList.length; j++) {
+      const tx = txList[j];
+      if (!tx?.date) continue;
+      const txTime = new Date(tx.date).getTime();
+      for (let i = 0; i < periodsCount; i++) {
+        if (txTime >= periodData[i].startTime && txTime < periodData[i].endTime) {
+          if (tx.pillar === 'income') periodData[i].income += tx.amount;
+          else if (tx.pillar === 'expense') periodData[i].expense += tx.amount;
+          break;
+        }
+      }
+    }
 
     for (let i = 0; i < periodsCount; i++) {
-      const pStart = new Date(startDate.getTime() + i * intervalDays * 86400000);
-      const pEnd = new Date(pStart.getTime() + intervalDays * 86400000);
-
-      let pIncome = 0;
-      let pExpense = 0;
-
-      txList.forEach((tx) => {
-        if (!tx?.date) return;
-        const txTime = new Date(tx.date).getTime();
-        if (txTime >= pStart.getTime() && txTime < pEnd.getTime()) {
-          if (tx.pillar === 'income') pIncome += tx.amount;
-          if (tx.pillar === 'expense') pExpense += tx.amount;
-        }
-      });
-
-      const net = pIncome - pExpense;
+      const p = periodData[i];
+      const net = p.income - p.expense;
       runningAccumulated += net;
-
       points.push({
-        label: `${pStart.getDate()} ${monthNames[pStart.getMonth()]}`,
-        dateKey: pStart.toISOString().substring(0, 10),
-        income: Math.round(pIncome * 100) / 100,
-        expense: Math.round(pExpense * 100) / 100,
+        label: `${p.pStart.getDate()} ${monthNames[p.pStart.getMonth()]}`,
+        dateKey: p.pStart.toISOString().substring(0, 10),
+        income: Math.round(p.income * 100) / 100,
+        expense: Math.round(p.expense * 100) / 100,
         netSavings: Math.round(net * 100) / 100,
         accumulatedSavings: Math.round(runningAccumulated * 100) / 100,
       });
@@ -370,32 +427,57 @@ export function generateSavingsEvolution(
   const points: SavingsEvolutionPoint[] = [];
   let runningAccumulated = 0;
 
+  const monthBuckets: Array<{
+    y: number;
+    m: number;
+    key: string;
+    label: string;
+    startTime: number;
+    endTime: number;
+    income: number;
+    expense: number;
+  }> = [];
+
   for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(currentYear, currentMonth - i, 1);
     const y = d.getFullYear();
     const m = d.getMonth();
     const nextM = new Date(y, m + 1, 1);
-
-    let mIncome = 0;
-    let mExpense = 0;
-
-    txList.forEach((tx) => {
-      if (!tx?.date) return;
-      const txTime = new Date(tx.date).getTime();
-      if (txTime >= d.getTime() && txTime < nextM.getTime()) {
-        if (tx.pillar === 'income') mIncome += tx.amount;
-        if (tx.pillar === 'expense') mExpense += tx.amount;
-      }
-    });
-
-    const net = mIncome - mExpense;
-    runningAccumulated += net;
-
-    points.push({
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    monthBuckets.push({
+      y,
+      m,
+      key,
       label: monthNames[m],
-      dateKey: `${y}-${String(m + 1).padStart(2, '0')}`,
-      income: Math.round(mIncome * 100) / 100,
-      expense: Math.round(mExpense * 100) / 100,
+      startTime: d.getTime(),
+      endTime: nextM.getTime(),
+      income: 0,
+      expense: 0,
+    });
+  }
+
+  for (let j = 0; j < txList.length; j++) {
+    const tx = txList[j];
+    if (!tx?.date) continue;
+    const txTime = new Date(tx.date).getTime();
+    for (let i = 0; i < monthBuckets.length; i++) {
+      if (txTime >= monthBuckets[i].startTime && txTime < monthBuckets[i].endTime) {
+        if (tx.pillar === 'income') monthBuckets[i].income += tx.amount;
+        else if (tx.pillar === 'expense') monthBuckets[i].expense += tx.amount;
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < monthBuckets.length; i++) {
+    const b = monthBuckets[i];
+    const net = b.income - b.expense;
+    runningAccumulated += net;
+    points.push({
+      label: b.label,
+      dateKey: b.key,
+      income: Math.round(b.income * 100) / 100,
+      expense: Math.round(b.expense * 100) / 100,
       netSavings: Math.round(net * 100) / 100,
       accumulatedSavings: Math.round(runningAccumulated * 100) / 100,
     });
@@ -633,11 +715,27 @@ export function reconcileAssetsFromTransactions(
   brands: { id: string; name: string }[] = [],
   priceLookup?: (identifier: string) => number | undefined
 ): InvestmentAsset[] {
-  const investTransactions = (Array.isArray(transactions) ? transactions : []).filter(
-    (tx) => tx && tx.pillar === 'invest' && typeof tx.amount === 'number' && tx.amount > 0
-  );
+  // Group all active invest transactions by normalized identifier key in a single pass
+  const txsByKey = new Map<string, Transaction[]>();
+  let hasInvestTx = false;
+  const txList = Array.isArray(transactions) ? transactions : [];
 
-  if (investTransactions.length === 0) {
+  for (let i = 0; i < txList.length; i++) {
+    const tx = txList[i];
+    if (tx && tx.pillar === 'invest' && typeof tx.amount === 'number' && tx.amount > 0) {
+      hasInvestTx = true;
+      const { identifier } = parseInvestmentConcept(tx.concept);
+      const key = identifier.toUpperCase();
+      let list = txsByKey.get(key);
+      if (!list) {
+        list = [];
+        txsByKey.set(key, list);
+      }
+      list.push(tx);
+    }
+  }
+
+  if (!hasInvestTx) {
     // If no invest transactions exist in the ledger, prune any orphaned auto-reconciled assets
     return currentAssets
       .filter((a) => !a.id.startsWith('reconciled-asset-'))
@@ -658,16 +756,6 @@ export function reconcileAssetsFromTransactions(
     if (primaryKey) {
       existingByIdent.set(primaryKey, corrected);
     }
-  });
-
-  // Group all active invest transactions by normalized identifier key
-  const txsByKey = new Map<string, Transaction[]>();
-  investTransactions.forEach((tx) => {
-    const { identifier } = parseInvestmentConcept(tx.concept);
-    const key = identifier.toUpperCase();
-    const list = txsByKey.get(key) || [];
-    list.push(tx);
-    txsByKey.set(key, list);
   });
 
   const reconciledAssets: InvestmentAsset[] = [];

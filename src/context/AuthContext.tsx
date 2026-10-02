@@ -11,7 +11,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: AuthError | Error | null; data?: any }>;
   signOut: () => Promise<void>;
-  enterDemoMode: () => void;
+  enterDemoMode: () => Promise<void> | void;
   exitDemoMode: () => void;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | Error | null }>;
   deleteUserAccount: () => Promise<{ error: Error | null }>;
@@ -142,14 +142,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const enterDemoMode = () => {
+  const enterDemoMode = async () => {
     setIsDemoMode(true);
     try {
       localStorage.setItem('fluo_demo_mode_active', 'true');
     } catch {
       // Ignore
     }
-    useFinanceStore.getState().loadDemoData();
+    await useFinanceStore.getState().loadDemoData();
   };
 
   const exitDemoMode = () => {

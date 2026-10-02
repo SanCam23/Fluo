@@ -13,12 +13,6 @@ import type {
   SourceAccount,
 } from '../types/finance';
 import { INITIAL_CATEGORIES, INITIAL_BRANDS } from '../data/categoriesAndBrands';
-import {
-  INITIAL_TRANSACTIONS,
-  INITIAL_INVESTMENT_ASSETS,
-  INITIAL_RECURRENCE_RULES,
-  INITIAL_SOURCE_ACCOUNTS,
-} from '../data/initialMockData';
 import { batchUpdateMarketQuotes, pruneExpiredQuoteCache, resetSwrTimestamps } from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
 import {
@@ -95,8 +89,8 @@ interface FinanceState {
   simulateTimeAdvance: (days: number) => { generatedCount: number; simulatedDate: string };
   resetSimulatedTime: () => void;
   simulatedTimeOffsetDays: number;
-  resetToInitialData: () => void;
-  loadDemoData: () => void;
+  resetToInitialData: () => Promise<void>;
+  loadDemoData: () => Promise<void>;
   purgeUserData: () => void;
 
   // Source Actions
@@ -153,6 +147,42 @@ const safeStorage = {
   },
 };
 
+// Cached lookup maps for O(1) entity lookups
+let cachedCategoriesRef: Category[] | null = null;
+let categoryLookupMap = new Map<string, Category>();
+
+function getCategoryLookup(categories: Category[]): Map<string, Category> {
+  if (categories !== cachedCategoriesRef) {
+    cachedCategoriesRef = categories;
+    categoryLookupMap = new Map((Array.isArray(categories) ? categories : []).map((c) => [c.id, c]));
+  }
+  return categoryLookupMap;
+}
+
+let cachedBrandsRef: Brand[] | null = null;
+let brandLookupMap = new Map<string, Brand>();
+
+function getBrandLookup(brands: Brand[]): Map<string, Brand> {
+  if (brands !== cachedBrandsRef) {
+    cachedBrandsRef = brands;
+    brandLookupMap = new Map((Array.isArray(brands) ? brands : []).map((b) => [b.id, b]));
+  }
+  return brandLookupMap;
+}
+
+let cachedSourcesRef: SourceAccount[] | null = null;
+let sourceLookupMap = new Map<string, SourceAccount>();
+
+function getSourceLookup(sources: SourceAccount[]): Map<string, SourceAccount> {
+  if (sources !== cachedSourcesRef) {
+    cachedSourcesRef = sources;
+    sourceLookupMap = new Map((Array.isArray(sources) ? sources : []).map((s) => [s.id, s]));
+  }
+  return sourceLookupMap;
+}
+
+const DEMO_RECURRENCE_IDS = new Set(['rec-001', 'rec-002', 'rec-003', 'rec-004', 'rec-005']);
+
 export const useFinanceStore = create<FinanceState>()(
   persist(
     (set, get) => ({
@@ -208,7 +238,13 @@ export const useFinanceStore = create<FinanceState>()(
         set({ sources: sorted });
       },
 
-      loadDemoData: () => {
+      loadDemoData: async () => {
+        const {
+          INITIAL_TRANSACTIONS,
+          INITIAL_INVESTMENT_ASSETS,
+          INITIAL_RECURRENCE_RULES,
+          INITIAL_SOURCE_ACCOUNTS,
+        } = await import('../data/initialMockData');
         set({
           transactions: sortTransactionsDesc(INITIAL_TRANSACTIONS),
           assets: INITIAL_INVESTMENT_ASSETS,
@@ -447,7 +483,7 @@ export const useFinanceStore = create<FinanceState>()(
 
       getSourceById: (id) => {
         if (!id) return undefined;
-        return get().sources.find((s) => s.id === id);
+        return getSourceLookup(get().sources).get(id);
       },
 
       getSourceBalance: (sourceId) => {
@@ -1052,7 +1088,7 @@ export const useFinanceStore = create<FinanceState>()(
         // Self-healing: Purge any orphaned recurrence rules that have 0 transactions in the ledger
         // (Cleans up recurrences where the initial transaction was deleted prior to this update)
         const healedRecurrences = recurrences.filter((rule) => {
-          if (INITIAL_RECURRENCE_RULES.some((d) => d.id === rule.id)) {
+          if (DEMO_RECURRENCE_IDS.has(rule.id)) {
             return true;
           }
           const hasMatchingTx = transactions.some(
@@ -1134,7 +1170,7 @@ export const useFinanceStore = create<FinanceState>()(
         return newBrand;
       },
 
-      resetToInitialData: () => {
+      resetToInitialData: async () => {
         try {
           localStorage.removeItem('fluo_finance_storage_v1');
           localStorage.removeItem('fluo_finance_storage_v2');
@@ -1142,6 +1178,12 @@ export const useFinanceStore = create<FinanceState>()(
         } catch (e) {
           console.warn('Error clearing localStorage:', e);
         }
+        const {
+          INITIAL_TRANSACTIONS,
+          INITIAL_INVESTMENT_ASSETS,
+          INITIAL_RECURRENCE_RULES,
+          INITIAL_SOURCE_ACCOUNTS,
+        } = await import('../data/initialMockData');
         set({
           transactions: sortTransactionsDesc(INITIAL_TRANSACTIONS),
           categories: INITIAL_CATEGORIES,
@@ -1193,41 +1235,45 @@ export const useFinanceStore = create<FinanceState>()(
         if (timeRange === 'all') return txList;
 
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
-        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+        let minTime = -Infinity;
+        let maxTime = Infinity;
+
+        switch (timeRange) {
+          case 'this_month':
+            minTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            break;
+          case 'last_month':
+            minTime = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+            maxTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            break;
+          case 'last_3_months':
+            minTime = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
+            break;
+          case 'last_6_months':
+            minTime = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
+            break;
+          case 'this_year':
+            minTime = new Date(now.getFullYear(), 0, 1).getTime();
+            break;
+          default:
+            return txList;
+        }
 
         return txList.filter((tx) => {
           if (!tx || !tx.date) return false;
           const txTime = new Date(tx.date).getTime();
-          switch (timeRange) {
-            case 'this_month':
-              return txTime >= startOfMonth;
-            case 'last_month':
-              return txTime >= startOfLastMonth && txTime < startOfMonth;
-            case 'last_3_months':
-              return txTime >= threeMonthsAgo;
-            case 'last_6_months':
-              return txTime >= sixMonthsAgo;
-            case 'this_year':
-              return txTime >= startOfYear;
-            default:
-              return true;
-          }
+          return txTime >= minTime && txTime < maxTime;
         });
       },
 
       getCategoryById: (id) => {
-        const categories = get().categories;
-        return Array.isArray(categories) ? categories.find((c) => c.id === id) : undefined;
+        if (!id) return undefined;
+        return getCategoryLookup(get().categories).get(id);
       },
 
       getBrandById: (id) => {
         if (!id) return undefined;
-        const brands = get().brands;
-        return Array.isArray(brands) ? brands.find((b) => b.id === id) : undefined;
+        return getBrandLookup(get().brands).get(id);
       },
     }),
     {
