@@ -1,7 +1,7 @@
 # 01 - Arquitectura del Sistema: Fluo
 
 ## 1. Visión General
-**Fluo** es una aplicación de finanzas personales *Responsive-First* (Mobile → Tablet → Desktop/PC) concebida con los más altos estándares de fidelidad visual y rendimiento interactivo. Implementa el lenguaje estético **Liquid Glass** (inspirado en la API nativa de iOS 26+ y traducido a Tailwind CSS v4 y CSS3 moderno). El sistema de navegación es dual: barra inferior flotante en móvil/tablet (`< lg`) y barra lateral fija Liquid Glass en escritorio (`≥ lg`).
+**Fluo** es una aplicación de finanzas personales *Responsive-First* (Mobile → Tablet → Desktop/PC) concebida con los más altos estándares de fidelidad visual y rendimiento interactivo. Implementa el lenguaje estético **Liquid Glass** (inspirado en la API nativa de iOS 26+ y traducido a Tailwind CSS v4 y CSS3 moderno). En pantallas grandes (PC / Desktop / Tablet horizontal, `≥ 1024px`), la aplicación preserva la icónica barra de navegación flotante centrada como un dock de cristal (`max-w-xl mx-auto px-6 py-2.5 rounded-full backdrop-blur-2xl bg-slate-900/60 border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.4)]`), amplía el contenedor a `max-w-7xl` con un Header Superior completo y redistribuye el contenido en una arquitectura de doble columna sin interacciones de arrastrar con ratón.
 
 ---
 
@@ -61,14 +61,15 @@ Fluo/
 │   │   │   ├── ProfileSettingsModal.tsx # Modal principal de ajustes y seguridad
 │   │   │   └── SourceAccountManager.tsx # Gestor y reordenador reactivo de fuentes de dinero
 │   │   ├── layout/                 # Estructura responsive del layout
-│   │   │   ├── DesktopSidebar.tsx  # Barra lateral Liquid Glass fija (solo lg+): navegación, CTA, perfil, PIN
-│   │   │   ├── FloatingNavbar.tsx  # Barra inferior flotante Liquid Glass (oculta en lg+)
-│   │   │   └── MobileContainer.tsx # Contenedor responsive: max-w-md centrado (<lg) / lg:ml-64 ancho completo (≥lg)
+│   │   │   ├── FloatingNavbar.tsx  # Dock flotante Liquid Glass (móvil: max-w-sm / desktop: max-w-xl centrado)
+│   │   │   └── MobileContainer.tsx # Contenedor responsive: max-w-md centrado (<lg) / max-w-7xl centrado (≥lg)
 │   │   ├── home/                   # Vista de Inicio
-│   │   │   ├── HeroBalance.tsx     # Carrusel deslizable Liquid Glass (Consolidado + Cuentas)
+│   │   │   ├── HeroBalance.tsx     # Carrusel táctil en móvil / Patrimonio y bandeja paralela de fuentes en PC
 │   │   │   ├── MetricPillars.tsx   # Los 3 pilares (Ingresos, Gastos, Inversión)
+│   │   │   ├── DesktopInvestmentWidget.tsx # Widget de cartera de inversiones para columna lateral en PC
+│   │   │   ├── DesktopBudgetsWidget.tsx    # Widget de presupuestos y progreso de categorías en PC
 │   │   │   ├── RecentTransactionsList.tsx # Listado de últimos movimientos filtrable con modal de edición
-│   │   │   ├── SwipeableTransactionItem.tsx # Elemento deslizable bidireccional (derecha: editar, izquierda: eliminar)
+│   │   │   ├── SwipeableTransactionItem.tsx # Elemento con swipe táctil en móvil y hover/clic directo en PC
 │   │   │   └── RecurrenceSummaryWidget.tsx # Widget de pagos y cobros próximos recurrentes
 │   │   ├── investments/            # Vista de Cartera de Inversiones
 │   │   │   └── InvestmentsView.tsx # Tarjetas de activos, rentabilidad P&L y filtros
@@ -138,30 +139,31 @@ Fluo/
 
 ## 5. Principios de Renderizado, Responsive y Liquid Glass
 
-### Arquitectura de Navegación Dual
+### Arquitectura de Navegación y Header Superior en PC
 | Breakpoint | Sistema de Nav | Descripción |
 | :--- | :--- | :--- |
-| `< lg` (< 1024px) — Mobile/Tablet | `FloatingNavbar` (dock inferior) | Barra flotante Liquid Glass `fixed bottom-4`, grid 4 columnas: Inicio, Estadísticas, Inversiones, (+) |
-| `≥ lg` (≥ 1024px) — Desktop/PC | `DesktopSidebar` (barra lateral) | Sidebar fija `w-64 fixed left-0 h-screen`, logo, navegación con pill activo, CTA, mini-card de perfil |
+| `< lg` (< 1024px) — Mobile/Tablet | `FloatingNavbar` (dock inferior compacto) | Barra flotante Liquid Glass `fixed bottom-4 max-w-sm`, grid 4 columnas: Inicio, Estadísticas, Inversiones, (+) |
+| `≥ lg` (≥ 1024px) — Desktop/PC | `FloatingNavbar` (dock inferior expandido) + Header `max-w-7xl` | Barra flotante centrada fija `fixed bottom-6 max-w-xl mx-auto px-6 py-2.5 rounded-full backdrop-blur-2xl bg-slate-900/60 border-white/15`, con `:hover` de ratón. Header superior `w-full max-w-7xl mx-auto px-8 py-6` con wordmark Fluo y perfil/PIN/sync a la derecha |
 
 ### Grid Layout por Vista
 | Vista | Mobile (`< lg`) | Desktop (`≥ lg`) |
 | :--- | :--- | :--- |
-| **Home** | Stack vertical: HeroBalance → MetricPillars → Recurrences → Transactions | `grid-cols-12`: col-8 (Hero + Pillars + Transactions) + col-4 sticky (Recurrences + Quick-Action) |
-| **Estadísticas** | Stack vertical de tarjetas analíticas | Stack vertical dentro del área de contenido `lg:ml-64` |
-| **Inversiones** | Listado de activos vertical | Listado dentro del área de contenido `lg:ml-64` |
+| **Home** | Stack vertical: HeroBalance → MetricPillars → Recurrences → Transactions | `grid-cols-12`: Columna Principal (8/12: Patrimonio + bandeja paralela estática de fuentes sin swipe + KPIs + Transacciones con clic directo/hover) + Columna Secundaria (4/12: Cartera de inversiones + Presupuestos activos + Próximos cobros/pagos) |
+| **Estadísticas (`/stats`)** | Selector de periodo/mes + Tabs segmentados de gráficos en stack vertical | Selector superior unificado + Cuadrícula 2x2 amplia mostrando simultáneamente los 4 gráficos (Evolución Temporal, Ahorro Neto, Distribución por Categorías y Top Comercios) con tooltips activados por hover |
+| **Inversiones (`/investments`)** | Tarjeta de cartera con métricas 2 cols + lista vertical de activos | Tarjeta de cartera con métricas 4 cols (`lg:grid-cols-4`) + Cuadrícula de 2 columnas de activos registrados (`lg:grid-cols-2`) |
+| **Modales** | Bottom sheet / diálogo centrado según dispositivo | Tarjetas flotantes centradas (`max-w-lg w-full backdrop-blur-3xl bg-slate-950/80 border-white/15 rounded-3xl p-8 shadow-2xl`), cierre por `Escape` o clic fuera del modal, selectores visibles o dropdowns sin scroll horizontal forzado con ratón |
 
 ### Breakpoints de Tailwind en Fluo
 | Prefijo | Ancho mínimo | Uso principal |
 | :--- | :--- | :--- |
-| `sm:` | 640px | Ajustes de tipografía y padding secundarios |
+| `sm:` | 640px | Ajustes de tipografía, gap y padding secundarios |
 | `md:` | 768px | Transiciones de tablet (preparación para cambios de layout) |
-| `lg:` | 1024px | **Breakpoint principal**: activa sidebar, oculta BottomNav, habilita grid multi-col |
-| `xl:` | 1280px | Padding adicional en el área de contenido (`xl:px-14`) |
+| `lg:` | 1024px | **Breakpoint principal**: activa layout PC `max-w-7xl`, dock centrado `max-w-xl`, cuadrículas multi-columna sin swipe |
+| `xl:` | 1280px | Expansión de bandejas paralelas (`xl:grid-cols-3` en fuentes) y márgenes de lectura óptimos |
 
 ### Regla de Oro de Desempeño
 - Se evita la multiplicidad de capas de `backdrop-filter: blur()` dentro de listas virtuales o con scroll continuo. Los elementos con scroll usan fondos planos semi-translúcidos (`bg-white/[0.04]`), reservando el desenfoque volumétrico a tarjetas clave, encabezados y la barra de navegación.
-- La sidebar utiliza `transform-gpu` para aislamiento de composición GPU, garantizando que sus efectos de desenfoque no afecten al rendimiento del área de contenido principal.
+- Todo dock flotante y modal utiliza `gpu-layer` y `transform-gpu` para aislamiento de composición por GPU, garantizando 60/120 fps estables.
 - **Logotipos e Identidad de Marcas**: Los avatares de marcas utilizan un fondo oscuro neutro `#111726` sin degradados o líneas especulares blancas.
 
 ---

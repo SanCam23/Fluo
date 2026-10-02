@@ -1028,3 +1028,38 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
 - Producción: `npm run build` compilado exitosamente con code splitting verificado (`initialMockData` en chunk perezoso independiente).
+
+### v0.9.35 (Rediseño y Expansión Responsive para Pantallas Grandes / Desktop PC ≥ 1024px)
+
+**Objetivo:** Adaptar y expandir la experiencia de usuario completa para pantallas grandes (PC / Desktop / Tablet horizontal, `≥ 1024px`), manteniendo intacta la barra de navegación flotante existente y la estética visual Liquid Glass, sin alterar la lógica de negocio ni crear nuevas capacidades, erradicando por completo cualquier interacción de arrastrar o deslizar con ratón en escritorio y preservando la experiencia móvil (`< 1024px`).
+
+- **[x] Barra de Navegación y Header en PC**:
+  - [`FloatingNavbar.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/FloatingNavbar.tsx): Preservada la barra flotante Liquid Glass que ya existe en la app, fijada y centrada horizontalmente como dock de escritorio (`fixed bottom-6 inset-x-4 max-w-xl mx-auto px-6 py-2.5 rounded-full backdrop-blur-2xl bg-slate-900/60 border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.4)]`), con estados `:hover` sutiles y botón central (+) para nuevo movimiento.
+  - Header Superior ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx)): Expandido a `w-full max-w-7xl mx-auto px-8 py-6 flex items-center justify-between` con wordmark oficial de Fluo y accesos de sincronización con Supabase, botón de PIN y avatar de perfil/ajustes.
+- **[x] Contenedor Principal y Grid de Doble Columna en Home**:
+  - [`MobileContainer.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/layout/MobileContainer.tsx): Reemplaza la restricción estrecha en PC con `w-full max-w-7xl mx-auto px-6 lg:px-10 pb-28 pt-2 min-h-screen`, manteniendo `max-w-md` y padding inferior seguro en móvil.
+  - Cuadrícula de 12 columnas en Home ([`App.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/App.tsx)):
+    - **Columna Principal (8 de 12 columnas)**:
+      - [`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx): Tarjeta de Patrimonio Neto Total a ancho completo + Bandeja de fuentes existentes en cuadrícula paralela estática (`grid grid-cols-2 xl:grid-cols-3 gap-4 mt-4`) con selección y deselección por clic directo (anillo activo índigo), erradicando el carrusel con ratón.
+      - [`MetricPillars.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/MetricPillars.tsx): Fila horizontal de KPIs del mes (Ingresos, Gastos y Ahorro Neto).
+      - [`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx) y [`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx): Historial de movimientos con acciones de editar y eliminar accesibles por hover y clic directo (sin requerir swipe).
+    - **Columna Secundaria (4 de 12 columnas)**:
+      - [`DesktopInvestmentWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/DesktopInvestmentWidget.tsx): Resumen de valoración de mercado, coste invertido, rentabilidad no realizada (€ y %) y activos destacados con enlace directo a `/invest`.
+      - [`DesktopBudgetsWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/DesktopBudgetsWidget.tsx): Desglose de presupuestos y gasto del mes por categoría con barras de progreso Liquid Glass y porcentajes acumulados.
+      - [`RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx): Compromisos periódicos con cancelación directa.
+- **[x] Vistas de Estadísticas e Inversiones en PC**:
+  - [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx): Despliegue de cuadrícula 2x2 amplia (`hidden lg:grid lg:grid-cols-2 lg:gap-6`) mostrando simultáneamente los 4 gráficos (Evolución Temporal, Ahorro Neto, Distribución por Categorías y Top Comercios) con tooltips activados por hover, preservando tabs en móvil.
+  - [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx): Cabecera métrica ampliada a 4 columnas (`grid-cols-2 lg:grid-cols-4`) y listado de activos organizado en cuadrícula espaciosa de 2 columnas (`grid-cols-1 lg:grid-cols-2`).
+- **[x] Modales Flotantes en PC con Teclado y Clic Exterior**:
+  - [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), [`ProfileSettingsModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/ProfileSettingsModal.tsx), [`TimeSimulatorModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/TimeSimulatorModal.tsx), [`InitialSourceModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/common/InitialSourceModal.tsx), [`SignOutConfirmModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/auth/SignOutConfirmModal.tsx) y [`SourceAccountManager.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/profile/SourceAccountManager.tsx):
+    - Apertura en PC como tarjetas flotantes centradas (`max-w-lg w-full backdrop-blur-3xl bg-slate-950/80 border border-white/15 rounded-3xl p-8 shadow-2xl`).
+    - Cierre habilitado mediante tecla `Escape` y clic fuera del diálogo en el backdrop oscuro con desenfoque profundo.
+    - Selectores internos desplegables por clic directo (`GlassSelect`) o contenedores con `flex-wrap` sin scroll horizontal forzado.
+- **[x] Preservación de Móvil e Integridad de Lógica**:
+  - La interfaz móvil (`< 1024px`) permanece 100% idéntica, conservando gestos táctiles, carruseles de fuentes y swipe en transacciones.
+  - Cero nuevas funcionalidades de negocio, campos de formulario ni botones inexistentes.
+
+**Validación de Calidad:**
+- Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
+- TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
+- Producción: `npm run build` compilado exitosamente con chunks optimizados y Service Worker PWA activo.

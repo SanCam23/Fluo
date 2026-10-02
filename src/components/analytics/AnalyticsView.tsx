@@ -777,416 +777,442 @@ export const AnalyticsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Section Switcher: Tipos de Visualización */}
-      <div className="flex items-center gap-1 bg-white/[0.06] light:bg-slate-200/70 p-1 rounded-2xl border border-white/10 light:border-slate-300">
-        <button
-          type="button"
-          onClick={() => setActiveChartSection('savings')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            activeChartSection === 'savings'
-              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-          }`}
-        >
-          <PiggyBank className="h-3.5 w-3.5" />
-          <span>Ahorro</span>
-        </button>
+      {/* 3. Helper Renderers for Chart Sections */}
+      {(() => {
+        const renderSavingsChart = () => (
+          <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3 relative overflow-hidden transition-all duration-300">
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-        <button
-          type="button"
-          onClick={() => setActiveChartSection('categories')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            activeChartSection === 'categories'
-              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-          }`}
-        >
-          <PieIcon className="h-3.5 w-3.5" />
-          <span>Categorías</span>
-        </button>
+            {/* Ambient Glow */}
+            <div
+              className={`pointer-events-none absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl transition-colors duration-500 ${
+                savingsMetrics.isPositive ? 'bg-emerald-500/10' : 'bg-rose-500/10'
+              }`}
+            />
 
-        <button
-          type="button"
-          onClick={() => setActiveChartSection('comparison')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            activeChartSection === 'comparison'
-              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-          }`}
-        >
-          <BarChart3 className="h-3.5 w-3.5" />
-          <span>Mensual</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveChartSection('networth')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            activeChartSection === 'networth'
-              ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-          }`}
-        >
-          <Layers className="h-3.5 w-3.5" />
-          <span>Patrimonio</span>
-        </button>
-      </div>
-
-      {/* 4. CHART SECTION 1: Evolución del Ahorro */}
-      {activeChartSection === 'savings' && (
-        <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3 relative overflow-hidden transition-all duration-300">
-          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-
-          {/* Ambient Glow */}
-          <div
-            className={`pointer-events-none absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl transition-colors duration-500 ${
-              savingsMetrics.isPositive ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-            }`}
-          />
-
-          <div className="flex items-center justify-between relative z-10 gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución del Ahorro</h3>
-              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">
-                {savingsChartMode === 'accumulated'
-                  ? 'Trayectoria acumulada a lo largo del tiempo'
-                  : 'Ahorro neto obtenido por cada corte del periodo'}
-              </p>
-            </div>
-
-            {/* Mode toggle */}
-            <div className="flex items-center bg-white/[0.06] light:bg-slate-200/70 p-0.5 rounded-xl border border-white/10 light:border-slate-300 text-[10px] flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setSavingsChartMode('accumulated')}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  savingsChartMode === 'accumulated'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
-                    : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                Acumulado
-              </button>
-              <button
-                type="button"
-                onClick={() => setSavingsChartMode('net')}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  savingsChartMode === 'net'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
-                    : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                Neto
-              </button>
-            </div>
-          </div>
-
-          {/* Area Chart Container */}
-          <div className="h-60 w-full pt-2 relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={savingsEvolutionData}
-                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="savingsAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
-                      stopOpacity={0.0}
-                    />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="label"
-                  stroke="#94A3B8"
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                />
-                <YAxis
-                  stroke="#94A3B8"
-                  fontSize={9}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => formatCompactCurrency(v)}
-                />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
-                <Tooltip content={<SavingsCustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey={savingsChartMode === 'accumulated' ? 'accumulatedSavings' : 'netSavings'}
-                  name={savingsChartMode === 'accumulated' ? 'Ahorro Acumulado' : 'Ahorro Neto'}
-                  stroke={savingsMetrics.isPositive ? '#34D399' : '#FB7185'}
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#savingsAreaGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Quick Monthly Superávit/Déficit Row */}
-          <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center relative z-10">
-            {monthlyComparisonData.map((m) => {
-              const net = m.income - m.expense;
-              const isPositive = net >= 0;
-              return (
-                <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
-                  <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
-                  <span
-                    className={`text-[11px] font-bold block truncate ${
-                      isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
-                    }`}
-                  >
-                    {isPositive ? '+' : ''}
-                    {Math.round(net)}€
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 5. CHART SECTION 2: Donut de Categorías */}
-      {activeChartSection === 'categories' && (
-        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Distribución de Gastos</h3>
-              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Porcentaje por categoría en el periodo</p>
-            </div>
-            <span className="text-xs font-bold text-rose-400 light:text-rose-600 bg-rose-500/10 light:bg-rose-50 px-2.5 py-1 rounded-full border border-rose-500/20 light:border-rose-200 flex-shrink-0 whitespace-nowrap">
-              -{formatCurrency(periodExpense)}
-            </span>
-          </div>
-
-          {categoryChartData.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-400 light:text-slate-500">
-              No hay gastos registrados en este periodo.
-            </div>
-          ) : (
-            <>
-              {/* Donut Chart with Centered Total */}
-              <div className="relative h-60 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip content={<GlassTooltip />} />
-                    <Pie
-                      data={categoryChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={68}
-                      outerRadius={92}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="rgba(255,255,255,0.1)"
-                      strokeWidth={1}
-                    >
-                      {categoryChartData.map((entry) => (
-                        <Cell key={entry.id} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-
-                {/* Donut Center Display */}
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 light:text-slate-500">
-                    Total Gastado
-                  </span>
-                  <span className="text-lg font-black text-white light:text-slate-900 leading-tight">
-                    {formatCurrency(periodExpense)}
-                  </span>
-                </div>
+            <div className="flex items-center justify-between relative z-10 gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución del Ahorro</h3>
+                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">
+                  {savingsChartMode === 'accumulated'
+                    ? 'Trayectoria acumulada a lo largo del tiempo'
+                    : 'Ahorro neto obtenido por cada corte del periodo'}
+                </p>
               </div>
 
-              {/* Interactive Category Chips Legend */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-white/10 light:border-slate-200/80">
-                {categoryChartData.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] light:bg-white/80 light:hover:bg-white border border-transparent light:border-slate-200/80 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-                      <span
-                        className="h-3 w-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: cat.color }}
+              {/* Mode toggle */}
+              <div className="flex items-center bg-white/[0.06] light:bg-slate-200/70 p-0.5 rounded-xl border border-white/10 light:border-slate-300 text-[10px] flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSavingsChartMode('accumulated')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    savingsChartMode === 'accumulated'
+                      ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
+                      : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
+                  }`}
+                >
+                  Acumulado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSavingsChartMode('net')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    savingsChartMode === 'net'
+                      ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-slate-900 light:shadow-sm'
+                      : 'text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900'
+                  }`}
+                >
+                  Neto
+                </button>
+              </div>
+            </div>
+
+            {/* Area Chart Container */}
+            <div className="h-60 w-full pt-2 relative z-10">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={savingsEvolutionData}
+                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="savingsAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
+                        stopOpacity={0.3}
                       />
-                      <span className="text-xs font-semibold text-slate-200 light:text-slate-800 truncate">{cat.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
-                      <span className="text-xs font-bold text-white light:text-slate-900">
-                        {formatCurrency(cat.value)}
-                      </span>
-                      <span className="text-[10px] font-semibold text-slate-400 light:text-slate-600 bg-white/5 light:bg-slate-100 px-1.5 py-0.5 rounded-md">
-                        {cat.percentage.toFixed(1)}%
-                      </span>
-                    </div>
+                      <stop
+                        offset="95%"
+                        stopColor={savingsMetrics.isPositive ? '#10B981' : '#F43F5E'}
+                        stopOpacity={0.0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="label"
+                    stroke="#94A3B8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={9}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCompactCurrency(v)}
+                  />
+                  <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                  <Tooltip content={<SavingsCustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey={savingsChartMode === 'accumulated' ? 'accumulatedSavings' : 'netSavings'}
+                    name={savingsChartMode === 'accumulated' ? 'Ahorro Acumulado' : 'Ahorro Neto'}
+                    stroke={savingsMetrics.isPositive ? '#34D399' : '#FB7185'}
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#savingsAreaGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Quick Monthly Superávit/Déficit Row */}
+            <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center relative z-10">
+              {monthlyComparisonData.map((m) => {
+                const net = m.income - m.expense;
+                const isPositive = net >= 0;
+                return (
+                  <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
+                    <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
+                    <span
+                      className={`text-[11px] font-bold block truncate ${
+                        isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
+                      }`}
+                    >
+                      {isPositive ? '+' : ''}
+                      {Math.round(net)}€
+                    </span>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+        );
+
+        const renderCategoriesChart = () => (
+          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Distribución de Gastos</h3>
+                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Porcentaje por categoría en el periodo</p>
               </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* 6. CHART SECTION 3: Barras Comparativas Mensuales */}
-      {activeChartSection === 'comparison' && (
-        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Flujo Mensual Comparativo</h3>
-              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Ingresos vs Gastos vs Ahorro acumulado</p>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] flex-shrink-0 whitespace-nowrap">
-              <span className="flex items-center gap-1 text-emerald-400 light:text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 light:bg-emerald-600" /> Ingreso
-              </span>
-              <span className="flex items-center gap-1 text-rose-400 light:text-rose-700">
-                <span className="h-2 w-2 rounded-full bg-rose-400 light:bg-rose-600" /> Gasto
-              </span>
-              <span className="flex items-center gap-1 text-indigo-400 light:text-indigo-700">
-                <span className="h-2 w-2 rounded-full bg-indigo-400 light:bg-indigo-600" /> Ahorro
+              <span className="text-xs font-bold text-rose-400 light:text-rose-600 bg-rose-500/10 light:bg-rose-50 px-2.5 py-1 rounded-full border border-rose-500/20 light:border-rose-200 flex-shrink-0 whitespace-nowrap">
+                -{formatCurrency(periodExpense)}
               </span>
             </div>
-          </div>
 
-          <div className="h-64 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={monthlyComparisonData}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
-                <XAxis
-                  dataKey="label"
-                  stroke="#94A3B8"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                />
-                <YAxis
-                  stroke="#94A3B8"
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
-                />
-                <Tooltip content={<GlassTooltip />} />
-                <Bar
-                  dataKey="income"
-                  name="Ingresos"
-                  fill="#10B981"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-                <Bar
-                  dataKey="expense"
-                  name="Gastos"
-                  fill="#EF4444"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-                <Bar
-                  dataKey="savings"
-                  name="Ahorro"
-                  fill="#6366F1"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={18}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            {categoryChartData.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 light:text-slate-500">
+                No hay gastos registrados en este periodo.
+              </div>
+            ) : (
+              <>
+                {/* Donut Chart with Centered Total */}
+                <div className="relative h-60 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip content={<GlassTooltip />} />
+                      <Pie
+                        data={categoryChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={68}
+                        outerRadius={92}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="rgba(255,255,255,0.1)"
+                        strokeWidth={1}
+                      >
+                        {categoryChartData.map((entry) => (
+                          <Cell key={entry.id} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
 
-          {/* Quick Monthly Superávit/Déficit Row */}
-          <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center">
-            {monthlyComparisonData.map((m) => {
-              const net = m.income - m.expense;
-              const isPositive = net >= 0;
-              return (
-                <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
-                  <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
-                  <span
-                    className={`text-[11px] font-bold block truncate ${
-                      isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
-                    }`}
-                  >
-                    {isPositive ? '+' : ''}
-                    {Math.round(net)}€
-                  </span>
+                  {/* Donut Center Display */}
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 light:text-slate-500">
+                      Total Gastado
+                    </span>
+                    <span className="text-lg font-black text-white light:text-slate-900 leading-tight">
+                      {formatCurrency(periodExpense)}
+                    </span>
+                  </div>
                 </div>
-              );
-            })}
+
+                {/* Interactive Category Chips Legend */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/10 light:border-slate-200/80">
+                  {categoryChartData.map((cat) => (
+                    <div
+                      key={cat.id}
+                      className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] light:bg-white/80 light:hover:bg-white border border-transparent light:border-slate-200/80 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                        <span
+                          className="h-3 w-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="text-xs font-semibold text-slate-200 light:text-slate-800 truncate">{cat.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
+                        <span className="text-xs font-bold text-white light:text-slate-900">
+                          {formatCurrency(cat.value)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400 light:text-slate-600 bg-white/5 light:bg-slate-100 px-1.5 py-0.5 rounded-md">
+                          {cat.percentage.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        );
 
-      {/* 7. CHART SECTION 4: Evolución del Patrimonio Neto */}
-      {activeChartSection === 'networth' && (
-        <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+        const renderComparisonChart = () => (
+          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución de Patrimonio</h3>
-              <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Balance acumulado + Cartera de inversión</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Flujo Mensual Comparativo</h3>
+                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Ingresos vs Gastos vs Ahorro acumulado</p>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] flex-shrink-0 whitespace-nowrap">
+                <span className="flex items-center gap-1 text-emerald-400 light:text-emerald-700">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 light:bg-emerald-600" /> Ingreso
+                </span>
+                <span className="flex items-center gap-1 text-rose-400 light:text-rose-700">
+                  <span className="h-2 w-2 rounded-full bg-rose-400 light:bg-rose-600" /> Gasto
+                </span>
+                <span className="flex items-center gap-1 text-indigo-400 light:text-indigo-700">
+                  <span className="h-2 w-2 rounded-full bg-indigo-400 light:bg-indigo-600" /> Ahorro
+                </span>
+              </div>
             </div>
-            <span className="text-xs font-bold text-indigo-400 light:text-indigo-700 bg-indigo-500/10 light:bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-500/20 light:border-indigo-200 flex-shrink-0 whitespace-nowrap">
-              {formatCurrency(netWorthData[netWorthData.length - 1]?.netWorth || 0)}
-            </span>
-          </div>
 
-          <div className="h-64 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={netWorthData}
-                margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="gradientNetWorth" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="month"
-                  stroke="#94A3B8"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                />
-                <YAxis
-                  stroke="#94A3B8"
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
-                />
-                <Tooltip content={<GlassTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="netWorth"
-                  name="Patrimonio Neto"
-                  stroke="#818CF8"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#gradientNetWorth)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-64 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={monthlyComparisonData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <XAxis
+                    dataKey="label"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
+                  />
+                  <Tooltip content={<GlassTooltip />} />
+                  <Bar
+                    dataKey="income"
+                    name="Ingresos"
+                    fill="#10B981"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={18}
+                  />
+                  <Bar
+                    dataKey="expense"
+                    name="Gastos"
+                    fill="#EF4444"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={18}
+                  />
+                  <Bar
+                    dataKey="savings"
+                    name="Ahorro"
+                    fill="#6366F1"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={18}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Quick Monthly Superávit/Déficit Row */}
+            <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-white/10 light:border-slate-200/80 text-center">
+              {monthlyComparisonData.map((m) => {
+                const net = m.income - m.expense;
+                const isPositive = net >= 0;
+                return (
+                  <div key={m.label} className="p-1.5 rounded-xl bg-white/[0.03] light:bg-slate-100 border border-white/5 light:border-slate-200 min-w-0">
+                    <span className="text-[10px] text-slate-400 light:text-slate-500 block font-medium truncate">{m.label}</span>
+                    <span
+                      className={`text-[11px] font-bold block truncate ${
+                        isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'
+                      }`}
+                    >
+                      {isPositive ? '+' : ''}
+                      {Math.round(net)}€
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+
+        const renderNetWorthChart = () => (
+          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución de Patrimonio</h3>
+                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Balance acumulado + Cartera de inversión</p>
+              </div>
+              <span className="text-xs font-bold text-indigo-400 light:text-indigo-700 bg-indigo-500/10 light:bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-500/20 light:border-indigo-200 flex-shrink-0 whitespace-nowrap">
+                {formatCurrency(netWorthData[netWorthData.length - 1]?.netWorth || 0)}
+              </span>
+            </div>
+
+            <div className="h-64 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={netWorthData}
+                  margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="gradientNetWorth" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.6} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="month"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
+                  />
+                  <Tooltip content={<GlassTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="netWorth"
+                    name="Patrimonio Neto"
+                    stroke="#818CF8"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#gradientNetWorth)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+
+        return (
+          <>
+            {/* Section Switcher: Tipos de Visualización (Mobile only, <lg) */}
+            <div className="lg:hidden flex items-center gap-1 bg-white/[0.06] light:bg-slate-200/70 p-1 rounded-2xl border border-white/10 light:border-slate-300">
+              <button
+                type="button"
+                onClick={() => setActiveChartSection('savings')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeChartSection === 'savings'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                <PiggyBank className="h-3.5 w-3.5" />
+                <span>Ahorro</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveChartSection('categories')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeChartSection === 'categories'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                <PieIcon className="h-3.5 w-3.5" />
+                <span>Categorías</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveChartSection('comparison')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeChartSection === 'comparison'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                <span>Mensual</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveChartSection('networth')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeChartSection === 'networth'
+                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>Patrimonio</span>
+              </button>
+            </div>
+
+            {/* Mobile View: Single Tab (<lg) */}
+            <div className="lg:hidden flex flex-col gap-4">
+              {activeChartSection === 'savings' && renderSavingsChart()}
+              {activeChartSection === 'categories' && renderCategoriesChart()}
+              {activeChartSection === 'comparison' && renderComparisonChart()}
+              {activeChartSection === 'networth' && renderNetWorthChart()}
+            </div>
+
+            {/* Desktop View: All 4 charts in expansive 2x2 grid (≥lg) */}
+            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-6 items-start">
+              {/* Left Column */}
+              <div className="flex flex-col gap-6">
+                {renderSavingsChart()}
+                {renderComparisonChart()}
+              </div>
+
+              {/* Right Column */}
+              <div className="flex flex-col gap-6">
+                {renderCategoriesChart()}
+                {renderNetWorthChart()}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* 7. Ranking de Marcas Más Frecuentes (Gráfico Horizontal con Logos Reales) */}
       <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">

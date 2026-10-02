@@ -365,12 +365,15 @@ Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El br
 
 | Patrón | Implementación | Componentes |
 | :--- | :--- | :--- |
-| **Selector de cuenta por tabs** | Fila de botones pill clicables + `ChevronLeft/Right` explícitos | `HeroBalance.tsx` (desktop branch `hidden lg:flex`) |
-| **Grid de tarjeta activa** | Tarjeta consolidada siempre visible + tarjeta de cuenta activa bajo los tabs | `HeroBalance.tsx` |
-| **Eliminar / Editar por hover** | `opacity-0 group-hover:opacity-100` en botones `Pencil` y `Trash2` | `SwipeableTransactionItem.tsx` |
+| **Bandeja estática paralela de fuentes** | `grid grid-cols-2 xl:grid-cols-3 gap-4 mt-4` con clic directo para seleccionar/deseleccionar | `HeroBalance.tsx` |
+| **Tarjeta de patrimonio neto** | Tarjeta completa ocupando todo el ancho de la columna principal | `HeroBalance.tsx` |
+| **Dock flotante centrado** | Barra Liquid Glass fija centrada horizontalmente `max-w-xl mx-auto px-6 py-2.5 rounded-full` con estados `:hover` sutiles | `FloatingNavbar.tsx` |
+| **Header superior completo** | Barra superior expandida `max-w-7xl mx-auto px-8 py-6` con wordmark y perfil/PIN/sync | `App.tsx` |
+| **Eliminar / Editar por hover/clic** | `lg:opacity-60 lg:group-hover:opacity-100` y clic directo para editar | `SwipeableTransactionItem.tsx` |
 | **Filtros wrap sin scroll** | `lg:overflow-x-visible lg:flex-wrap` | `RecentTransactionsList`, `InvestmentsView`, `AnalyticsView`, `RecurrenceSummaryWidget` |
-| **Cursor** | `cursor-pointer` (nunca `cursor-grab`) | Todos los componentes de lista |
+| **Cursor** | `cursor-pointer` (estrictamente prohibido `cursor-grab`) | Todos los componentes de lista e interacción |
 | **Navegación teclado** | `Escape` para cerrar modales, `Tab` para navegación de foco, `Enter` para confirmar | Modales Liquid Glass |
+| **Widgets de Columna Secundaria** | Cartera de inversiones y Presupuestos activos en cuadrícula fija | `DesktopInvestmentWidget.tsx`, `DesktopBudgetsWidget.tsx` |
 
 ### 5.3. Reglas Obligatorias
 
@@ -378,4 +381,46 @@ Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El br
 2. **Nunca ocultar opciones de acción detrás de swipe en desktop.** Toda acción debe ser accesible por clic directo en estado visible o por hover (`group-hover:opacity-100`).
 3. **`overflow-x-auto` sin barra visible es un antipatrón de UX en desktop.** Siempre complementar con `lg:overflow-x-visible lg:flex-wrap` para que el ratón pueda acceder a todos los elementos sin arrastrar.
 4. **Tooltips y detalles de gráficos se activan con `mouseover/hover`** en recharts — no requieren clics mantenidos ni arrastres.
+5. **Todos los modales deben soportar tecla `Escape` y clic fuera del diálogo** para su cierre inmediato en escritorio.
+
+---
+
+## 27. Especificaciones Liquid Glass para Pantallas Grandes (Desktop / PC ≥ 1024px)
+
+### 27.1. Dock Flotante Centrado (`FloatingNavbar`)
+- **Geometría y Posicionamiento**:
+  - `fixed bottom-6 inset-x-4 max-w-xl mx-auto z-50 p-1.5 lg:px-6 lg:py-2.5 rounded-full`
+  - Sustrato: `bg-slate-900/60 backdrop-blur-2xl border border-white/15`
+  - Sombra volumétrica de profundidad: `shadow-[0_8px_32px_rgba(0,0,0,0.4)]`
+  - Destello perimetral superior: `h-px bg-gradient-to-r from-transparent via-white/30 to-transparent`
+  - Micro-interacción: Hover suave en botones inactivos (`hover:bg-white/[0.08]`) y escala al presionar (`active:scale-95`).
+
+### 27.2. Bandeja de Fuentes en Paralelo (`HeroBalance`)
+- **Sustitución del Carrusel**:
+  - En lugar de forzar el arrastre con ratón sobre el carrusel táctil, en escritorio se presentan todas las cuentas registradas en una cuadrícula estática: `grid grid-cols-2 xl:grid-cols-3 gap-4 mt-4`.
+  - Cada tarjeta individual muestra:
+    - Avatar vítreo de la entidad (`SourceAvatar`).
+    - Nombre de la fuente y etiqueta de tipo (`Banco` / `Efectivo`).
+    - Saldo formateado en tipografía semibold destacada.
+    - Indicador de estado activo con anillo refractivo índigo (`ring-2 ring-indigo-500/50 bg-white/[0.09]`) al hacer clic directo.
+    - Botón para restablecer la vista al patrimonio consolidado cuando una fuente específica está seleccionada.
+
+### 27.3. Columna Secundaria de Widgets (4 de 12 Columnas en Home)
+- **Cartera de Inversiones (`DesktopInvestmentWidget`)**:
+  - Tarjeta Liquid Glass (`p-5 rounded-3xl bg-white/[0.05] backdrop-blur-2xl border border-white/10 shadow-xl`).
+  - Muestra valor actual de mercado, capital total invertido y rentabilidad no realizada (€ y %).
+  - Listado de principales activos en cartera con insignia de tipo de activo y acceso directo a la pestaña `/invest`.
+- **Presupuestos Activos (`DesktopBudgetsWidget`)**:
+  - Tarjeta Liquid Glass con desglose de gasto del mes por categorías principales.
+  - Barras de progreso visuales con color de categoría y porcentaje respecto al gasto acumulado total.
+- **Próximos Pagos y Cobros (`RecurrenceSummaryWidget`)**:
+  - Tarjetas de compromisos periódicos accesibles y cancelables con un solo clic.
+
+### 27.4. Modales Flotantes en PC (`QuickAddTransactionModal`, `ProfileSettingsModal`, `TimeSimulatorModal`)
+- **Contenedor y Capa de Enfoque**:
+  - Tarjeta flotante centrada: `max-w-lg w-full bg-slate-950/80 backdrop-blur-3xl border border-white/15 rounded-3xl p-8 shadow-2xl`.
+  - Capa de fondo oscura con desenfoque profundo: `bg-slate-950/80 backdrop-blur-3xl`.
+  - Cierre universal: Listener global para tecla `Escape` y evento `onClick` sobre el backdrop (con detención de propagación en la tarjeta).
+  - Selectores internos desplegables mediante clic directo (`GlassSelect`) o pastillas flexibles con ajuste de línea (`flex-wrap gap-2`), erradicando cualquier contenedor con scroll horizontal forzado.
+
 

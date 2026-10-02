@@ -9,8 +9,6 @@ import {
   TrendingDown,
   PieChart,
   Layers,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { useFinanceStore, useFinancialSummary } from '../../store/useFinanceStore';
 import type { PillarType, Transaction, SourceAccount } from '../../types/finance';
@@ -37,6 +35,11 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
   const sources = useFinanceStore((state) => state.sources);
   const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const setActiveSourceId = useFinanceStore((state) => state.setActiveSourceId);
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) : null),
+    [sources, activeSourceId]
+  );
 
   const sortedSources = useMemo(
     () => [...sources].sort((a, b) => a.orderIndex - b.orderIndex),
@@ -92,13 +95,6 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
       left: targetLeft,
       behavior: 'smooth',
     });
-    setActiveSlide(index);
-    const newSourceId = index === 0 ? null : (sortedSources[index - 1]?.id ?? null);
-    setActiveSourceId(newSourceId);
-  };
-
-  // Desktop: navigate by clicking prev/next buttons or source tab
-  const selectDesktopSource = (index: number) => {
     setActiveSlide(index);
     const newSourceId = index === 0 ? null : (sortedSources[index - 1]?.id ?? null);
     setActiveSourceId(newSourceId);
@@ -544,150 +540,136 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          DESKTOP (≥lg): Static grid layout — no swipe, click to select
+          DESKTOP (≥lg): Static parallel layout — no swipe, direct click
           ══════════════════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex flex-col gap-4">
 
-        {/* ── Consolidated / Pillar card (always visible) ── */}
+        {/* ── 1. Tarjeta de Patrimonio Neto Total / Pilar Activo ── */}
         <div
-          className={`relative overflow-hidden rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border ${theme.border} p-5 ${theme.shadow} transition-all duration-500`}
+          className={`relative overflow-hidden rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border ${theme.border} p-6 ${theme.shadow} transition-all duration-500`}
         >
           <div className={`pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r ${theme.hairline} transition-all duration-500`} />
 
-          <div className="flex items-start justify-between gap-4">
-            {/* Left: icon + title + big number */}
-            <div className="flex flex-col gap-3 flex-1 min-w-0">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 border border-white/15 flex-shrink-0">
-                  {selectedPillar === 'income' && <ArrowUpRight className="h-4 w-4 text-emerald-400" />}
-                  {selectedPillar === 'expense' && <ArrowDownRight className="h-4 w-4 text-rose-400" />}
-                  {selectedPillar === 'invest' && <PieChart className="h-4 w-4 text-indigo-400" />}
-                  {selectedPillar === 'all' && <Layers className="h-4 w-4 text-indigo-400" />}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 border border-white/15 flex-shrink-0">
+                  {selectedPillar === 'income' && <ArrowUpRight className="h-4.5 w-4.5 text-emerald-400" />}
+                  {selectedPillar === 'expense' && <ArrowDownRight className="h-4.5 w-4.5 text-rose-400" />}
+                  {selectedPillar === 'invest' && <PieChart className="h-4.5 w-4.5 text-indigo-400" />}
+                  {selectedPillar === 'all' && <Layers className="h-4.5 w-4.5 text-indigo-400" />}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold truncate ${theme.accentText}`}>{theme.title}</span>
+                    <span className={`text-base font-bold truncate ${theme.accentText}`}>{theme.title}</span>
                     <span className={`flex h-1.5 w-1.5 rounded-full ${theme.dot} animate-pulse flex-shrink-0`} />
                   </div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Balance Consolidado</span>
-                </div>
-                <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-                  {(selectedPillar === 'all' || selectedPillar === 'invest') && (
-                    <button
-                      type="button"
-                      onClick={() => refreshAllAssetPrices()}
-                      disabled={isLiveUpdating}
-                      className="p-1.5 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                      title="Actualizar cotizaciones en vivo"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 ${isLiveUpdating ? 'animate-spin text-indigo-400' : ''}`} />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowBalance(!showBalance)}
-                    className="p-1.5 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                    title={showBalance ? 'Ocultar balance' : 'Mostrar balance'}
-                  >
-                    {showBalance ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                  </button>
+                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                    {activeSource ? `Fuente filtrada: ${activeSource.name}` : 'Patrimonio Neto Total (Consolidado)'}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-baseline gap-1">
-                {showBalance ? (
-                  <>
-                    {theme.sign && (
-                      <span className={`text-3xl font-extrabold mr-0.5 ${theme.signColor}`}>{theme.sign}</span>
-                    )}
-                    <span className="text-4xl font-extrabold tracking-tight text-white drop-shadow-md">{integerPart}</span>
-                    {decimalPart && (
-                      <span className="text-2xl font-bold text-slate-300">,{decimalPart}</span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-3xl font-extrabold tracking-widest text-slate-400">•••••••• €</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {(selectedPillar === 'all' || selectedPillar === 'invest') && (
+                  <button
+                    type="button"
+                    onClick={() => refreshAllAssetPrices()}
+                    disabled={isLiveUpdating}
+                    className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                    title="Actualizar cotizaciones en vivo"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLiveUpdating ? 'animate-spin text-indigo-400' : ''}`} />
+                  </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setShowBalance(!showBalance)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                  title={showBalance ? 'Ocultar balance' : 'Mostrar balance'}
+                >
+                  {showBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
-            {/* Right: sub-metrics grid */}
-            <div className="w-64 flex-shrink-0">
-              <SubMetrics />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Source account cards grid (clickable, no swipe) ── */}
-        {sortedSources.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {/* Source tab selector row */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* "All sources" tab */}
-              <button
-                type="button"
-                onClick={() => selectDesktopSource(0)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer border ${
-                  activeSlide === 0
-                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 shadow-sm'
-                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border-white/10 hover:border-white/20'
-                }`}
-                aria-label="Vista consolidada"
-                title="Ver balance consolidado"
-              >
-                <Layers className="h-3 w-3 flex-shrink-0" />
-                <span>Consolidado</span>
-              </button>
-              {sortedSources.map((source, idx) => (
-                <button
-                  key={source.id}
-                  type="button"
-                  onClick={() => selectDesktopSource(idx + 1)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer border ${
-                    activeSlide === idx + 1
-                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 shadow-sm'
-                      : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 border-white/10 hover:border-white/20'
-                  }`}
-                  aria-label={`Ver ${source.name}`}
-                  title={`Ver balance de ${source.name}`}
-                >
-                  <SourceAvatar source={source} size="xs" />
-                  <span className="truncate max-w-[120px]">{source.name}</span>
-                </button>
-              ))}
-
-              {/* Prev / Next chevron buttons for keyboard/mouse users */}
-              {totalSlides > 2 && (
-                <div className="ml-auto flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => selectDesktopSource(Math.max(0, activeSlide - 1))}
-                    disabled={activeSlide === 0}
-                    className="p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
-                    aria-label="Cuenta anterior"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectDesktopSource(Math.min(totalSlides - 1, activeSlide + 1))}
-                    disabled={activeSlide === totalSlides - 1}
-                    className="p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
-                    aria-label="Cuenta siguiente"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+            <div className="flex items-baseline gap-1 my-1">
+              {showBalance ? (
+                <>
+                  {theme.sign && (
+                    <span className={`text-4xl font-extrabold mr-1 ${theme.signColor}`}>{theme.sign}</span>
+                  )}
+                  <span className="text-5xl font-black tracking-tight text-white drop-shadow-md">{integerPart}</span>
+                  {decimalPart && (
+                    <span className="text-3xl font-bold text-slate-300">,{decimalPart}</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-4xl font-extrabold tracking-widest text-slate-400">•••••••• €</span>
               )}
             </div>
 
-            {/* Active source card (no swipe — click the tab above to switch) */}
-            {activeSlide > 0 && sortedSources[activeSlide - 1] && (
-              <div className="relative overflow-hidden rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition-all duration-300 flex flex-col gap-0">
-                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-                <SourceCardContent source={sortedSources[activeSlide - 1]} />
-              </div>
-            )}
+            <SubMetrics />
+          </div>
+        </div>
+
+        {/* ── 2. Bandeja de Fuentes existentes en paralelo (grid grid-cols-2 xl:grid-cols-3 gap-4 mt-4) ── */}
+        {sortedSources.length > 0 && (
+          <div className="flex flex-col gap-2.5 mt-1">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Fuentes Financieras ({sortedSources.length})
+              </span>
+              {activeSourceId && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSourceId(null)}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer transition-colors"
+                >
+                  Restablecer a Consolidado ✕
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+              {sortedSources.map((source) => {
+                const balanceInfo = sourceBalancesMap.get(source.id) ?? computeSourceBalance(source, transactions);
+                const isSelected = activeSourceId === source.id;
+                const isBank = source.type === 'bank';
+
+                return (
+                  <button
+                    key={source.id}
+                    type="button"
+                    onClick={() => setActiveSourceId(isSelected ? null : source.id)}
+                    className={`relative p-4 rounded-2xl border text-left backdrop-blur-xl transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[110px] group ${
+                      isSelected
+                        ? 'bg-indigo-500/15 border-indigo-500/40 ring-2 ring-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.25)]'
+                        : 'bg-white/[0.05] hover:bg-white/[0.09] border-white/10 hover:border-white/25 shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                        <SourceAvatar source={source} size="xs" />
+                        <span className="text-xs font-bold text-white tracking-tight truncate">
+                          {source.name}
+                        </span>
+                      </div>
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isSelected ? 'bg-indigo-400 animate-pulse' : 'bg-white/20'}`} />
+                    </div>
+
+                    <div className="mt-2.5">
+                      <span className="text-lg font-extrabold text-white tracking-tight block truncate">
+                        {showBalance ? formatCurrency(balanceInfo.netBalance) : '•••• €'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium truncate block mt-0.5">
+                        {source.institution || (isBank ? 'Cuenta Bancaria' : 'Efectivo')} • {balanceInfo.transactionCount} movs
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

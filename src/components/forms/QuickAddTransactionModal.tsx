@@ -156,6 +156,18 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     }
   }, [isOpen, initialPillar, activeTab, editingTransaction, sortedSources, activeSourceId]);
 
+  // Handle Escape key to close modal on desktop
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Source Options for Liquid Glass Select
   const sourceOptions: GlassSelectOption<string>[] = useMemo(() => {
     return sortedSources.map((source: SourceAccount) => ({
@@ -736,9 +748,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md transition-all duration-300 gpu-layer transform-gpu">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
+    >
       <div
-        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 border border-white/20 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden gpu-layer transform-gpu"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 lg:bg-slate-950/80 border border-white/20 lg:border-white/15 rounded-t-3xl sm:rounded-3xl p-6 lg:p-8 shadow-2xl backdrop-blur-2xl lg:backdrop-blur-3xl relative overflow-hidden gpu-layer transform-gpu"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular Top Edge */}

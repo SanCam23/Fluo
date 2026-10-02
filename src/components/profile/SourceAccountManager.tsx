@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Landmark,
@@ -51,6 +51,19 @@ export const SourceAccountManager: React.FC = () => {
 
   // Deletion confirmation state
   const [deletingSource, setDeletingSource] = useState<SourceAccount | null>(null);
+
+  // Handle Escape key to close any active modal
+  useEffect(() => {
+    if (!isModalOpen && !deletingSource) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false);
+        setDeletingSource(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, deletingSource]);
 
   // Open modal for Adding new source
   const handleOpenAdd = () => {
@@ -272,8 +285,14 @@ export const SourceAccountManager: React.FC = () => {
       {isModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn overflow-y-auto">
-            <div className="relative w-full max-w-sm max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-white/20 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-4 text-white my-auto">
+          <div
+            onClick={() => setIsModalOpen(false)}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 lg:bg-slate-950/85 backdrop-blur-xl lg:backdrop-blur-3xl animate-fadeIn overflow-y-auto"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm lg:max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 lg:bg-slate-950/90 backdrop-blur-2xl lg:backdrop-blur-3xl border border-white/20 lg:border-white/15 p-5 lg:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-4 text-white my-auto"
+            >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                   <Landmark className="h-4 w-4 text-indigo-400" />
@@ -432,8 +451,14 @@ export const SourceAccountManager: React.FC = () => {
       {deletingSource &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xl animate-fadeIn overflow-y-auto">
-            <div className="relative w-full max-w-sm max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-rose-500/30 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-3.5 text-white my-auto">
+          <div
+            onClick={() => setDeletingSource(null)}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 lg:bg-slate-950/85 backdrop-blur-xl lg:backdrop-blur-3xl animate-fadeIn overflow-y-auto"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm lg:max-w-md max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 lg:bg-slate-950/90 backdrop-blur-2xl lg:backdrop-blur-3xl border border-rose-500/30 lg:border-rose-500/40 p-5 lg:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-3.5 text-white my-auto"
+            >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400">
                   <ShieldAlert className="h-6 w-6" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, FastForward, Play, RotateCcw, Clock, Calendar, AlertCircle, CheckCircle2, Repeat } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { formatCurrency } from '../../utils/currency';
@@ -16,6 +16,17 @@ export const TimeSimulatorModal: React.FC<TimeSimulatorModalProps> = ({ isOpen, 
   const recurrences = useFinanceStore((state) => state.recurrences);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -63,9 +74,12 @@ export const TimeSimulatorModal: React.FC<TimeSimulatorModalProps> = ({ isOpen, 
   const activeRecurrences = recurrences.filter((r) => r.isActive);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all duration-300 gpu-layer transform-gpu">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
+    >
       <div
-        className="w-full max-w-lg bg-[#0E1526]/95 border border-white/20 rounded-3xl p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col max-h-[90vh] gpu-layer transform-gpu"
+        className="w-full max-w-lg bg-[#0E1526]/95 lg:bg-slate-950/85 border border-white/20 lg:border-white/15 rounded-3xl p-6 lg:p-8 shadow-2xl backdrop-blur-2xl lg:backdrop-blur-3xl relative overflow-hidden flex flex-col max-h-[90vh] gpu-layer transform-gpu"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular top highlight */}

@@ -157,15 +157,20 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
+        onClick={() => {
+          if (!isSwiping && Math.abs(offsetX) < 5) {
+            onEdit?.(tx);
+          }
+        }}
         style={{
           transform: isDeleting ? 'translateX(-100%)' : `translateX(${offsetX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           touchAction: 'pan-y',
         }}
-        className="group relative flex items-center justify-between py-3 pl-3 pr-2.5 sm:pr-3 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.18] hover:border-white/30 transition-all duration-200 cursor-pointer shadow-[0_2px_8px_-1px_rgba(0,0,0,0.3)] shadow-inner"
+        className="group relative flex items-center justify-between py-3 pl-3 pr-2.5 sm:pr-3.5 lg:py-3.5 lg:px-4 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.18] hover:border-white/30 transition-all duration-200 cursor-pointer shadow-[0_2px_8px_-1px_rgba(0,0,0,0.3)] shadow-inner"
       >
         {/* Left side: Avatar */}
-        <div className="flex-shrink-0 mr-2.5 pointer-events-none">
+        <div className="flex-shrink-0 mr-2.5 lg:mr-3.5 pointer-events-none">
           <BrandAvatar
             brand={brand}
             fallbackText={category?.name || 'TX'}
@@ -175,9 +180,9 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
           />
         </div>
 
-        {/* Center: Concept + Category & Badges (expanded room for concept title) */}
+        {/* Center: Concept + Category & Badges */}
         <div className="flex-1 min-w-0 mr-2 pointer-events-none">
-          <span className="text-[13.5px] sm:text-sm font-semibold text-white tracking-tight truncate block">
+          <span className="text-[13.5px] sm:text-sm lg:text-[14.5px] font-semibold text-white tracking-tight truncate block">
             {tx.concept}
           </span>
 
@@ -202,10 +207,10 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
         </div>
 
         {/* Right side: Amount and relative date shifted rightward */}
-        <div className="flex items-center gap-1 flex-shrink-0 text-right">
+        <div className="flex items-center gap-1.5 lg:gap-3 flex-shrink-0 text-right">
           <div className="flex flex-col items-end pointer-events-none">
             <span
-              className={`text-[14.5px] sm:text-[15px] font-bold tracking-tight block whitespace-nowrap ${
+              className={`text-[14.5px] sm:text-[15px] lg:text-base font-bold tracking-tight block whitespace-nowrap ${
                 isIncome
                   ? 'text-emerald-400 light:text-emerald-600'
                   : isInvest
@@ -220,15 +225,15 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
             </span>
           </div>
 
-          {/* Action buttons visible on hover (desktop: always reachable by click, not swipe) */}
-          <div className="hidden sm:flex items-center gap-0.5 -mr-1">
+          {/* Action buttons visible on hover/desktop (direct click, no swipe) */}
+          <div className="hidden sm:flex items-center gap-1 -mr-1">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit?.(tx);
               }}
-              className="opacity-0 group-hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1.5 text-slate-500 hover:text-indigo-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 lg:opacity-60 lg:group-hover:opacity-100 p-1.5 text-slate-400 hover:text-indigo-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
               title="Editar movimiento"
               aria-label="Editar movimiento"
             >
@@ -241,7 +246,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
                 e.stopPropagation();
                 triggerDelete();
               }}
-              className="opacity-0 group-hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 lg:opacity-60 lg:group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-400 transition-all rounded-lg hover:bg-white/10 cursor-pointer"
               title="Eliminar movimiento"
               aria-label="Eliminar movimiento"
             >

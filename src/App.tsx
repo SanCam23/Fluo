@@ -6,10 +6,11 @@ import { useSecurityLock } from './hooks/useSecurityLock';
 import { useTheme } from './hooks/useTheme';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { FloatingNavbar } from './components/layout/FloatingNavbar';
-import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { HeroBalance } from './components/home/HeroBalance';
 import { MetricPillars } from './components/home/MetricPillars';
 import { RecurrenceSummaryWidget } from './components/home/RecurrenceSummaryWidget';
+import { DesktopInvestmentWidget } from './components/home/DesktopInvestmentWidget';
+import { DesktopBudgetsWidget } from './components/home/DesktopBudgetsWidget';
 import { RecentTransactionsList } from './components/home/RecentTransactionsList';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
@@ -142,23 +143,8 @@ export default function App() {
   // 3. Main Dashboard (Authenticated or Demo Mode)
   return (
     <MobileContainer activePillar={activeTab === 'home' ? selectedPillar : 'all'}>
-      {/* Desktop Sidebar (lg+) — hidden on mobile/tablet */}
-      <DesktopSidebar
-        onOpenAddModal={() => setIsAddModalOpen(true)}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        onOpenSimulator={!user ? () => setIsSimulatorOpen(true) : undefined}
-        onLockOrSetupPin={() => {
-          if (hasPin) { lockNow(); } else { setIsConfiguringPin(true); }
-        }}
-        hasPin={hasPin}
-        userEmail={user?.email}
-        isDemoMode={isDemoMode}
-        isCloudLoading={isCloudLoading}
-        simulatedTimeOffsetDays={simulatedTimeOffsetDays}
-      />
-
-      {/* Top Mobile Bar — hidden on lg+ (sidebar takes over) */}
-      <header className="lg:hidden flex items-center justify-between mb-5 px-1 gap-2">
+      {/* ── Unified Liquid Glass Header (Mobile & PC) ── */}
+      <header className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 lg:py-6 flex items-center justify-between mb-4 lg:mb-6 gap-2">
         <div className="flex items-center gap-2 flex-shrink-0">
           <img
             src="/fluo-wordmark.webp"
@@ -166,20 +152,20 @@ export default function App() {
             width="194"
             height="84"
             fetchPriority="high"
-            className="h-9 sm:h-10 w-auto object-contain filter drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)] select-none"
+            className="h-9 sm:h-10 lg:h-12 w-auto object-contain filter drop-shadow-[0_2px_14px_rgba(99,102,241,0.35)] select-none"
           />
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
           {/* Cloud Sync indicator */}
           {isCloudLoading && (
             <div
-              className="flex items-center gap-1 text-[11px] text-indigo-400 light:text-indigo-600 bg-indigo-500/10 light:bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-500/20 light:border-indigo-200 animate-pulse flex-shrink-0"
+              className="flex items-center gap-1.5 text-[11px] lg:text-xs text-indigo-400 light:text-indigo-600 bg-indigo-500/10 light:bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-500/20 light:border-indigo-200 animate-pulse flex-shrink-0"
               title="Sincronizando con Supabase..."
             >
-              <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-              <span className="hidden sm:inline">Sync</span>
+              <Loader2 className="h-3 w-3 lg:h-3.5 lg:w-3.5 animate-spin flex-shrink-0" />
+              <span>Sync</span>
             </div>
           )}
 
@@ -188,14 +174,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsSimulatorOpen(true)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md flex-shrink-0 ${
+              className={`flex items-center gap-1 px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer backdrop-blur-md flex-shrink-0 ${
                 simulatedTimeOffsetDays > 0
                   ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 light:text-amber-800 light:bg-amber-50 light:border-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
                   : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 light:text-indigo-700 light:bg-indigo-50 light:border-indigo-200 border-indigo-500/30'
               }`}
               title="Simulador de Tiempo y Recurrencias"
             >
-              <FastForward className="h-3 w-3 flex-shrink-0" />
+              <FastForward className="h-3 w-3 lg:h-3.5 lg:w-3.5 flex-shrink-0" />
               <span className="truncate">Simular</span>
               {simulatedTimeOffsetDays > 0 && (
                 <span className="text-[10px] font-bold text-amber-200 light:text-amber-900 flex-shrink-0">
@@ -215,7 +201,7 @@ export default function App() {
                 setIsConfiguringPin(true);
               }
             }}
-            className={`p-2 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
+            className={`p-2 lg:p-2.5 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
               hasPin
                 ? 'bg-white/[0.08] light:bg-white/90 hover:bg-white/[0.14] hover:light:bg-white text-slate-300 light:text-slate-700 hover:text-white hover:light:text-slate-900 border-white/12 light:border-slate-300/80 shadow-sm'
                 : 'bg-indigo-500/15 light:bg-indigo-50 hover:bg-indigo-500/25 text-indigo-300 light:text-indigo-700 border-indigo-500/30 light:border-indigo-200'
@@ -224,9 +210,9 @@ export default function App() {
             aria-label={hasPin ? 'Bloquear Fluo' : 'Configurar PIN'}
           >
             {hasPin ? (
-              <Lock className="h-3.5 w-3.5 text-slate-300 light:text-slate-700" />
+              <Lock className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-slate-300 light:text-slate-700" />
             ) : (
-              <ShieldCheck className="h-3.5 w-3.5 text-indigo-400 light:text-indigo-600" />
+              <ShieldCheck className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-indigo-400 light:text-indigo-600" />
             )}
           </button>
 
@@ -234,7 +220,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsProfileModalOpen(true)}
-            className="relative w-10 h-10 rounded-full bg-slate-800/60 light:bg-white/90 backdrop-blur-xl border border-white/15 light:border-slate-300/80 flex items-center justify-center hover:bg-slate-700/60 hover:light:bg-white transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] light:shadow-[0_2px_8px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 group"
+            className="relative w-10 h-10 lg:w-11 lg:h-11 rounded-full bg-slate-800/60 light:bg-white/90 backdrop-blur-xl border border-white/15 light:border-slate-300/80 flex items-center justify-center hover:bg-slate-700/60 hover:light:bg-white transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] light:shadow-[0_2px_8px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 group"
             title={user?.email ? `Cuenta: ${user.email.split('@')[0]} (${user.email})` : 'Modo Demostración — Perfil y Ajustes'}
             aria-label="Perfil y Ajustes de Cuenta"
           >
@@ -257,10 +243,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Desktop page title bar — only visible at lg+ */}
-      <div className="hidden lg:flex items-center justify-between mb-6 pt-2">
+      {/* Desktop page context title bar (lg+) */}
+      <div className="hidden lg:flex items-center justify-between mb-6 px-1">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tight">
+          <h1 className="text-2xl font-black text-white tracking-tight">
             {activeTab === 'home' && 'Dashboard'}
             {activeTab === 'stats' && 'Estadísticas'}
             {activeTab === 'invest' && 'Inversiones'}
@@ -271,15 +257,6 @@ export default function App() {
             {activeTab === 'invest' && 'Cartera de inversiones y P&L en tiempo real'}
           </p>
         </div>
-        {/* Quick security badge on desktop */}
-        <div className="flex items-center gap-2">
-          {isCloudLoading && (
-            <div className="flex items-center gap-1.5 text-xs text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20 animate-pulse">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Sincronizando…</span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Main View Switcher with Privacy Obfuscation when locked */}
@@ -289,25 +266,25 @@ export default function App() {
         }`}
       >
         {activeTab === 'home' && (
-          /* Desktop: 12-col grid — content (8) + sidebar panel (4). Mobile: single column */
+          /* Desktop: 12-col grid — Col A (8/12) + Col B (4/12). Mobile: single column stack */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-            {/* ── Main column (8/12) ── */}
+            {/* ── Columna Principal (8 de 12 columnas) ── */}
             <div className="lg:col-span-8 flex flex-col gap-6">
-              {/* 1. Hero Net Balance */}
+              {/* 1. Patrimonio y Fuentes (Sin deslizamiento en PC) */}
               <HeroBalance selectedPillar={selectedPillar} />
 
-              {/* 2. Three Metric Pillars (Ingresos, Gastos, Cartera) */}
+              {/* 2. KPIs del Mes (Ingresos, Gastos, Cartera/Ahorro) */}
               <MetricPillars
                 selectedPillar={selectedPillar}
                 onSelectPillar={setSelectedPillar}
               />
 
-              {/* 3. Upcoming Recurrences — mobile only (desktop shows in right panel) */}
+              {/* 3. Próximos Pagos y Cobros Recurrentes (en móvil) */}
               <div className="lg:hidden">
                 <RecurrenceSummaryWidget />
               </div>
 
-              {/* 4. Recent Transactions with Brand Avatars & Filtering */}
+              {/* 4. Historial de Movimientos Recientes */}
               <RecentTransactionsList
                 selectedPillar={selectedPillar}
                 onSelectPillar={setSelectedPillar}
@@ -315,26 +292,16 @@ export default function App() {
               />
             </div>
 
-            {/* ── Right sidebar panel (4/12) — visible only on desktop ── */}
-            <div className="hidden lg:flex lg:col-span-4 flex-col gap-5 sticky top-6">
-              {/* Upcoming Recurrences Widget */}
-              <RecurrenceSummaryWidget />
+            {/* ── Columna Secundaria (4 de 12 columnas) — visible solo en PC (lg+) ── */}
+            <div className="hidden lg:flex lg:col-span-4 flex-col gap-6 sticky top-6">
+              {/* B.1. Cartera de Inversiones */}
+              <DesktopInvestmentWidget />
 
-              {/* Desktop quick-action hint card */}
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-md">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Acceso rápido</p>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium
-                    bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300
-                    border border-indigo-500/25 hover:border-indigo-500/40
-                    transition-all duration-200 cursor-pointer active:scale-[0.98]"
-                >
-                  <span className="h-6 w-6 rounded-lg bg-indigo-500/25 flex items-center justify-center flex-shrink-0 text-indigo-400 font-black text-base">+</span>
-                  Registrar movimiento
-                </button>
-              </div>
+              {/* B.2. Presupuestos Activos */}
+              <DesktopBudgetsWidget />
+
+              {/* B.3. Próximos Pagos Recurrentes */}
+              <RecurrenceSummaryWidget />
             </div>
           </div>
         )}
@@ -353,7 +320,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Bottom Glass Navigation Bar (mobile/tablet only — hidden at lg+) */}
+      {/* Centered Floating Bottom Glass Navigation Bar (Mobile & Desktop Dock) */}
       <FloatingNavbar onOpenAddModal={() => setIsAddModalOpen(true)} />
 
       {/* Quick Add / Edit Transaction Modal */}

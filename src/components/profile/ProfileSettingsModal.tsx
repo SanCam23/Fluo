@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   User,
@@ -214,13 +214,31 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     }
   };
 
+  // Handle Escape key to close modal on desktop
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'U';
   const userName = user?.email ? user.email.split('@')[0] : 'Modo Demostración';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xl animate-fadeIn">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 lg:bg-slate-950/85 backdrop-blur-xl lg:backdrop-blur-3xl animate-fadeIn"
+    >
       {/* Liquid Glass Main Modal Sheet */}
-      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.2)] flex flex-col gap-5 text-white">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md lg:max-w-lg max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/90 lg:bg-slate-950/80 backdrop-blur-2xl lg:backdrop-blur-3xl border border-white/15 p-6 lg:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.2)] flex flex-col gap-5 text-white"
+      >
         {/* Specular Top Hairline */}
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 

@@ -281,13 +281,13 @@ export const InvestmentsView: React.FC = () => {
           </span>
         </div>
 
-        {/* Global Metrics Dual Card (Patrimonio Total Invertido & Plusvalía/Minusvalía Real) */}
-        <div className="grid grid-cols-2 gap-2.5 mt-4 pt-3.5 border-t border-white/10">
-          <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+        {/* Global Metrics Cards (Responsive 2 cols on mobile, 4 cols on desktop) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-4 mt-4 pt-3.5 border-t border-white/10">
+          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
             <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
               Patrimonio Invertido
             </span>
-            <span className="text-base font-bold text-slate-200 light:text-slate-800 block mt-1">
+            <span className="text-base lg:text-lg font-bold text-slate-200 light:text-slate-800 block mt-1">
               {formatCurrency(totalCost)}
             </span>
             <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
@@ -296,7 +296,7 @@ export const InvestmentsView: React.FC = () => {
           </div>
 
           <div
-            className={`p-3 rounded-2xl border backdrop-blur-md transition-all flex flex-col justify-between ${
+            className={`p-3.5 rounded-2xl border backdrop-blur-md transition-all flex flex-col justify-between ${
               isOverallProfit
                 ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.15)] light:bg-emerald-50/70 light:border-emerald-200'
                 : 'bg-rose-500/10 border-rose-500/25 shadow-[0_0_15px_rgba(244,63,94,0.15)] light:bg-rose-50/70 light:border-rose-200'
@@ -306,7 +306,7 @@ export const InvestmentsView: React.FC = () => {
               P&L Total No Realizado
             </span>
             <span
-              className={`text-base font-bold tracking-tight block mt-1 ${
+              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 ${
                 isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
@@ -320,6 +320,34 @@ export const InvestmentsView: React.FC = () => {
               {isOverallProfit ? <TrendingUp className="h-3 w-3 flex-shrink-0" /> : <TrendingDown className="h-3 w-3 flex-shrink-0" />}
               <span>{formatPercentage(totalPnLPercent)}</span>
             </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+              Posiciones Activas
+            </span>
+            <span className="text-base lg:text-lg font-bold text-white light:text-slate-800 block mt-1">
+              {assets.length} {assets.length === 1 ? 'activo' : 'activos'}
+            </span>
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
+              En cartera
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+              Rentabilidad Global
+            </span>
+            <span
+              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 ${
+                isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
+              }`}
+            >
+              {isOverallProfit ? '+' : ''}{formatPercentage(totalPnLPercent)}
+            </span>
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
+              ROI de cartera
+            </span>
           </div>
         </div>
       </div>
@@ -345,10 +373,10 @@ export const InvestmentsView: React.FC = () => {
         })}
       </div>
 
-      {/* Assets List */}
-      <div className="flex flex-col gap-3">
+      {/* Assets List (1 col on mobile, 2 cols on PC) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {assets.length === 0 ? (
-          <div className="py-12 px-5 text-center rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 flex flex-col items-center justify-center gap-3 shadow-xl">
+          <div className="lg:col-span-2 py-12 px-5 text-center rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 flex flex-col items-center justify-center gap-3 shadow-xl">
             <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <PieChart className="h-7 w-7 text-indigo-400 opacity-80" />
             </div>
@@ -360,7 +388,7 @@ export const InvestmentsView: React.FC = () => {
             </div>
           </div>
         ) : filteredAssets.length === 0 ? (
-          <div className="py-10 px-4 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs flex flex-col items-center gap-1.5">
+          <div className="lg:col-span-2 py-10 px-4 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs flex flex-col items-center gap-1.5">
             <Layers className="h-6 w-6 text-slate-500 opacity-60 mb-0.5" />
             <p className="font-semibold text-slate-300">No tienes activos registrados en esta categoría.</p>
           </div>
