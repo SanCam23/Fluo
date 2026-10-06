@@ -387,13 +387,16 @@ Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El br
 
 ## 27. Especificaciones Liquid Glass para Pantallas Grandes (Desktop / PC ≥ 1024px)
 
-### 27.1. Dock Flotante Centrado (`FloatingNavbar`)
+### 27.1. Dock Flotante Centrado Estilo Apple Candy (`FloatingNavbar`)
 - **Geometría y Posicionamiento**:
-  - `fixed bottom-6 inset-x-4 max-w-xl mx-auto z-50 p-1.5 lg:px-6 lg:py-2.5 rounded-full`
-  - Sustrato: `bg-slate-900/60 backdrop-blur-2xl border border-white/15`
-  - Sombra volumétrica de profundidad: `shadow-[0_8px_32px_rgba(0,0,0,0.4)]`
-  - Destello perimetral superior: `h-px bg-gradient-to-r from-transparent via-white/30 to-transparent`
-  - Micro-interacción: Hover suave en botones inactivos (`hover:bg-white/[0.08]`) y escala al presionar (`active:scale-95`).
+  - `fixed bottom-4 lg:bottom-6 inset-x-4 max-w-sm lg:max-w-xl mx-auto z-50 p-1.5 lg:px-5 lg:py-2 rounded-full select-none`
+  - **Aura Atmosférica Iris Sutil**: Gradiente difuso contenido `bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 light:bg-indigo-500/15` con desenfoque suave `blur-xl` que aporta una luminiscencia cromática limpia y sin sobrecargar.
+  - **Sustrato Cristalino Calibrado**: `bg-slate-900/55 lg:bg-slate-900/65 light:bg-white/55 backdrop-blur-2xl lg:backdrop-blur-3xl backdrop-saturate-150 border border-white/15 lg:border-white/20 light:border-white/80`.
+  - **Sombra y Relieve Vítreo Continuo**: `shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_16px_36px_-8px_rgba(0,0,0,0.5)]` y en modo claro `light:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.9),0_12px_32px_-8px_rgba(15,23,42,0.12)]`.
+  - **Refracción Continua Interior**: Sheen uniforme `bg-gradient-to-b from-white/[0.04] light:from-white/20 via-transparent to-transparent` sobre todo el arco orgánico `rounded-full`, eliminando líneas cáusticas planas `h-px` que generaban recortes angulares en los bordes.
+  - **Pastilla Activa Translúcida de Borde Limpio**: Superficie nítida `bg-white/12 light:bg-white/80 border border-white/20 light:border-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_8px_rgba(0,0,0,0.25)]`. Erradicación de `backdrop-blur-md` anidado y hairlines internas desalineadas que causaban dobles bordes y halos oscuros en Chromium.
+  - **Botón Joya de Acción (+)**: Degradado refinado `from-indigo-500/95 via-indigo-600/90 to-emerald-500/80 text-white`, contorno limpio `border-white/25 light:border-white/40` y resplandor controlado `shadow-[0_4px_14px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.45)]` sin lentes flotantes disonantes.
+  - **Micro-interacción**: Giro de 90° con transición elástica en hover del icono `+`, hover sutil en pestañas inactivas (`hover:bg-white/[0.05]` / `light:hover:bg-white/40`) y respuesta háptica `active:scale-95`.
 
 ### 27.2. Bandeja de Fuentes en Paralelo (`HeroBalance`)
 - **Sustitución del Carrusel**:

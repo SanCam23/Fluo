@@ -243,22 +243,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Desktop page context title bar (lg+) */}
-      <div className="hidden lg:flex items-center justify-between mb-6 px-1">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            {activeTab === 'home' && 'Dashboard'}
-            {activeTab === 'stats' && 'Estadísticas'}
-            {activeTab === 'invest' && 'Inversiones'}
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {activeTab === 'home' && 'Resumen financiero personal'}
-            {activeTab === 'stats' && 'Análisis de flujo de caja y patrimonio'}
-            {activeTab === 'invest' && 'Cartera de inversiones y P&L en tiempo real'}
-          </p>
-        </div>
-      </div>
-
       {/* Main View Switcher with Privacy Obfuscation when locked */}
       <main
         className={`flex-1 flex flex-col gap-6 transition-all duration-300 ${
