@@ -1066,9 +1066,12 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - **[x] Conector de Alta Velocidad para Fondos Indexados por ISIN (`api/quote.ts`, `vite.config.ts`)**:
     - Integración de resolución prioritaria mediante **Financial Times Markets / Lipper** para activos con ISIN (`isIsinFormat`).
     - Erradicación del desfase de 24-36 horas de los feeds de fondos de Yahoo Finance Frankfurt, sincronizando los Valores Liquidativos diarios al instante con la misma inmediatez matinal que bancos custodios como MyInvestor / Inversis (ej. actualización a `84,74 €` en Vanguard S&P 500 al día siguiente de la sesión).
+    - **Inversión de Prioridad en `resolveIsinQuote` & Soporte de Tickers Morningstar**: Corrección del pipeline en `marketDataService.ts` donde `candidateTicker` (`0P00000SUJ.F`) interceptaba la llamada antes que el ISIN limpio (`IE0032126645`) devolviendo el valor atrasado de Yahoo Finance (83,66 €). Se invirtió la prioridad (Ruta 1 para ISIN directo), se mapearon los tickers Morningstar `0P*` a su ISIN tanto en desarrollo (`vite.config.ts`) como en producción (`api/quote.ts`), y se añadió parámetro de cache-busting `_t` en el navegador.
+    - **Verificación en Vivo**: Verificado que `/api/quote?symbol=IE0032126645` y `/api/quote?symbol=0P00000SUJ.F` retornan de inmediato `{ price: 84.74, change24h: 1.29, currency: 'EUR' }`.
     - Mantenimiento de fallback transparente a Yahoo Finance para acciones, criptomonedas y ETFs bursátiles estándar.
 
 **Validación de Calidad:**
 - Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
+- Servidor de Desarrollo: Vite activo en segundo plano en `http://localhost:5173/`.
 - Producción: `npm run build` compilado exitosamente con chunks optimizados y Service Worker PWA activo.

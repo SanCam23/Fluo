@@ -65,20 +65,28 @@ function quoteDevProxyPlugin(): PluginOption {
 
           const cleanInput = rawSymbol.toUpperCase();
           const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(cleanInput);
+          const KNOWN_TICKER_TO_ISIN: Record<string, string> = {
+            '0P00000SUJ.F': 'IE0032126645',
+            '0P00000SUJ': 'IE0032126645',
+            '0P00000RQ8.F': 'IE0007987690',
+            '0P00000RQ8': 'IE0007987690',
+          };
+          const resolvedIsin = isIsinFormat ? cleanInput : KNOWN_TICKER_TO_ISIN[cleanInput];
           let targetSymbol = rawSymbol;
 
-          if (isIsinFormat) {
+          if (resolvedIsin) {
             // 1. High-speed resolution via Financial Times Markets (updates early morning vs 24h Yahoo delay)
-            const ftQuote = await fetchFTQuote(cleanInput);
+            const ftQuote = await fetchFTQuote(resolvedIsin);
             if (ftQuote && ftQuote.price > 0) {
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify(ftQuote));
+              res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+              res.end(JSON.stringify({ ...ftQuote, symbol: rawSymbol }));
               return;
             }
 
             try {
               const sRes = await fetch(
-                `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanInput)}`,
+                `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(resolvedIsin)}`,
                 { headers: { 'User-Agent': 'Mozilla/5.0' } }
               );
               if (sRes.ok) {

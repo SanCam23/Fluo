@@ -913,8 +913,8 @@ async function fetchYahooChartQuote(
     let data: { price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null = null;
 
     if (typeof window !== 'undefined') {
-      // ── Browser (mobile + desktop): use our CORS-safe proxy ──
-      const proxyUrl = `/api/quote?symbol=${encodeURIComponent(symbol)}`;
+      // ── Browser (mobile + desktop): use our CORS-safe proxy with cache-busting ──
+      const proxyUrl = `/api/quote?symbol=${encodeURIComponent(symbol)}&_t=${Date.now()}`;
       const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (!res.ok) return null;
@@ -927,11 +927,53 @@ async function fetchYahooChartQuote(
         symbol: json.symbol || symbol,
       };
     } else {
-      // ── Non-browser (Node / Vitest): direct call to Yahoo ──
+      // ── Non-browser (Node / Vitest): direct call to FT Markets for ISIN or Yahoo ──
       const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(symbol.toUpperCase());
       let targetSym = symbol;
 
       if (isIsinFormat) {
+        // High-speed Financial Times resolution for Node / test environments
+        try {
+          const ftUrl = `https://markets.ft.com/data/funds/tearsheet/summary?s=${encodeURIComponent(symbol)}:EUR`;
+          const ftRes = await fetch(ftUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              Accept: 'text/html,application/xhtml+xml',
+            },
+            signal: controller.signal,
+          });
+          if (ftRes.ok) {
+            const ftHtml = await ftRes.text();
+            const priceMatch = ftHtml.match(
+              /Price \(([A-Z]{3})\)<\/span>\s*<span class="mod-ui-data-list__value">([0-9.,]+)<\/span>/
+            );
+            if (priceMatch) {
+              const currency = priceMatch[1] === 'USD' ? 'USD' : 'EUR';
+              const price = Number(priceMatch[2].replace(/,/g, ''));
+              if (!isNaN(price) && price > 0) {
+                let change24h = 0;
+                const changeMatch = ftHtml.match(
+                  /Today's Change<\/span>[\s\S]*?([+-]?[0-9.,]+)%\s*<\/span>/
+                );
+                if (changeMatch) {
+                  change24h = Number(changeMatch[1].replace(/,/g, ''));
+                  if (isNaN(change24h)) change24h = 0;
+                }
+                clearTimeout(timeoutId);
+                return {
+                  price: Number(price.toFixed(2)),
+                  change24h: Number(change24h.toFixed(2)),
+                  currency,
+                  symbol,
+                };
+              }
+            }
+          }
+        } catch {
+          // FT direct failed, continue with Yahoo search
+        }
+
         try {
           const sRes = await fetch(
             `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}`,
@@ -992,9 +1034,10 @@ async function fetchYahooChartQuote(
 /**
  * Multi-route Quote Resolver for Mutual / Index Funds by ISIN
  *
- * Ruta 1: Direct fetch via proxy (resolves Yahoo internal mutual fund symbol without CORS)
- * Ruta 2: Equivalence table to twin ETF / benchmark index (e.g. 'VUSA.AS' / 'VEUR.AS')
- * Ruta 3: Fallback Net Asset Value (NAV) with cut-off timestamp from persistent cache / baseline
+ * Ruta 1: Direct ISIN quote via proxy (Financial Times Markets high-speed official NAV)
+ * Ruta 2: Candidate Ticker (Yahoo internal symbol e.g. '0P00000SUJ.F')
+ * Ruta 3: Equivalence table to twin ETF / benchmark index (e.g. 'VUSA.AS' / 'VEUR.AS')
+ * Ruta 4: Fallback Net Asset Value (NAV) with cut-off timestamp from persistent cache / baseline
  */
 export async function resolveIsinQuote(
   isin: string,
@@ -1006,10 +1049,34 @@ export async function resolveIsinQuote(
     (a) => a.isin?.toUpperCase() === cleanIsin || a.identifier.toUpperCase() === cleanIsin
   );
 
-  // If a known working quoteTicker was previously resolved or provided as a hint, test it first
   const cached = getQuoteFromCache(cleanIsin);
   const candidateTicker = quoteTickerHint || cached?.quoteTicker || curated?.quoteTicker;
 
+  // 1. Ruta 1: Direct ISIN quote via proxy / FT Markets (fastest & most up to date NAV)
+  const isinQuote = await fetchYahooChartQuote(cleanIsin);
+  if (isinQuote && isinQuote.price > 0) {
+    const result: MarketQuoteResult = {
+      identifier: cleanIsin,
+      name: curated?.name || equivalence?.name || cached?.name || `Fondo ISIN ${cleanIsin}`,
+      ticker: candidateTicker || isinQuote.symbol || equivalence?.referenceTicker,
+      isin: cleanIsin,
+      quoteTicker: candidateTicker || isinQuote.symbol || equivalence?.referenceTicker,
+      price: isinQuote.price,
+      change24h: isinQuote.change24h,
+      currency: isinQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
+      lastUpdated: new Date().toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+      lastPriceUpdate: new Date().toISOString(),
+      isOfflineCached: false,
+    };
+    saveQuoteToCache(result);
+    return result;
+  }
+
+  // 2. Ruta 2: Candidate Ticker (Yahoo internal symbol e.g. 0P00000SUJ.F)
   if (candidateTicker) {
     const directQuote = await fetchYahooChartQuote(candidateTicker);
     if (directQuote && directQuote.price > 0) {
@@ -1033,30 +1100,6 @@ export async function resolveIsinQuote(
       saveQuoteToCache(result);
       return result;
     }
-  }
-
-  // 1. Ruta 1: Direct ISIN quote via proxy (resolves internal Yahoo symbol e.g. 0P00000RQ8.F with 0 CORS issues)
-  const isinQuote = await fetchYahooChartQuote(cleanIsin);
-  if (isinQuote && isinQuote.price > 0) {
-    const result: MarketQuoteResult = {
-      identifier: cleanIsin,
-      name: curated?.name || equivalence?.name || cached?.name || `Fondo ISIN ${cleanIsin}`,
-      ticker: isinQuote.symbol || candidateTicker || equivalence?.referenceTicker,
-      isin: cleanIsin,
-      quoteTicker: isinQuote.symbol || candidateTicker || equivalence?.referenceTicker,
-      price: isinQuote.price,
-      change24h: isinQuote.change24h,
-      currency: isinQuote.currency || equivalence?.currency || curated?.currency || 'EUR',
-      lastUpdated: new Date().toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }),
-      lastPriceUpdate: new Date().toISOString(),
-      isOfflineCached: false,
-    };
-    saveQuoteToCache(result);
-    return result;
   }
 
   // 2. Ruta 2: Mapeo a Ticker / ETF Subyacente Equivalente
@@ -1327,20 +1370,39 @@ export async function batchUpdateMarketQuotes(
   const results: Record<string, MarketQuoteResult> = {};
   await Promise.all(
     assetsOrIds.map(async (query) => {
-      const id = typeof query === 'string' ? query : query.identifier;
-      const hint = typeof query === 'object' ? query.quoteTicker : undefined;
+      const isObj = typeof query === 'object';
+      const id = isObj ? query.identifier : query;
+      const isin = isObj ? query.isin : undefined;
+      const hint = isObj ? query.quoteTicker : undefined;
+      // Prioritize ISIN if present as it is the globally unique fund identifier
+      const targetQueryId = isin && isIsin(isin) ? isin : id;
+
       try {
-        const quote = await fetchCurrentPrice(id, hint, forceRefresh);
-        results[id] = quote;
-        if (typeof query === 'object' && query.isin) {
-          results[query.isin] = quote;
+        const quote = await fetchCurrentPrice(targetQueryId, hint, forceRefresh);
+        if (id) {
+          results[id] = quote;
+          results[id.toUpperCase()] = quote;
+        }
+        if (isin) {
+          results[isin] = quote;
+          results[isin.toUpperCase()] = quote;
+        }
+        if (quote.quoteTicker) {
+          results[quote.quoteTicker] = quote;
+          results[quote.quoteTicker.toUpperCase()] = quote;
+        }
+        if (quote.ticker) {
+          results[quote.ticker] = quote;
+          results[quote.ticker.toUpperCase()] = quote;
         }
       } catch (e) {
         console.warn(`Error updating quote for ${id}:`, e);
         // Fallback to cache if available
-        const cached = getQuoteFromCache(id);
+        const cached = getQuoteFromCache(id) || (isin ? getQuoteFromCache(isin) : null);
         if (cached) {
-          results[id] = { ...cached, isOfflineCached: true };
+          const fallback = { ...cached, isOfflineCached: true };
+          if (id) results[id] = fallback;
+          if (isin) results[isin] = fallback;
         }
       }
     })

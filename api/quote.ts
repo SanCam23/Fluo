@@ -129,23 +129,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const cleanInput = rawSymbol.toUpperCase();
   const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(cleanInput);
+  const KNOWN_TICKER_TO_ISIN: Record<string, string> = {
+    '0P00000SUJ.F': 'IE0032126645',
+    '0P00000SUJ': 'IE0032126645',
+    '0P00000RQ8.F': 'IE0007987690',
+    '0P00000RQ8': 'IE0007987690',
+  };
+  const resolvedIsin = isIsinFormat ? cleanInput : KNOWN_TICKER_TO_ISIN[cleanInput];
 
   let targetSymbol = rawSymbol;
 
-  // 1. High-speed resolution via Financial Times Markets for ISIN funds
-  if (isIsinFormat) {
-    const ftQuote = await fetchFTQuote(cleanInput);
+  // 1. High-speed resolution via Financial Times Markets for ISIN funds & fund tickers
+  if (resolvedIsin) {
+    const ftQuote = await fetchFTQuote(resolvedIsin);
     if (ftQuote && ftQuote.price > 0) {
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=120');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      return res.status(200).json(ftQuote);
+      return res.status(200).json({ ...ftQuote, symbol: rawSymbol });
     }
   }
 
-  // If input is an ISIN, resolve its Yahoo symbol (e.g. 0P00000RQ8.F) via Search API
-  if (isIsinFormat) {
-    const searchUrl1 = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanInput)}`;
-    const searchUrl2 = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanInput)}`;
+  // If input is an ISIN or maps to one, resolve its Yahoo symbol (e.g. 0P00000RQ8.F) via Search API
+  if (resolvedIsin) {
+    const searchUrl1 = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(resolvedIsin)}`;
+    const searchUrl2 = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(resolvedIsin)}`;
     const searchData = await fetchWithFallback(searchUrl1, searchUrl2, 3500);
 
     const quotes = searchData?.quotes;
@@ -159,8 +166,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Fallback to equivalence map if search didn't resolve symbol
-    if (targetSymbol === rawSymbol && KNOWN_ISIN_MAP[cleanInput]) {
-      targetSymbol = KNOWN_ISIN_MAP[cleanInput];
+    if (targetSymbol === rawSymbol && KNOWN_ISIN_MAP[resolvedIsin]) {
+      targetSymbol = KNOWN_ISIN_MAP[resolvedIsin];
     }
   }
 

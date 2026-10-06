@@ -245,13 +245,15 @@ Permite localizar cualquier instrumento mediante:
 Los fondos indexados y fondos mutuos UCITS (ej. Vanguard US 500 con ISIN `IE0032126645` o Vanguard European Stock con ISIN `IE0007987690`) no son instrumentos de negociación continua en bolsa, por lo que carecen de tickers bursátiles directos. Fluo implementa un pipeline de resolución en 3 etapas:
 1. **Detección Inteligente de ISIN (`isIsin`)**:
    - Identifica patrones internacionales estándar (12 caracteres alfanuméricos con código de país de 2 letras y dígito de control, ej. `/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`). Detecta además ISINs embebidos en descripciones complejas como `"Inversión en SP500 IE0007987690"`.
-2. **Ruta 1 (Resolución de Alta Velocidad por ISIN vía Financial Times / Lipper & Proxy `/api/quote`)**:
+2. **Ruta 1 (Resolución de Alta Velocidad por ISIN y Tickers Morningstar vía Financial Times / Lipper & Proxy `/api/quote`)**:
    - Para erradicar el retraso de 24-36 horas de los feeds de fondos de Yahoo Finance y garantizar sincronización inmediata con bancos y brokers (MyInvestor / Inversis):
-     - Cuando la consulta corresponde a un código ISIN estándar (`isIsinFormat`), el proxy de Node.js (`api/quote.ts` en Vercel y `quoteDevProxyPlugin` en Vite dev) consulta prioritariamente el feed de fondos de **Financial Times Markets / Lipper** (`markets.ft.com`).
+     - Cuando la consulta corresponde a un código ISIN estándar (`isIsinFormat`) o a un ticker de fondo Morningstar reconocido (`0P00000SUJ.F`, `0P00000RQ8.F`), el proxy de Node.js (`api/quote.ts` en Vercel y `quoteDevProxyPlugin` en Vite dev) consulta prioritariamente el feed de fondos de **Financial Times Markets / Lipper** (`markets.ft.com`).
      - Esto entrega el Valor Liquidativo oficial diario publicado a primera hora de la mañana (ej. `84,74 €` para Vanguard S&P 500 al día siguiente de la sesión en Wall Street) con latencia inferior a 300ms y variación 24h precisa.
-   - Si la consulta no es un ISIN (ej. acciones, criptos, ETFs `AAPL`, `BTC`, `VUSA`) o si FT no dispone del instrumento, el proxy conmuta limpiamente a la API de **Yahoo Finance** (`query1`/`query2` con resolución de ticker europeo o API Chart v8), incluyendo cabeceras `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=120`.
-3. **Ruta 2 (Tabla de Equivalencias & Ticker Gemelo / ETF de Referencia)**:
-   - Si la consulta de búsqueda no entrega cotización directa o se encuentra restringida, el motor consulta la tabla predefinida `FUND_ISIN_EQUIVALENCE_MAP`:
+     - **Inversión de Prioridad en `resolveIsinQuote`**: Se evalúa prioritariamente la consulta directa por ISIN mediante este pipeline antes que los tickers candidatos internos de Yahoo (`candidateTicker`), impidiendo que un ticker de fondo con datos atrasados de Yahoo Finance intercepte la llamada.
+     - **Prevención de Caché HTTP**: La URL del proxy añade parámetro temporal `_t` en el navegador y cabeceras `Cache-Control: no-cache, no-store, must-revalidate` en desarrollo para garantizar que el botón de refresco siempre sirva la cotización viva.
+   - Si la consulta no es un ISIN ni fondo mapeado (ej. acciones, criptos, ETFs `AAPL`, `BTC`, `VUSA`) o si FT no dispone del instrumento, el proxy conmuta limpiamente a la API de **Yahoo Finance** (`query1`/`query2` con resolución de ticker europeo o API Chart v8), incluyendo cabeceras `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=120`.
+3. **Ruta 2 (Tickers Candidatos & Ticker Gemelo / ETF de Referencia)**:
+   - Si la consulta directa por ISIN no responde o no está disponible, el motor prueba los tickers candidatos internos (`quoteTickerHint`, ej. `0P00000SUJ.F`) y consulta la tabla predefinida `FUND_ISIN_EQUIVALENCE_MAP`:
      - `IE0032126645` (Vanguard US 500 Index EUR) $\rightarrow$ Ticker de referencia: `VUSA.AS` / `VUAA.DE` (S&P 500 EUR).
      - `IE0007987690` (Vanguard European Stock Index EUR) $\rightarrow$ Ticker de referencia: `VEUR.AS` / `VGK` (MSCI Europe EUR).
      - `IE00B03HD191` (Vanguard Global Stock Index EUR) $\rightarrow$ Ticker de referencia: `VWCE.DE` / `SWDA.L` (MSCI World EUR).

@@ -13,7 +13,13 @@ import type {
   SourceAccount,
 } from '../types/finance';
 import { INITIAL_CATEGORIES, INITIAL_BRANDS } from '../data/categoriesAndBrands';
-import { batchUpdateMarketQuotes, pruneExpiredQuoteCache, resetSwrTimestamps } from '../services/marketDataService';
+import {
+  batchUpdateMarketQuotes,
+  pruneExpiredQuoteCache,
+  resetSwrTimestamps,
+  isIsin,
+  CURATED_MARKET_ASSETS,
+} from '../services/marketDataService';
 import { processDueRecurrences } from '../services/recurringEngine';
 import {
   computeFinancialSummary,
@@ -869,11 +875,21 @@ export const useFinanceStore = create<FinanceState>()(
         set({ isLiveUpdating: true });
         try {
           const state = get();
-          const queries = state.assets.map((a) => ({
-            identifier: a.identifier,
-            quoteTicker: a.quoteTicker || a.quote_ticker,
-            isin: a.isin,
-          }));
+          const queries = state.assets.map((a) => {
+            const cleanIdent = a.identifier?.trim().toUpperCase() || '';
+            const curatedMatch = CURATED_MARKET_ASSETS.find(
+              (c) =>
+                c.identifier.toUpperCase() === cleanIdent ||
+                c.isin?.toUpperCase() === cleanIdent ||
+                (c.keywords && c.keywords.some((k) => a.name?.toLowerCase().includes(k)))
+            );
+            const isin = a.isin || (isIsin(cleanIdent) ? cleanIdent : undefined) || curatedMatch?.isin;
+            return {
+              identifier: a.identifier,
+              quoteTicker: a.quoteTicker || a.quote_ticker || curatedMatch?.quoteTicker,
+              isin,
+            };
+          });
           const quotes = await batchUpdateMarketQuotes(queries, true);
           const syncTime = new Date().toLocaleTimeString('es-ES', {
             hour: '2-digit',
@@ -885,11 +901,18 @@ export const useFinanceStore = create<FinanceState>()(
           set((s) => ({
             lastSyncTimestamp: syncTime,
             assets: s.assets.map((asset) => {
+              const cleanId = asset.identifier?.trim().toUpperCase() || '';
+              const cleanIsin = asset.isin?.trim().toUpperCase() || '';
+              const cleanTicker = (asset.quoteTicker || asset.quote_ticker)?.trim().toUpperCase() || '';
+
               const quote =
                 quotes[asset.identifier] ||
-                quotes[asset.identifier.toUpperCase()] ||
-                (asset.quoteTicker ? quotes[asset.quoteTicker] : undefined) ||
-                (asset.isin ? quotes[asset.isin] : undefined);
+                quotes[cleanId] ||
+                (cleanTicker ? quotes[cleanTicker] || quotes[asset.quoteTicker!] : undefined) ||
+                (cleanIsin ? quotes[cleanIsin] || quotes[asset.isin!] : undefined) ||
+                (cleanId === 'IE0032126645' || asset.name?.toLowerCase().includes('us 500') || asset.name?.toLowerCase().includes('sp500')
+                  ? quotes['IE0032126645'] || quotes['0P00000SUJ.F']
+                  : undefined);
 
               if (quote) {
                 // Auto-correct any single-share distorted cost position (e.g. S&P 500 total invested vs quotation)
@@ -947,11 +970,21 @@ export const useFinanceStore = create<FinanceState>()(
         if (staleAssets.length === 0) return;
 
         try {
-          const queries = staleAssets.map((a) => ({
-            identifier: a.identifier,
-            quoteTicker: a.quoteTicker || a.quote_ticker,
-            isin: a.isin,
-          }));
+          const queries = staleAssets.map((a) => {
+            const cleanIdent = a.identifier?.trim().toUpperCase() || '';
+            const curatedMatch = CURATED_MARKET_ASSETS.find(
+              (c) =>
+                c.identifier.toUpperCase() === cleanIdent ||
+                c.isin?.toUpperCase() === cleanIdent ||
+                (c.keywords && c.keywords.some((k) => a.name?.toLowerCase().includes(k)))
+            );
+            const isin = a.isin || (isIsin(cleanIdent) ? cleanIdent : undefined) || curatedMatch?.isin;
+            return {
+              identifier: a.identifier,
+              quoteTicker: a.quoteTicker || a.quote_ticker || curatedMatch?.quoteTicker,
+              isin,
+            };
+          });
           const quotes = await batchUpdateMarketQuotes(queries, true);
           const syncTime = new Date().toLocaleTimeString('es-ES', {
             hour: '2-digit',
@@ -963,11 +996,18 @@ export const useFinanceStore = create<FinanceState>()(
           set((s) => ({
             lastSyncTimestamp: syncTime,
             assets: s.assets.map((asset) => {
+              const cleanId = asset.identifier?.trim().toUpperCase() || '';
+              const cleanIsin = asset.isin?.trim().toUpperCase() || '';
+              const cleanTicker = (asset.quoteTicker || asset.quote_ticker)?.trim().toUpperCase() || '';
+
               const quote =
                 quotes[asset.identifier] ||
-                quotes[asset.identifier.toUpperCase()] ||
-                (asset.quoteTicker ? quotes[asset.quoteTicker] : undefined) ||
-                (asset.isin ? quotes[asset.isin] : undefined);
+                quotes[cleanId] ||
+                (cleanTicker ? quotes[cleanTicker] || quotes[asset.quoteTicker!] : undefined) ||
+                (cleanIsin ? quotes[cleanIsin] || quotes[asset.isin!] : undefined) ||
+                (cleanId === 'IE0032126645' || asset.name?.toLowerCase().includes('us 500') || asset.name?.toLowerCase().includes('sp500')
+                  ? quotes['IE0032126645'] || quotes['0P00000SUJ.F']
+                  : undefined);
 
               if (quote) {
                 // Auto-correct any single-share distorted cost position (e.g. S&P 500 total invested vs quotation)
