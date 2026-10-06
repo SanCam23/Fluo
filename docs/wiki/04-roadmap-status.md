@@ -1063,6 +1063,11 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - **Calibración de Densidad y Refracción**: Ajuste del sustrato vítreo a `bg-slate-900/55 lg:bg-slate-900/65` (modo oscuro) y `bg-white/55` (modo claro), preservando el toque candy sutil mientras se garantiza que los elementos de fondo en scroll no generen sombras o siluetas discordantes detrás del cristal.
   - **Refracción Continua Integral**: Sustitución de hairlines planas en los extremos por una máscara continua `inset-0 rounded-full bg-gradient-to-b from-white/[0.04] to-transparent` que acompaña la curvatura completa del dock sin cortes.
 
+  - **[x] Conector de Alta Velocidad para Fondos Indexados por ISIN (`api/quote.ts`, `vite.config.ts`)**:
+    - Integración de resolución prioritaria mediante **Financial Times Markets / Lipper** para activos con ISIN (`isIsinFormat`).
+    - Erradicación del desfase de 24-36 horas de los feeds de fondos de Yahoo Finance Frankfurt, sincronizando los Valores Liquidativos diarios al instante con la misma inmediatez matinal que bancos custodios como MyInvestor / Inversis (ej. actualización a `84,74 €` en Vanguard S&P 500 al día siguiente de la sesión).
+    - Mantenimiento de fallback transparente a Yahoo Finance para acciones, criptomonedas y ETFs bursátiles estándar.
+
 **Validación de Calidad:**
 - Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).

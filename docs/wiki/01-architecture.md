@@ -245,11 +245,11 @@ Permite localizar cualquier instrumento mediante:
 Los fondos indexados y fondos mutuos UCITS (ej. Vanguard US 500 con ISIN `IE0032126645` o Vanguard European Stock con ISIN `IE0007987690`) no son instrumentos de negociación continua en bolsa, por lo que carecen de tickers bursátiles directos. Fluo implementa un pipeline de resolución en 3 etapas:
 1. **Detección Inteligente de ISIN (`isIsin`)**:
    - Identifica patrones internacionales estándar (12 caracteres alfanuméricos con código de país de 2 letras y dígito de control, ej. `/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/`). Detecta además ISINs embebidos en descripciones complejas como `"Inversión en SP500 IE0007987690"`.
-2. **Ruta 1 (Proxy Serverless Multi-Endpoint `/api/quote` & Dev Middleware)**:
-   - Para erradicar bloqueos de CORS en navegadores móviles (iOS Safari, Chrome Android) y desktop, las consultas viajan por `/api/quote?symbol={ISIN}`:
-     - En producción (Vercel Serverless Function) y en desarrollo local (`quoteDevProxyPlugin` en `vite.config.ts`), el proxy ejecuta la búsqueda en Yahoo (`query1` con failover a `query2`) desde Node.js sin restricciones de CORS.
-     - Extrae el símbolo interno oficial devuelto con sufijos de bolsa europea (ej. `0P00000SUJ.F` para Vanguard US 500 o `0P00000RQ8.F` para Vanguard European Stock) y consulta su precio y divisa en tiempo real mediante la API v8 Chart (`/v8/finance/chart/{symbol}`).
-     - Incluye cabeceras `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=120`.
+2. **Ruta 1 (Resolución de Alta Velocidad por ISIN vía Financial Times / Lipper & Proxy `/api/quote`)**:
+   - Para erradicar el retraso de 24-36 horas de los feeds de fondos de Yahoo Finance y garantizar sincronización inmediata con bancos y brokers (MyInvestor / Inversis):
+     - Cuando la consulta corresponde a un código ISIN estándar (`isIsinFormat`), el proxy de Node.js (`api/quote.ts` en Vercel y `quoteDevProxyPlugin` en Vite dev) consulta prioritariamente el feed de fondos de **Financial Times Markets / Lipper** (`markets.ft.com`).
+     - Esto entrega el Valor Liquidativo oficial diario publicado a primera hora de la mañana (ej. `84,74 €` para Vanguard S&P 500 al día siguiente de la sesión en Wall Street) con latencia inferior a 300ms y variación 24h precisa.
+   - Si la consulta no es un ISIN (ej. acciones, criptos, ETFs `AAPL`, `BTC`, `VUSA`) o si FT no dispone del instrumento, el proxy conmuta limpiamente a la API de **Yahoo Finance** (`query1`/`query2` con resolución de ticker europeo o API Chart v8), incluyendo cabeceras `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=120`.
 3. **Ruta 2 (Tabla de Equivalencias & Ticker Gemelo / ETF de Referencia)**:
    - Si la consulta de búsqueda no entrega cotización directa o se encuentra restringida, el motor consulta la tabla predefinida `FUND_ISIN_EQUIVALENCE_MAP`:
      - `IE0032126645` (Vanguard US 500 Index EUR) $\rightarrow$ Ticker de referencia: `VUSA.AS` / `VUAA.DE` (S&P 500 EUR).

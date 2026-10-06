@@ -71,6 +71,47 @@ async function fetchWithFallback(url1: string, url2: string, timeoutMs = 4000): 
   return null;
 }
 
+async function fetchFTQuote(isin: string): Promise<{ price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3500);
+    const url = `https://markets.ft.com/data/funds/tearsheet/summary?s=${encodeURIComponent(isin)}:EUR`;
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+
+    const html = await res.text();
+    const priceMatch = html.match(/Price \(([A-Z]{3})\)<\/span>\s*<span class="mod-ui-data-list__value">([0-9.,]+)<\/span>/);
+    if (!priceMatch) return null;
+
+    const currency = priceMatch[1] === 'USD' ? 'USD' : 'EUR';
+    const price = Number(priceMatch[2].replace(/,/g, ''));
+    if (isNaN(price) || price <= 0) return null;
+
+    let change24h = 0;
+    const changeMatch = html.match(/Today's Change<\/span>[\s\S]*?([+-]?[0-9.,]+)%\s*<\/span>/);
+    if (changeMatch) {
+      change24h = Number(changeMatch[1].replace(/,/g, ''));
+      if (isNaN(change24h)) change24h = 0;
+    }
+
+    return {
+      price,
+      change24h,
+      currency,
+      symbol: isin,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -90,6 +131,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isIsinFormat = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(cleanInput);
 
   let targetSymbol = rawSymbol;
+
+  // 1. High-speed resolution via Financial Times Markets for ISIN funds
+  if (isIsinFormat) {
+    const ftQuote = await fetchFTQuote(cleanInput);
+    if (ftQuote && ftQuote.price > 0) {
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=120');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      return res.status(200).json(ftQuote);
+    }
+  }
 
   // If input is an ISIN, resolve its Yahoo symbol (e.g. 0P00000RQ8.F) via Search API
   if (isIsinFormat) {

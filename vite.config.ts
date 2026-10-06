@@ -7,6 +7,47 @@ import compression from 'vite-plugin-compression'
 
 const viteCompression = compression as unknown as (options?: Record<string, unknown>) => PluginOption
 
+async function fetchFTQuote(isin: string): Promise<{ price: number; change24h: number; currency: 'EUR' | 'USD'; symbol: string } | null> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3500);
+    const url = `https://markets.ft.com/data/funds/tearsheet/summary?s=${encodeURIComponent(isin)}:EUR`;
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+
+    const html = await res.text();
+    const priceMatch = html.match(/Price \(([A-Z]{3})\)<\/span>\s*<span class="mod-ui-data-list__value">([0-9.,]+)<\/span>/);
+    if (!priceMatch) return null;
+
+    const currency = priceMatch[1] === 'USD' ? 'USD' : 'EUR';
+    const price = Number(priceMatch[2].replace(/,/g, ''));
+    if (isNaN(price) || price <= 0) return null;
+
+    let change24h = 0;
+    const changeMatch = html.match(/Today's Change<\/span>[\s\S]*?([+-]?[0-9.,]+)%\s*<\/span>/);
+    if (changeMatch) {
+      change24h = Number(changeMatch[1].replace(/,/g, ''));
+      if (isNaN(change24h)) change24h = 0;
+    }
+
+    return {
+      price,
+      change24h,
+      currency,
+      symbol: isin,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function quoteDevProxyPlugin(): PluginOption {
   return {
     name: 'quote-dev-proxy',
@@ -27,6 +68,14 @@ function quoteDevProxyPlugin(): PluginOption {
           let targetSymbol = rawSymbol;
 
           if (isIsinFormat) {
+            // 1. High-speed resolution via Financial Times Markets (updates early morning vs 24h Yahoo delay)
+            const ftQuote = await fetchFTQuote(cleanInput);
+            if (ftQuote && ftQuote.price > 0) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(ftQuote));
+              return;
+            }
+
             try {
               const sRes = await fetch(
                 `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanInput)}`,
