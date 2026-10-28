@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from 'react';
+import { useState, useMemo, useEffect, memo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   TrendingUp,
@@ -7,13 +7,24 @@ import {
   PieChart,
   Coins,
   Clock,
-  Trash2,
   Building2,
   Layers,
+  Pencil,
+  ArrowDownRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  Calendar,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
-import type { InvestmentAsset, AssetType } from '../../types/finance';
+import type { InvestmentAsset, AssetType, Transaction } from '../../types/finance';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
+import { getTransactionsForAsset } from '../../utils/finance';
+import { WithdrawInvestmentModal } from './WithdrawInvestmentModal';
+import { EditAssetModal } from './EditAssetModal';
+import { QuickAddTransactionModal } from '../forms/QuickAddTransactionModal';
+import { SourceAvatar } from '../common/SourceAvatar';
 
 const assetTypeLabels: Record<AssetType, string> = {
   stock: 'Acción',
@@ -33,132 +44,407 @@ const assetTypeColors: Record<AssetType, string> = {
   deposit: 'bg-teal-500/15 text-teal-300 border-teal-500/25 light:bg-teal-500/10 light:text-teal-700 light:border-teal-500/30',
 };
 
-interface AssetCardProps {
-  asset: InvestmentAsset;
-  onDelete: (id: string) => void;
+interface ConsolidatedAssetGroup {
+  key: string;
+  primaryAsset: InvestmentAsset;
+  shares: number;
+  investedCost: number;
+  averageBuyPrice: number;
+  currentPrice: number;
+  marketValue: number;
+  pnl: number;
+  pnlPercent: number;
+  isProfit: boolean;
+  contributions: Transaction[];
 }
 
-const AssetCard = memo(({ asset, onDelete }: AssetCardProps) => {
-  const investedCost = asset.shares * asset.averageBuyPrice + (asset.initialFee || 0);
-  const marketValue = asset.shares * asset.currentPrice;
-  const pnl = marketValue - investedCost;
-  const pnlPercent = investedCost > 0 ? (pnl / investedCost) * 100 : 0;
-  const isProfit = pnl >= 0;
+interface AssetCardProps {
+  group: ConsolidatedAssetGroup;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: (asset: InvestmentAsset) => void;
+  onWithdraw: (asset: InvestmentAsset) => void;
+  onEditTransaction?: (tx: Transaction) => void;
+}
+
+const AssetCard = memo(({
+  group,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onWithdraw,
+  onEditTransaction,
+}: AssetCardProps) => {
+  const { primaryAsset, shares, investedCost, averageBuyPrice, currentPrice, marketValue, pnl, pnlPercent, isProfit, contributions } = group;
+  const getSourceById = useFinanceStore((state) => state.getSourceById);
+
+  // Swipe gesture state
+  const [offsetX, setOffsetX] = useState(0);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const isHorizontal = useRef<boolean | null>(null);
+  const currentOffset = useRef(0);
+  const didDrag = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    startX.current = touch.clientX;
+    startY.current = touch.clientY;
+    isHorizontal.current = null;
+    currentOffset.current = 0;
+    didDrag.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const diffX = touch.clientX - startX.current;
+    const diffY = touch.clientY - startY.current;
+
+    if (isHorizontal.current === null) {
+      if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+        isHorizontal.current = Math.abs(diffX) > Math.abs(diffY);
+      }
+    }
+
+    if (isHorizontal.current) {
+      didDrag.current = true;
+      if (diffX < 0) {
+        // Swiping Left -> Retirada
+        const clamped = diffX < -110 ? -110 + (diffX + 110) * 0.35 : diffX;
+        currentOffset.current = clamped;
+        setOffsetX(clamped);
+      } else {
+        // Swiping Right -> Editar
+        const clamped = diffX > 110 ? 110 + (diffX - 110) * 0.35 : diffX;
+        currentOffset.current = clamped;
+        setOffsetX(clamped);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (currentOffset.current <= -80) {
+      setOffsetX(0);
+      currentOffset.current = 0;
+      onWithdraw(primaryAsset);
+    } else if (currentOffset.current >= 80) {
+      setOffsetX(0);
+      currentOffset.current = 0;
+      onEdit(primaryAsset);
+    } else {
+      setOffsetX(0);
+      currentOffset.current = 0;
+    }
+    isHorizontal.current = null;
+  };
+
+  const isPastEditThreshold = offsetX >= 80;
+  const isPastWithdrawThreshold = offsetX <= -80;
 
   return (
-    <div className="group relative p-4 rounded-3xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-200 flex flex-col gap-3 shadow-lg cv-auto">
-      {/* Top row: Name, badges & Market Value */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
-            {asset.name}
-          </h4>
-
-          {/* Metadata Badges */}
-          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-            <span className="px-2 py-0.5 rounded-md bg-white/10 light:bg-indigo-50/80 text-[10px] font-mono font-bold text-indigo-200 light:text-indigo-800 border border-white/15 light:border-indigo-200/80">
-              {asset.identifier}
-            </span>
-
-            <span
-              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                assetTypeColors[asset.assetType]
-              }`}
-            >
-              {assetTypeLabels[asset.assetType]}
-            </span>
-
-            {asset.platform && (
-              <span className="text-[10px] text-slate-400 light:text-slate-600 flex items-center gap-0.5">
-                <Building2 className="h-2.5 w-2.5 text-slate-500 light:text-slate-600" />
-                {asset.platform}
-              </span>
-            )}
-
-            {asset.isOfflineCached && (
-              <span className="px-1.5 py-0.2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 light:bg-amber-50 light:text-amber-800 light:border-amber-300 text-[10px] font-semibold flex items-center gap-1">
-                <Clock className="h-2.5 w-2.5" />
-                Dato offline / en caché
-              </span>
-            )}
-
-            {asset.quoteTicker && asset.quoteTicker !== asset.identifier && (
-              <span
-                className="px-1.5 py-0.2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 text-[10px] font-mono"
-                title={`Cotización activa vía ticker de referencia: ${asset.quoteTicker}`}
-              >
-                Ref: {asset.quoteTicker}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Market Value & P&L Badge */}
-        <div className="text-right flex-shrink-0">
-          <span className="text-base font-extrabold text-white block">
-            {formatCurrency(marketValue, asset.currency)}
-          </span>
-
-          <span
-            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full mt-1 backdrop-blur-md border shadow-sm transition-all ${
-              isProfit
-                ? 'bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                : 'bg-rose-500/15 text-rose-400 light:bg-rose-50 light:text-rose-700 light:border-rose-200 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
-            }`}
-          >
-            {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            <span>{isProfit ? '+' : ''}{formatPercentage(pnlPercent)}</span>
-            <span className="font-normal opacity-90">
-              ({isProfit ? '+' : ''}{formatCurrency(pnl, asset.currency)})
-            </span>
-          </span>
+    <div className="relative overflow-hidden rounded-3xl select-none transition-all duration-200">
+      {/* Background revealed when swiping RIGHT (Edit) */}
+      <div
+        className={`absolute inset-0 flex items-center justify-start pl-6 rounded-3xl transition-colors duration-200 pointer-events-none ${
+          isPastEditThreshold ? 'bg-indigo-600 text-white' : 'bg-indigo-500/80 text-indigo-100'
+        } backdrop-blur-xl z-0`}
+        style={{
+          opacity: offsetX > 0 ? Math.min(1, Math.abs(offsetX) / 25) : 0,
+          visibility: offsetX > 0 ? 'visible' : 'hidden',
+        }}
+      >
+        <div
+          className={`flex items-center gap-2 font-bold text-xs transition-transform duration-150 ${
+            isPastEditThreshold ? 'scale-110' : 'scale-100'
+          }`}
+        >
+          <Pencil className="h-4 w-4" />
+          <span>{isPastEditThreshold ? 'Soltar para editar' : 'Editar posición'}</span>
         </div>
       </div>
 
-      {/* Bottom details & calculation breakdown */}
-      <div className="pt-2.5 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 text-[11px]">
-          <span>
-            Invertido: <strong className="text-slate-300 font-semibold">{formatCurrency(investedCost, asset.currency)}</strong>
-            {' '}({asset.shares} uds @ {formatCurrency(asset.averageBuyPrice, asset.currency)})
-          </span>
-          {asset.initialFee && asset.initialFee > 0 && (
-            <span className="text-[10px] text-slate-500">
-              • Comis: {formatCurrency(asset.initialFee, asset.currency)}
-            </span>
-          )}
+      {/* Background revealed when swiping LEFT (Withdraw) */}
+      <div
+        className={`absolute inset-0 flex items-center justify-end pr-6 rounded-3xl transition-colors duration-200 pointer-events-none ${
+          isPastWithdrawThreshold ? 'bg-emerald-600 text-white' : 'bg-emerald-500/80 text-emerald-100'
+        } backdrop-blur-xl z-0`}
+        style={{
+          opacity: offsetX < 0 ? Math.min(1, Math.abs(offsetX) / 25) : 0,
+          visibility: offsetX < 0 ? 'visible' : 'hidden',
+        }}
+      >
+        <div
+          className={`flex items-center gap-2 font-bold text-xs transition-transform duration-150 ${
+            isPastWithdrawThreshold ? 'scale-110' : 'scale-100'
+          }`}
+        >
+          <ArrowDownRight className="h-4 w-4" />
+          <span>{isPastWithdrawThreshold ? 'Soltar para retirar' : 'Retirar fondos'}</span>
         </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right text-[11px]">
-            <span className="text-slate-400 flex items-center gap-1">
-              <Coins className="h-3 w-3 text-slate-400" />
-              Cotiz:{' '}
-              <strong className="text-white font-semibold">
-                {formatCurrency(asset.currentPrice, asset.currency)}
-              </strong>
-            </span>
-            {asset.change24h !== undefined && (
+      {/* Sliding Foreground Card */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onClick={() => {
+          if (!didDrag.current) {
+            onToggleExpand();
+          }
+        }}
+        style={{
+          transform: `translateX(${offsetX}px)`,
+          transition: isHorizontal.current ? 'none' : 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        className="group relative p-4 rounded-3xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-200 flex flex-col gap-3 shadow-lg cv-auto cursor-pointer z-10"
+      >
+        {/* Top row: Name, badges & Market Value */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
+                {primaryAsset.name}
+              </h4>
+              {contributions.length > 1 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-[10px] font-bold text-indigo-300 shrink-0" title={`${contributions.length} aportaciones registradas`}>
+                  {contributions.length} aportaciones
+                </span>
+              )}
+            </div>
+
+            {/* Metadata Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              <span className="px-2 py-0.5 rounded-md bg-white/10 light:bg-indigo-50/80 text-[10px] font-mono font-bold text-indigo-200 light:text-indigo-800 border border-white/15 light:border-indigo-200/80">
+                {primaryAsset.identifier}
+              </span>
+
               <span
-                className={`text-[10px] font-bold block ${
-                  asset.change24h >= 0 ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                  assetTypeColors[primaryAsset.assetType]
                 }`}
               >
-                {asset.change24h >= 0 ? '+' : ''}{formatPercentage(asset.change24h)} 24h
+                {assetTypeLabels[primaryAsset.assetType]}
+              </span>
+
+              {primaryAsset.platform && (
+                <span className="text-[10px] text-slate-400 light:text-slate-600 flex items-center gap-0.5">
+                  <Building2 className="h-2.5 w-2.5 text-slate-500 light:text-slate-600" />
+                  {primaryAsset.platform}
+                </span>
+              )}
+
+              {primaryAsset.isOfflineCached && (
+                <span className="px-1.5 py-0.2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 light:bg-amber-50 light:text-amber-800 light:border-amber-300 text-[10px] font-semibold flex items-center gap-1">
+                  <Clock className="h-2.5 w-2.5" />
+                  Dato offline
+                </span>
+              )}
+
+              {primaryAsset.quoteTicker && primaryAsset.quoteTicker !== primaryAsset.identifier && (
+                <span
+                  className="px-1.5 py-0.2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 text-[10px] font-mono"
+                  title={`Cotización activa vía ticker de referencia: ${primaryAsset.quoteTicker}`}
+                >
+                  Ref: {primaryAsset.quoteTicker}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Market Value & P&L Badge */}
+          <div className="text-right flex-shrink-0">
+            <span className="text-base font-extrabold text-white block">
+              {formatCurrency(marketValue, primaryAsset.currency)}
+            </span>
+
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full mt-1 backdrop-blur-md border shadow-sm transition-all ${
+                isProfit
+                  ? 'bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-700 light:border-emerald-200 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                  : 'bg-rose-500/15 text-rose-400 light:bg-rose-50 light:text-rose-700 light:border-rose-200 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
+              }`}
+            >
+              {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              <span>{isProfit ? '+' : ''}{formatPercentage(pnlPercent)}</span>
+              <span className="font-normal opacity-90">
+                ({isProfit ? '+' : ''}{formatCurrency(pnl, primaryAsset.currency)})
+              </span>
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom details & calculation breakdown */}
+        <div className="pt-2.5 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 text-[11px]">
+            <span>
+              Invertido: <strong className="text-slate-300 font-semibold">{formatCurrency(investedCost, primaryAsset.currency)}</strong>
+              {' '}({shares.toLocaleString('es-ES', { maximumFractionDigits: 6 })} uds @ {formatCurrency(averageBuyPrice, primaryAsset.currency)})
+            </span>
+            {primaryAsset.initialFee && primaryAsset.initialFee > 0 && (
+              <span className="text-[10px] text-slate-500">
+                • Comis: {formatCurrency(primaryAsset.initialFee, primaryAsset.currency)}
               </span>
             )}
           </div>
 
-          {/* Delete action button */}
-          <button
-            type="button"
-            onClick={() => onDelete(asset.id)}
-            className="opacity-80 hover:opacity-100 active:scale-95 p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition-all cursor-pointer"
-            title="Eliminar activo de la cartera"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-[11px]">
+              <span className="text-slate-400 flex items-center gap-1">
+                <Coins className="h-3 w-3 text-slate-400" />
+                Cotiz:{' '}
+                <strong className="text-white font-semibold">
+                  {formatCurrency(currentPrice, primaryAsset.currency)}
+                </strong>
+              </span>
+              {primaryAsset.change24h !== undefined && (
+                <span
+                  className={`text-[10px] font-bold block ${
+                    primaryAsset.change24h >= 0 ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
+                  }`}
+                >
+                  {primaryAsset.change24h >= 0 ? '+' : ''}{formatPercentage(primaryAsset.change24h)} 24h
+                </span>
+              )}
+            </div>
+
+            {/* Desktop Action Buttons (Pencil & Withdraw) */}
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => onEdit(primaryAsset)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-indigo-500/20 text-slate-300 hover:text-indigo-300 transition-all cursor-pointer"
+                title="Editar posición"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onWithdraw(primaryAsset)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 transition-all cursor-pointer"
+                title="Retirar fondos a una cuenta"
+              >
+                <ArrowDownRight className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer ml-0.5"
+                title={isExpanded ? 'Ocultar historial de aportaciones' : 'Ver todas las aportaciones a este índice'}
+              >
+                {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-indigo-400" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Expandable Breakdown Drawer: All contributions to this index */}
+        {isExpanded && (
+          <div
+            className="pt-3 border-t border-white/10 mt-1 flex flex-col gap-2.5 animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                <ArrowUpRight className="h-3 w-3 text-indigo-400" />
+                Historial de aportaciones ({contributions.length})
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Haz clic en una aportación para editarla
+              </span>
+            </div>
+
+            {contributions.length === 0 ? (
+              <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs text-center flex flex-col items-center gap-1">
+                <span>Posición consolidada inicial en cartera</span>
+                <span className="text-[11px] text-slate-500">
+                  {shares} títulos a coste medio de {formatCurrency(averageBuyPrice, primaryAsset.currency)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 max-h-60 overflow-y-auto no-scrollbar pr-0.5">
+                {contributions.map((tx) => {
+                  const source = tx.sourceId ? getSourceById(tx.sourceId) : undefined;
+                  const isWithdrawal = tx.pillar === 'income';
+
+                  return (
+                    <div
+                      key={tx.id}
+                      onClick={() => onEditTransaction?.(tx)}
+                      className="group/item flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                            isWithdrawal
+                              ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400'
+                              : 'bg-indigo-500/15 border-indigo-500/25 text-indigo-400'
+                          }`}
+                        >
+                          {isWithdrawal ? (
+                            <ArrowDownRight className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">
+                            {tx.concept}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                            <span className="flex items-center gap-0.5">
+                              <Calendar className="h-2.5 w-2.5 text-slate-500" />
+                              {new Date(tx.date).toLocaleDateString('es-ES', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+
+                            {source ? (
+                              <span className="flex items-center gap-1 text-slate-300">
+                                <SourceAvatar source={source} size="xs" />
+                                <span className="truncate max-w-[100px]">{source.name}</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-white/5 border border-white/10 text-slate-400">
+                                <Wallet className="h-2.5 w-2.5 text-slate-500" />
+                                Fondos externos
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 ml-2">
+                        <span
+                          className={`text-xs font-bold block ${
+                            isWithdrawal ? 'text-emerald-400' : 'text-slate-200'
+                          }`}
+                        >
+                          {isWithdrawal ? '+' : ''}{formatCurrency(tx.amount)}
+                        </span>
+                        {tx.shares && tx.unitPrice ? (
+                          <span className="text-[10px] text-slate-400 block font-normal mt-0.5">
+                            {tx.shares.toLocaleString('es-ES', { maximumFractionDigits: 4 })} uds @ {formatCurrency(tx.unitPrice)}
+                          </span>
+                        ) : null}
+                        <div className="opacity-0 group-hover/item:opacity-100 transition-opacity text-[10px] text-indigo-400 font-semibold flex items-center justify-end gap-0.5 mt-0.5">
+                          <Pencil className="h-2.5 w-2.5" />
+                          <span>Editar</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -174,7 +460,6 @@ export const InvestmentsView: React.FC = () => {
     isLiveUpdating,
     refreshAllAssetPrices,
     syncStaleAssetQuotes,
-    deleteAsset,
     lastSyncTimestamp,
   } = useFinanceStore(
     useShallow((state) => ({
@@ -184,12 +469,29 @@ export const InvestmentsView: React.FC = () => {
       isLiveUpdating: state.isLiveUpdating,
       refreshAllAssetPrices: state.refreshAllAssetPrices,
       syncStaleAssetQuotes: state.syncStaleAssetQuotes,
-      deleteAsset: state.deleteAsset,
       lastSyncTimestamp: state.lastSyncTimestamp,
     }))
   );
 
   const [selectedType, setSelectedType] = useState<AssetType | 'all'>('all');
+  const [expandedAssetKeys, setExpandedAssetKeys] = useState<Set<string>>(new Set());
+
+  // Modal states
+  const [assetToWithdraw, setAssetToWithdraw] = useState<InvestmentAsset | null>(null);
+  const [assetToEdit, setAssetToEdit] = useState<InvestmentAsset | null>(null);
+  const [txToEdit, setTxToEdit] = useState<Transaction | null>(null);
+
+  const toggleExpand = (key: string) => {
+    setExpandedAssetKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   // Auto-reconcile investments if ledger contains invest transactions
   useEffect(() => {
@@ -204,14 +506,73 @@ export const InvestmentsView: React.FC = () => {
     syncStaleAssetQuotes(6);
   }, [syncStaleAssetQuotes]);
 
+  // Consolidate assets sharing the same identifier / ISIN into a single visual card
+  const consolidatedGroups: ConsolidatedAssetGroup[] = useMemo(() => {
+    const groupMap = new Map<string, { primaryAsset: InvestmentAsset; all: InvestmentAsset[] }>();
+
+    assets.forEach((asset) => {
+      const cleanIdent = (asset.isin || asset.identifier || asset.name).trim().toUpperCase();
+      const existing = groupMap.get(cleanIdent);
+      if (existing) {
+        existing.all.push(asset);
+      } else {
+        groupMap.set(cleanIdent, { primaryAsset: asset, all: [asset] });
+      }
+    });
+
+    const groups: ConsolidatedAssetGroup[] = [];
+
+    groupMap.forEach(({ primaryAsset, all }, key) => {
+      let totalShares = 0;
+      let totalInvestedCost = 0;
+
+      all.forEach((a) => {
+        const sh = Number(a.shares) || 0;
+        const bp = Number(a.averageBuyPrice) || 0;
+        const fee = Number(a.initialFee) || 0;
+        totalShares += sh;
+        totalInvestedCost += sh * bp + fee;
+      });
+
+      const weightedAvgBuyPrice = totalShares > 0 ? totalInvestedCost / totalShares : primaryAsset.averageBuyPrice;
+      const curPrice = primaryAsset.currentPrice || weightedAvgBuyPrice;
+      const marketVal = totalShares * curPrice;
+      const pnl = marketVal - totalInvestedCost;
+      const pnlPercent = totalInvestedCost > 0 ? (pnl / totalInvestedCost) * 100 : 0;
+      const contributions = getTransactionsForAsset(primaryAsset, transactions);
+
+      groups.push({
+        key,
+        primaryAsset: {
+          ...primaryAsset,
+          shares: totalShares,
+          averageBuyPrice: weightedAvgBuyPrice,
+          currentValue: marketVal,
+          pnl,
+          pnlPercentage: pnlPercent,
+        },
+        shares: totalShares,
+        investedCost: totalInvestedCost,
+        averageBuyPrice: weightedAvgBuyPrice,
+        currentPrice: curPrice,
+        marketValue: marketVal,
+        pnl,
+        pnlPercent,
+        isProfit: pnl >= 0,
+        contributions,
+      });
+    });
+
+    return groups;
+  }, [assets, transactions]);
+
   // Compute portfolio metrics (memoized)
   const { totalCost, totalValue, totalPnL, totalPnLPercent, isOverallProfit } = useMemo(() => {
     let cost = 0;
     let val = 0;
-    assets.forEach((asset) => {
-      const fee = asset.initialFee || 0;
-      cost += asset.shares * asset.averageBuyPrice + fee;
-      val += asset.shares * asset.currentPrice;
+    consolidatedGroups.forEach((g) => {
+      cost += g.investedCost;
+      val += g.marketValue;
     });
     const pnl = val - cost;
     const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
@@ -222,12 +583,12 @@ export const InvestmentsView: React.FC = () => {
       totalPnLPercent: pnlPercent,
       isOverallProfit: pnl >= 0,
     };
-  }, [assets]);
+  }, [consolidatedGroups]);
 
-  const filteredAssets = useMemo(() => {
-    if (selectedType === 'all') return assets;
-    return assets.filter((asset) => asset.assetType === selectedType);
-  }, [assets, selectedType]);
+  const filteredGroups = useMemo(() => {
+    if (selectedType === 'all') return consolidatedGroups;
+    return consolidatedGroups.filter((g) => g.primaryAsset.assetType === selectedType);
+  }, [consolidatedGroups, selectedType]);
 
   const assetTypeTabs: { type: AssetType | 'all'; label: string }[] = [
     { type: 'all', label: 'Todos' },
@@ -324,10 +685,10 @@ export const InvestmentsView: React.FC = () => {
 
           <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
             <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
-              Posiciones Activas
+              Posiciones Únicas
             </span>
             <span className="text-base lg:text-lg font-bold text-white light:text-slate-800 block mt-1">
-              {assets.length} {assets.length === 1 ? 'activo' : 'activos'}
+              {consolidatedGroups.length} {consolidatedGroups.length === 1 ? 'índice/activo' : 'índices/activos'}
             </span>
             <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
               En cartera
@@ -375,7 +736,7 @@ export const InvestmentsView: React.FC = () => {
 
       {/* Assets List (1 col on mobile, 2 cols on PC) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {assets.length === 0 ? (
+        {consolidatedGroups.length === 0 ? (
           <div className="lg:col-span-2 py-12 px-5 text-center rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 flex flex-col items-center justify-center gap-3 shadow-xl">
             <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <PieChart className="h-7 w-7 text-indigo-400 opacity-80" />
@@ -387,17 +748,48 @@ export const InvestmentsView: React.FC = () => {
               </p>
             </div>
           </div>
-        ) : filteredAssets.length === 0 ? (
+        ) : filteredGroups.length === 0 ? (
           <div className="lg:col-span-2 py-10 px-4 text-center rounded-2xl bg-white/[0.03] border border-white/10 text-slate-400 text-xs flex flex-col items-center gap-1.5">
             <Layers className="h-6 w-6 text-slate-500 opacity-60 mb-0.5" />
             <p className="font-semibold text-slate-300">No tienes activos registrados en esta categoría.</p>
           </div>
         ) : (
-          filteredAssets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} onDelete={deleteAsset} />
+          filteredGroups.map((group) => (
+            <AssetCard
+              key={group.key}
+              group={group}
+              isExpanded={expandedAssetKeys.has(group.key)}
+              onToggleExpand={() => toggleExpand(group.key)}
+              onEdit={(asset) => setAssetToEdit(asset)}
+              onWithdraw={(asset) => setAssetToWithdraw(asset)}
+              onEditTransaction={(tx) => setTxToEdit(tx)}
+            />
           ))
         )}
       </div>
+
+      {/* Withdraw Modal */}
+      <WithdrawInvestmentModal
+        isOpen={!!assetToWithdraw}
+        onClose={() => setAssetToWithdraw(null)}
+        asset={assetToWithdraw}
+      />
+
+      {/* Edit Position Modal */}
+      <EditAssetModal
+        isOpen={!!assetToEdit}
+        onClose={() => setAssetToEdit(null)}
+        asset={assetToEdit}
+      />
+
+      {/* Edit Transaction Modal (for individual contributions) */}
+      {txToEdit && (
+        <QuickAddTransactionModal
+          isOpen={!!txToEdit}
+          onClose={() => setTxToEdit(null)}
+          editingTransaction={txToEdit}
+        />
+      )}
     </div>
   );
 };

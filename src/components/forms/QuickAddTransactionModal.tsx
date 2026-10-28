@@ -22,6 +22,7 @@ import {
   DollarSign,
   Hash,
   Banknote,
+  Wallet,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -177,6 +178,19 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       icon: <SourceAvatar source={source} size="xs" />,
     }));
   }, [sortedSources]);
+
+  // Investment Source Options (Includes option for external funds without debiting accounts)
+  const investSourceOptions: GlassSelectOption<string>[] = useMemo(() => {
+    return [
+      {
+        value: '',
+        label: 'Sin cuenta vinculada (Fondos externos)',
+        subtitle: 'No descuenta saldo de tus cuentas',
+        icon: <Wallet className="h-3.5 w-3.5 text-slate-400" />,
+      },
+      ...sourceOptions,
+    ];
+  }, [sourceOptions]);
 
   // Standard movement fields (Expense / Income)
   const [amount, setAmount] = useState<string>('');
@@ -384,7 +398,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     setAutocompletedNotice(match.name);
     setTimeout(() => setAutocompletedNotice(null), 3500);
 
-    const priceToUse = match.averageBuyPrice || match.currentPrice;
+    const priceToUse = match.currentPrice || match.averageBuyPrice || 0;
     if (!averageBuyPrice && priceToUse > 0) {
       setAverageBuyPrice(priceToUse.toString());
       const totalNum = parsePositiveNumber(totalInvestedInput);
@@ -590,10 +604,12 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
       addTransaction({
         amount: totalAmount,
+        shares: safeShares,
+        unitPrice: safeBuyPrice,
         pillar: 'invest',
         categoryId: selectedCatId || 'cat-etf',
         brandId: brokerBrandId || undefined,
-        sourceId: selectedSourceId || sortedSources[0]?.id || undefined,
+        sourceId: selectedSourceId ? selectedSourceId : undefined,
         concept: `Inversión en ${assetName.trim()} (${identifier.trim().toUpperCase()})`,
         date: txDate,
         isRecurring,
@@ -1303,18 +1319,21 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 placeholder="Busca tu broker (MyInvestor, Trade Republic, Degiro, Kraken...)"
               />
 
-              {/* Source Account Selector for Investment Outflow */}
-              {sourceOptions.length > 0 && (
-                <div>
-                  <GlassSelect
-                    label="Cuenta o Fuente de Cargo"
-                    value={selectedSourceId}
-                    onChange={(val) => setSelectedSourceId(val)}
-                    options={sourceOptions}
-                    placeholder="Selecciona cuenta de origen..."
-                  />
-                </div>
-              )}
+              {/* Source Account Selector for Investment Outflow (Optional) */}
+              <div>
+                <GlassSelect
+                  label="Cuenta o Fuente de Cargo (Opcional)"
+                  value={selectedSourceId}
+                  onChange={(val) => setSelectedSourceId(val)}
+                  options={investSourceOptions}
+                  placeholder="Selecciona cuenta de origen o fondos externos..."
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {selectedSourceId
+                    ? 'Se registrará una salida vinculada de tu cuenta seleccionada.'
+                    : 'Fondos externos: no se restará saldo de ninguna de tus cuentas en la app.'}
+                </p>
+              </div>
 
               {/* Date & Initial Fee */}
               <div className="grid grid-cols-2 gap-2.5">

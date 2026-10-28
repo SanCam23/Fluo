@@ -1054,4 +1054,138 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       expect(useFinanceStore.getState().recurrences).toHaveLength(0);
     });
   });
+
+  describe('Investment Position Management - updateAsset & withdrawAsset', () => {
+    beforeEach(() => {
+      useFinanceStore.setState({
+        assets: [
+          {
+            id: 'asset-sp500-test',
+            name: 'Vanguard S&P 500 UCITS ETF',
+            identifier: 'IE0032126645',
+            isin: 'IE0032126645',
+            ticker: 'VUSA',
+            assetType: 'index_fund',
+            shares: 10,
+            averageBuyPrice: 80,
+            currentPrice: 100,
+            currentValue: 1000,
+            pnl: 200,
+            pnlPercentage: 25,
+            currency: 'EUR',
+            platform: 'MyInvestor',
+            lastUpdated: 'Reciente',
+          },
+        ],
+        sources: [
+          {
+            id: 'src-bank-dest',
+            name: 'Cuenta Principal',
+            type: 'bank',
+            initialBalance: 500,
+            orderIndex: 0,
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        transactions: [],
+      });
+    });
+
+    it('should update asset properties and recalculate market valuation and PnL', () => {
+      const store = useFinanceStore.getState();
+
+      store.updateAsset('asset-sp500-test', {
+        name: 'Vanguard S&P 500 Index Fund',
+        shares: 15,
+        averageBuyPrice: 85,
+        platform: 'Trade Republic',
+      });
+
+      const updated = useFinanceStore.getState().assets.find((a) => a.id === 'asset-sp500-test');
+      expect(updated).toBeDefined();
+      expect(updated?.name).toBe('Vanguard S&P 500 Index Fund');
+      expect(updated?.shares).toBe(15);
+      expect(updated?.averageBuyPrice).toBe(85);
+      expect(updated?.platform).toBe('Trade Republic');
+      // currentValue = 15 * 100 = 1500
+      expect(updated?.currentValue).toBe(1500);
+      // cost = 15 * 85 = 1275; pnl = 1500 - 1275 = 225
+      expect(updated?.pnl).toBe(225);
+      expect(updated?.pnlPercentage).toBeCloseTo((225 / 1275) * 100, 2);
+    });
+
+    it('should perform partial withdrawal: reduces shares, keeps buy price, and deposits income into destination account', () => {
+      const store = useFinanceStore.getState();
+
+      // Position: 10 shares @ 100 € market price = 1000 € total value
+      // Withdraw 400 € (which equals 4 shares at 100 € each)
+      store.withdrawAsset('asset-sp500-test', 400, 'src-bank-dest', '2026-10-28');
+
+      const remainingAsset = useFinanceStore.getState().assets.find((a) => a.id === 'asset-sp500-test');
+      expect(remainingAsset).toBeDefined();
+      // 10 - 4 = 6 shares remaining
+      expect(remainingAsset?.shares).toBe(6);
+      expect(remainingAsset?.averageBuyPrice).toBe(80); // Buy price is unchanged!
+      expect(remainingAsset?.currentValue).toBe(600); // 6 * 100
+      // Cost of remaining 6 shares = 6 * 80 = 480; pnl = 600 - 480 = 120
+      expect(remainingAsset?.pnl).toBe(120);
+
+      // Verify that an income transaction was recorded into 'src-bank-dest'
+      const txs = useFinanceStore.getState().transactions;
+      expect(txs).toHaveLength(1);
+      expect(txs[0].pillar).toBe('income');
+      expect(txs[0].amount).toBe(400);
+      expect(txs[0].sourceId).toBe('src-bank-dest');
+      expect(txs[0].concept).toContain('Retirada de Vanguard S&P 500');
+    });
+
+    it('should perform total liquidation when withdrawing the full position value: removes asset and deposits funds', () => {
+      const store = useFinanceStore.getState();
+
+      // Total position is 1000 €
+      store.withdrawAsset('asset-sp500-test', 1000, 'src-bank-dest', '2026-10-28');
+
+      // Asset must be liquidated / removed from active portfolio
+      const assets = useFinanceStore.getState().assets;
+      expect(assets.find((a) => a.id === 'asset-sp500-test')).toBeUndefined();
+
+      // Income transaction must be recorded
+      const txs = useFinanceStore.getState().transactions;
+      expect(txs).toHaveLength(1);
+      expect(txs[0].amount).toBe(1000);
+      expect(txs[0].sourceId).toBe('src-bank-dest');
+    });
+
+    it('should correctly recalculate weighted average buy price (PMCP) when adding tranches at different purchase prices', () => {
+      const store = useFinanceStore.getState();
+
+      // Initial asset in beforeEach: 10 shares @ 80 € (Cost: 800 €)
+      // Add second tranche: 10 shares @ 120 € (Cost: 1200 €)
+      store.addAsset({
+        name: 'Vanguard S&P 500 UCITS ETF',
+        identifier: 'IE0032126645',
+        isin: 'IE0032126645',
+        ticker: 'VUSA',
+        assetType: 'index_fund',
+        shares: 10,
+        averageBuyPrice: 120, // Different purchase price!
+        currentPrice: 110,
+        currency: 'EUR',
+      });
+
+      const consolidated = useFinanceStore.getState().assets.find((a) => a.identifier === 'IE0032126645');
+      expect(consolidated).toBeDefined();
+      // Total shares: 10 + 10 = 20
+      expect(consolidated?.shares).toBe(20);
+      // Combined total cost = 800 + 1200 = 2000 €
+      // Weighted average buy price = 2000 / 20 = 100 €
+      expect(consolidated?.averageBuyPrice).toBe(100);
+      // Current valuation at market price 110 € = 20 * 110 = 2200 €
+      expect(consolidated?.currentValue).toBe(2200);
+      // PnL = 2200 - 2000 = +200 €
+      expect(consolidated?.pnl).toBe(200);
+      // PnL % = (200 / 2000) * 100 = +10%
+      expect(consolidated?.pnlPercentage).toBe(10);
+    });
+  });
 });

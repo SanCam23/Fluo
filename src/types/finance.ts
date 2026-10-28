@@ -44,6 +44,8 @@ export interface Transaction {
   sourceId?: string;
   concept: string;
   date: string; // ISO 8601 string
+  shares?: number;
+  unitPrice?: number;
   isRecurring?: boolean;
   isRecurringGenerated?: boolean; // Generada automáticamente por el motor de recurrencias
   recurrenceId?: string;
@@ -143,6 +145,7 @@ export interface RecurrenceRule {
 
 export interface FinancialSummary {
   netBalance: number;
+  netCashBalance?: number;
   totalIncome: number;
   totalExpense: number;
   totalInvested: number;

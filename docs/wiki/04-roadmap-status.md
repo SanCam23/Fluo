@@ -44,8 +44,8 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Nuevas Categorías de Gasto & Flujo Cajero** | ✅ Completado | 6 nuevas categorías (Estudios, Cajero, Bizum, Viajes, Regalos, Otros), auto-ingreso gemelo en efectivo en Cajero y restricción a 1 sola cuenta de efectivo |
 | **Selector Dual en Estadísticas (Periodo vs Mes)** | ✅ Completado | Conmutador Liquid Glass en `/stats`: selección por periodos relativos o mes específico con stepper, picker nativo y evolución diaria continua |
 | **Auto-Sanación de Fondos Eclipsados & Purga Huérfana** | ✅ Completado | Detección reactiva de discrepancias en `reconcileAssetsFromTransactions`, auto-renombrado y recálculo según movimientos activos, purga de `reconciled-asset-*` huérfanos y botón de borrado visible en móvil (`opacity-80`) |
-| **Ciclo de Vida de Recurrencias & Auto-Sanación de Reglas** | ✅ Completado | Enlace bidireccional `recurrenceId`, cascada al borrar apunte inicial, preservación de regla en recurrencias subsiguientes (2ª+), purga de reglas huérfanas en arranque y botón de cancelación en widget |
 | **Optimización Integral & Consolidación** | ✅ Completado | Eliminación de código muerto (5 archivos), importación dinámica de mock data, Mapas O(1) en store y vistas, y consolidación de bucles en una sola pasada |
+| **Multi-Aportaciones, Fondos Externos & Retiradas** | ✅ Completado | Consolidación visual a 1 tarjeta por índice con historial desplegable de aportaciones, fondos externos opcionales, eliminación de borrado directo y modal de retirada con liquidación hacia cuentas |
 
 ---
 
@@ -1070,8 +1070,34 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
     - **Verificación en Vivo**: Verificado que `/api/quote?symbol=IE0032126645` y `/api/quote?symbol=0P00000SUJ.F` retornan de inmediato `{ price: 84.74, change24h: 1.29, currency: 'EUR' }`.
     - Mantenimiento de fallback transparente a Yahoo Finance para acciones, criptomonedas y ETFs bursátiles estándar.
 
+### v0.6.2 (Multi-Aportaciones a Índices, Fondos Externos Opcionales, Retiradas sin Borrado Directo y Gestos Swipe)
+- **[x] Consolidación Visual en 1 Tarjeta por Índice**:
+  - En la vista de inversiones ([`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx)), cualquier conjunto de posiciones que compartan el mismo ISIN o identificador (ej. múltiples compras del S&P 500 en fechas distintas) se agrupan en una única tarjeta mediante `ConsolidatedAssetGroup`.
+  - Muestra la suma consolidada de títulos, el precio medio de compra ponderado (PMCP) inmutable, el valor de mercado total y una pastilla informativa con el recuento total de aportaciones registradas.
+- **[x] Desglose Histórico de Aportaciones al Hacer Clic**:
+  - Al pulsar sobre la tarjeta del índice (o en el botón de despliegue), se abre un cajón acordeón Liquid Glass que ejecuta `getTransactionsForAsset(asset, transactions)`.
+  - Lista cronológica (de más reciente a más antigua) de cada aportación y retirada, con fecha formateada, concepto, broker y cuenta de origen (o insignia *"Fondos externos"*).
+  - Al hacer clic sobre cualquier aportación individual se abre el modal de edición de movimiento para modificarla de inmediato.
+- **[x] Inversiones con Fondos Externos Opcionales**:
+  - En [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), el selector de cuenta de origen para inversiones incluye la opción *"Sin cuenta vinculada (Fondos externos)"*, estableciendo `sourceId: undefined`.
+  - [`computeFinancialSummary`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts) omite la deducción de caja si `!tx.sourceId`, incorporando el activo a la cartera sin restar saldo de ninguna cuenta bancaria o de efectivo de la app.
+  - Si el usuario selecciona una cuenta registrada, el importe se descuenta automáticamente como salida vinculada de dicha cuenta.
+- **[x] Eliminación Directa Reemplazada por Retirada de Fondos**:
+  - Se suprime por completo el botón de papelera/eliminación de inversiones.
+  - Se implementa el modal [`WithdrawInvestmentModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/WithdrawInvestmentModal.tsx) y la acción `withdrawAsset` en Zustand:
+    - El usuario introduce el importe a retirar en euros (con accesos directos al 25%, 50%, 75% o 100% de liquidación).
+    - Muestra desglose predictivo de títulos liquidados ($\text{shares} = \text{amount} / \text{currentPrice}$) y posición residual.
+    - El usuario elige la cuenta de destino en la que se ingresa el dinero, generándose un movimiento de ingreso (`pillar: 'income'`, categoría `cat-dividends`).
+    - Si se liquida la totalidad de títulos, el activo se retira de la cartera. En retiradas parciales, se reducen las participaciones manteniendo el precio medio original.
+- **[x] Gestos Táctiles y Edición de Posición**:
+  - Soporte de gestos táctiles tipo iOS en las tarjetas de inversión:
+    - **Swipe a la derecha**: Revela capa índigo *"Editar posición"* y abre [`EditAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/EditAssetModal.tsx) para modificar nombre, participaciones, precio medio o custodio.
+    - **Swipe a la izquierda**: Revela capa esmeralda *"Retirar fondos"* y abre [`WithdrawInvestmentModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/WithdrawInvestmentModal.tsx).
+    - En PC / escritorio: Botones dedicados de acción por clic directo en la tarjeta.
+
 **Validación de Calidad:**
-- Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
+- Vitest: 125/125 tests unitarios pasando al 100% (7 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
 - Servidor de Desarrollo: Vite activo en segundo plano en `http://localhost:5173/`.
-- Producción: `npm run build` compilado exitosamente con chunks optimizados y Service Worker PWA activo.
+- Wiki: Sincronización completa de los 4 documentos en `/docs/wiki/`.
+

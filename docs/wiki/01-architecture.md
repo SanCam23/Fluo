@@ -72,7 +72,9 @@ Fluo/
 │   │   │   ├── SwipeableTransactionItem.tsx # Elemento con swipe táctil en móvil y hover/clic directo en PC
 │   │   │   └── RecurrenceSummaryWidget.tsx # Widget de pagos y cobros próximos recurrentes
 │   │   ├── investments/            # Vista de Cartera de Inversiones
-│   │   │   └── InvestmentsView.tsx # Tarjetas de activos, rentabilidad P&L y filtros
+│   │   │   ├── InvestmentsView.tsx # Tarjetas consolidadas, rentabilidad P&L, desglose expansible y filtros
+│   │   │   ├── WithdrawInvestmentModal.tsx # Modal Liquid Glass de retirada parcial/total hacia cuentas
+│   │   │   └── EditAssetModal.tsx  # Modal Liquid Glass para edición de posición de activo
 │   │   ├── analytics/              # Vista de Estadísticas Financieras
 │   │   │   └── AnalyticsView.tsx   # Selector de periodos, distribución y top marcas
 │   │   └── forms/                  # Formularios modales unificados
@@ -725,6 +727,43 @@ Para garantizar consistencia absoluta entre los movimientos del libro contable y
 
 ### 4. Cancelación Directa de Recurrencias (`RecurrenceSummaryWidget.tsx`)
 - En el widget de la pantalla de inicio ([`RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx)), cada tarjeta de pago/cobro próximo cuenta con un botón de papelera Liquid Glass que invoca `deleteRecurrence(id)` previa confirmación del usuario, permitiendo cancelar cualquier serie futura sin necesidad de tocar los movimientos ya registrados en el historial.
+
+---
+
+## 19. Gestión Avanzada de Inversiones: Multi-Aportaciones, Fondos Externos Opcionales y Retirada sin Borrado Directo
+
+### 1. Consolidación Visual en 1 Sola Tarjeta por Índice
+- Cuando un usuario realiza múltiples aportaciones a un mismo índice o activo (ej. S&P 500) en momentos diferentes, la vista de inversiones (`InvestmentsView.tsx`) agrupa automáticamente las posiciones mediante `ConsolidatedAssetGroup`:
+  - **Identificador unificado**: Se consolidan todas las entradas que compartan el mismo ISIN o identificador bursátil.
+  - **Cálculo consolidado**: Se suman las participaciones totales y se calcula el precio medio de compra ponderado (PMCP) inmutable:
+    $$\text{PMCP} = \frac{\sum (\text{shares}_i \times \text{buyPrice}_i + \text{fee}_i)}{\sum \text{shares}_i}$$
+  - **Tarjeta única**: En la interfaz solo se muestra **1 única tarjeta** representativa del índice con su valoración de mercado y P&L global.
+
+### 2. Desglose Histórico de Aportaciones al Hacer Clic
+- Al pulsar sobre la tarjeta consolidada, se despliega un cajón acordeón Liquid Glass interactivo que invoca `getTransactionsForAsset(asset, transactions)`:
+  - Muestra la cronología completa de aportaciones (compras) y retiradas (ventas parciales) asociadas al activo.
+  - Cada elemento del desglose refleja la fecha, el importe en euros, el precio unitario y títulos de esa compra en concreto (`X uds @ Y €`), el broker custodio y la cuenta de cargo utilizada (o la insignia de *Fondos externos*).
+  - Al hacer clic sobre cualquier aportación individual, se abre el modal de edición para modificar ese movimiento en concreto.
+
+### 3. Inversiones con Fondos Externos (Cuenta Opcional)
+- En `QuickAddTransactionModal.tsx`, la selección de cuenta de origen es completamente opcional para el pilar de inversión:
+  - La opción por defecto o seleccionable *"Sin cuenta vinculada (Fondos externos)"* establece `sourceId: undefined`.
+  - La función `computeFinancialSummary` evalúa `tx.sourceId`: si no existe cuenta vinculada, la inversión se incorpora a la cartera sin restar saldo de ninguna cuenta bancaria o de efectivo de la app.
+  - Si el usuario vincula una cuenta, la inversión descuenta automáticamente el saldo como salida de dicha fuente.
+
+### 4. Eliminación Reemplazada por Retirada ("Retirada de Fondos")
+- Se ha eliminado por completo el botón directo de borrado/papelera de las inversiones para evitar inconsistencias contables:
+  - La gestión de salida se efectúa mediante el modal `WithdrawInvestmentModal.tsx` o la acción `withdrawAsset` del store.
+  - El usuario indica el importe en euros a retirar (con selectores rápidos de 25%, 50%, 75% o 100% de liquidación) y selecciona a cuál de sus cuentas se ingresa el dinero.
+  - Se liquidan las participaciones equivalentes ($\text{shares} = \text{amount} / \text{currentPrice}$). Si se liquida la totalidad, el activo se retira de la cartera.
+  - Se registra automáticamente un movimiento de ingreso (`pillar: 'income'`, categoría `cat-dividends`) en la cuenta de destino seleccionada.
+
+### 5. Gestos Táctiles: Deslizar para Editar y Deslizar para Retirar
+- Siguiendo el patrón de la pantalla de inicio:
+  - **Deslizar a la derecha** (> 80px): Activa la edición de la posición abriendo `EditAssetModal.tsx` (con fondo vítreo índigo).
+  - **Deslizar a la izquierda** (< -80px): Activa la retirada de fondos abriendo `WithdrawInvestmentModal.tsx` (con fondo vítreo esmeralda).
+  - En desktop / ordenadores: Se disponen botones de acción directa Liquid Glass (lápiz para editar, flecha de retirada y flecha de despliegue) sin requerir arrastre.
+
 
 
 

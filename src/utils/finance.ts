@@ -112,7 +112,12 @@ export function computeFinancialSummary(
     if (!tx || typeof tx.amount !== 'number' || isNaN(tx.amount)) return;
     if (tx.pillar === 'income') totalIncome += tx.amount;
     if (tx.pillar === 'expense') totalExpense += tx.amount;
-    if (tx.pillar === 'invest') totalInvestTx += tx.amount;
+    if (tx.pillar === 'invest') {
+      // Only deduct from cash if it was actually drawn from a tracked source account
+      if (sourceList.length === 0 || !!tx.sourceId) {
+        totalInvestTx += tx.amount;
+      }
+    }
   });
 
   let totalInvestedCost = 0;
@@ -158,6 +163,7 @@ export function computeFinancialSummary(
 
   return {
     netBalance,
+    netCashBalance,
     totalIncome,
     totalExpense,
     totalInvested: portfolioMarketValue,
@@ -587,6 +593,57 @@ export function findMatchingAssetIndex(
 
     return false;
   });
+}
+
+/**
+ * Retrieves all transactions related to a specific investment asset (contributions & withdrawals)
+ * ordered chronologically descending (newest first).
+ */
+export function getTransactionsForAsset(
+  asset: InvestmentAsset,
+  transactions: Transaction[] = []
+): Transaction[] {
+  const cleanIdent = (asset.identifier || '').trim().toUpperCase();
+  const cleanIsin = (asset.isin || '').trim().toUpperCase();
+  const cleanTicker = (asset.ticker || '').trim().toUpperCase();
+  const cleanName = (asset.name || '').trim().toLowerCase();
+
+  const nameTokens = cleanName
+    .replace(/[()]/g, '')
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !['fondo', 'index', 'stock', 'fund', 'ucits', 'acc', 'eur'].includes(t));
+
+  return (transactions || []).filter((tx) => {
+    if (!tx || (tx.pillar !== 'invest' && tx.pillar !== 'income')) return false;
+    const conceptUpper = (tx.concept || '').toUpperCase();
+    const conceptLower = (tx.concept || '').toLowerCase();
+
+    // Check ISIN match
+    if (cleanIsin && conceptUpper.includes(cleanIsin)) return true;
+    // Check identifier/ticker match
+    if (cleanIdent && (conceptUpper.includes(`(${cleanIdent})`) || conceptUpper.includes(cleanIdent))) return true;
+    if (cleanTicker && (conceptUpper.includes(`(${cleanTicker})`) || conceptUpper.includes(cleanTicker))) return true;
+
+    // Check parsed identifier
+    const parsed = parseInvestmentConcept(tx.concept);
+    if (parsed.identifier) {
+      const pId = parsed.identifier.toUpperCase();
+      if (pId === cleanIdent || (cleanIsin && pId === cleanIsin) || (cleanTicker && pId === cleanTicker)) {
+        return true;
+      }
+    }
+
+    // Name tokens match
+    if (cleanName && conceptLower.includes(cleanName)) return true;
+    if (nameTokens.length > 0 && nameTokens.every((t) => conceptLower.includes(t))) return true;
+
+    // Retirada concept match: "Retirada de S&P 500"
+    if (conceptLower.startsWith('retirada') && (conceptLower.includes(cleanName) || (cleanIdent && conceptUpper.includes(cleanIdent)))) {
+      return true;
+    }
+
+    return false;
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 /**

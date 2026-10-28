@@ -426,4 +426,33 @@ Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El br
   - Cierre universal: Listener global para tecla `Escape` y evento `onClick` sobre el backdrop (con detención de propagación en la tarjeta).
   - Selectores internos desplegables mediante clic directo (`GlassSelect`) o pastillas flexibles con ajuste de línea (`flex-wrap gap-2`), erradicando cualquier contenedor con scroll horizontal forzado.
 
+---
+
+## 28. Componentes Visuales de Inversión y Gestualidad Táctil
+
+### 28.1. Tarjeta Consolidada de Índice (`AssetCard` en `InvestmentsView`)
+- **Estructura Visual**:
+  - `group relative p-4 rounded-3xl bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-200 shadow-lg`
+  - Cabecera: Nombre del activo, píldora con identificador/ISIN, etiqueta de tipo (`AssetType`) y valoración de mercado con badge dinámico de P&L (`bg-emerald-500/15` o `bg-rose-500/15`).
+  - Fila inferior: Importe invertido consolidado, desglose de participaciones a 6 decimales, cotización viva y botones de acción rápida.
+  - Insignia de aportaciones múltiples: `px-1.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-[10px] font-bold text-indigo-300` cuando existen múltiples entradas al mismo índice.
+
+### 28.2. Desglose Expansible de Aportaciones
+- **Cajón Acordeón Liquid Glass**:
+  - Al hacer clic en la tarjeta o en el chevron indicador, se despliega con animación suave `animate-fadeIn` el listado de aportaciones (`getTransactionsForAsset`).
+  - Cada apunte se presenta en una cápsula vítrea `p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10`.
+  - Incluye icono de dirección (compra `ArrowUpRight` en índigo, retirada `ArrowDownRight` en esmeralda), fecha formateada, concepto, cuenta de origen (o badge `Fondos externos`) e importe, con indicación hover para editar.
+
+### 28.3. Gestualidad Táctil Bidireccional (Swipe)
+- **Capa Deslizable con Resistencia Elástica**:
+  - **Swipe Derecho (> 80px - Editar)**: Revela capa vítrea índigo `bg-indigo-600/90 text-white backdrop-blur-xl` con icono `Pencil` y texto *"Soltar para editar"*.
+  - **Swipe Izquierdo (< -80px - Retirar)**: Revela capa vítrea esmeralda `bg-emerald-600/90 text-white backdrop-blur-xl` con icono `ArrowDownRight` y texto *"Soltar para retirar"*.
+  - Sin botón de papelera/borrado: La eliminación directa no está disponible para proteger la integridad de las aportaciones.
+
+### 28.4. Modal de Retirada (`WithdrawInvestmentModal`)
+- Contenedor vítreo `max-w-lg rounded-3xl bg-[#0F172A]/90 backdrop-blur-2xl border border-white/20 p-6 shadow-2xl`.
+- Selector numérico destacado en euros con chips de porcentaje rápido (25%, 50%, 75%, 100% liquidación total).
+- Desglose predictivo de títulos a liquidar y posición restante.
+- Selector Liquid Glass de cuenta destino (`GlassSelect`) y fecha de operación.
+
 

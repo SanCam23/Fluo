@@ -4,6 +4,7 @@ import {
   generateSavingsEvolution,
   computeSourceBalance,
   computeFinancialSummary,
+  getTransactionsForAsset,
 } from './finance';
 import type { Transaction, SourceAccount, InvestmentAsset } from '../types/finance';
 
@@ -257,5 +258,134 @@ describe('Utilidades base de balance (computeSourceBalance & computeFinancialSum
     expect(summary.portfolioMarketValue).toBe(600); // 10 * 60
     expect(summary.netBalance).toBe(1300 + 600); // 1900
     expect(summary.unrealizedPnL).toBe(100); // 600 - 500
+  });
+
+  it('no descuenta del saldo en efectivo si la inversión se realizó con fondos externos (sin sourceId)', () => {
+    const assets: InvestmentAsset[] = [
+      {
+        id: 'asset-sp500',
+        name: 'Vanguard S&P 500',
+        identifier: 'IE0032126645',
+        assetType: 'index_fund',
+        shares: 2,
+        averageBuyPrice: 100,
+        currentPrice: 110,
+        currency: 'EUR',
+        lastUpdated: 'Reciente',
+      },
+    ];
+
+    // Transacción de inversión con fondos externos (sourceId: undefined)
+    const externalInvestTx: Transaction = {
+      id: 'tx-inv-ext',
+      amount: 200,
+      pillar: 'invest',
+      categoryId: 'cat-etf',
+      concept: 'Inversión en Vanguard S&P 500 (IE0032126645)',
+      date: '2026-01-04',
+      createdAt: 3,
+    };
+
+    const summary = computeFinancialSummary([...txs, externalInvestTx], assets, [source]);
+    // Saldo en efectivo: 1000 + 500 - 200 = 1300 € (NO se restan los 200 € porque no tiene sourceId)
+    expect(summary.netCashBalance).toBe(1300);
+    expect(summary.portfolioMarketValue).toBe(220); // 2 * 110
+    expect(summary.netBalance).toBe(1300 + 220); // 1520 €
+  });
+
+  it('descuenta del saldo en efectivo cuando la inversión sí tiene una cuenta vinculada (sourceId)', () => {
+    const assets: InvestmentAsset[] = [
+      {
+        id: 'asset-sp500',
+        name: 'Vanguard S&P 500',
+        identifier: 'IE0032126645',
+        assetType: 'index_fund',
+        shares: 2,
+        averageBuyPrice: 100,
+        currentPrice: 110,
+        currency: 'EUR',
+        lastUpdated: 'Reciente',
+      },
+    ];
+
+    const linkedInvestTx: Transaction = {
+      id: 'tx-inv-linked',
+      amount: 200,
+      pillar: 'invest',
+      categoryId: 'cat-etf',
+      sourceId: 'src-1',
+      concept: 'Inversión en Vanguard S&P 500 (IE0032126645)',
+      date: '2026-01-04',
+      createdAt: 3,
+    };
+
+    const summary = computeFinancialSummary([...txs, linkedInvestTx], assets, [source]);
+    // Saldo en efectivo: 1000 + 500 - 200 - 200 = 1100 € (sí se descuenta)
+    expect(summary.netCashBalance).toBe(1100);
+  });
+});
+
+describe('Historial de Aportaciones por Activo (getTransactionsForAsset)', () => {
+  const asset: InvestmentAsset = {
+    id: 'asset-sp500',
+    name: 'Vanguard S&P 500',
+    identifier: 'IE0032126645',
+    isin: 'IE0032126645',
+    ticker: 'VUSA',
+    assetType: 'index_fund',
+    shares: 4,
+    averageBuyPrice: 80,
+    currentPrice: 85,
+    currency: 'EUR',
+    lastUpdated: 'Reciente',
+  };
+
+  const allTransactions: Transaction[] = [
+    {
+      id: 'tx-1',
+      amount: 160,
+      pillar: 'invest',
+      categoryId: 'cat-etf',
+      concept: 'Inversión en Vanguard S&P 500 (IE0032126645)',
+      date: '2026-01-10',
+      createdAt: 1,
+    },
+    {
+      id: 'tx-2',
+      amount: 50,
+      pillar: 'expense',
+      categoryId: 'cat-food',
+      concept: 'Supermercado Mercadona',
+      date: '2026-01-12',
+      createdAt: 2,
+    },
+    {
+      id: 'tx-3',
+      amount: 160,
+      pillar: 'invest',
+      categoryId: 'cat-etf',
+      concept: 'Aportación periódica Vanguard S&P 500',
+      date: '2026-02-10',
+      createdAt: 3,
+    },
+    {
+      id: 'tx-4',
+      amount: 50,
+      pillar: 'income',
+      categoryId: 'cat-dividends',
+      concept: 'Retirada de Vanguard S&P 500 (IE0032126645)',
+      date: '2026-02-15',
+      createdAt: 4,
+    },
+  ];
+
+  it('recupera todas las aportaciones y retiradas vinculadas al índice ordenadas cronológicamente', () => {
+    const result = getTransactionsForAsset(asset, allTransactions);
+
+    // Debe incluir tx-1, tx-3 y tx-4 (3 transacciones del índice), excluyendo tx-2 (Mercadona)
+    expect(result.length).toBe(3);
+    expect(result[0].id).toBe('tx-4'); // 15 Feb (más reciente)
+    expect(result[1].id).toBe('tx-3'); // 10 Feb
+    expect(result[2].id).toBe('tx-1'); // 10 Ene
   });
 });

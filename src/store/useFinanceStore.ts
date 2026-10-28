@@ -81,6 +81,8 @@ interface FinanceState {
   deleteTransaction: (id: string) => void;
   addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
   deleteAsset: (id: string) => void;
+  updateAsset: (id: string, updatedFields: Partial<Omit<InvestmentAsset, 'id'>>) => void;
+  withdrawAsset: (id: string, amount: number, destinationSourceId: string, date?: string) => void;
   updateAssetPrice: (id: string, newPrice: number) => void;
   refreshAllAssetPrices: () => Promise<void>;
   syncStaleAssetQuotes: (maxAgeHours?: number) => Promise<void>;
@@ -835,6 +837,139 @@ export const useFinanceStore = create<FinanceState>()(
 
         // Reconcile immediately so any shadowed active transaction is restored
         get().reconcileInvestments();
+      },
+
+      updateAsset: (id, updatedFields) => {
+        const { assets, userId } = get();
+        const existing = assets.find((a) => a.id === id);
+        if (!existing) return;
+
+        const nextShares =
+          updatedFields.shares !== undefined ? Number(updatedFields.shares) : existing.shares;
+        const nextBuyPrice =
+          updatedFields.averageBuyPrice !== undefined
+            ? Number(updatedFields.averageBuyPrice)
+            : existing.averageBuyPrice;
+        const nextCurrentPrice =
+          updatedFields.currentPrice !== undefined
+            ? Number(updatedFields.currentPrice)
+            : (existing.currentPrice || nextBuyPrice);
+        const nextFee =
+          updatedFields.initialFee !== undefined
+            ? Number(updatedFields.initialFee)
+            : (existing.initialFee || 0);
+        const nextTotalCost = nextShares * nextBuyPrice + nextFee;
+        const nextCurrentValue = Number((nextShares * nextCurrentPrice).toFixed(2));
+        const nextPnl = Number((nextCurrentValue - nextTotalCost).toFixed(2));
+        const nextPnlPercentage =
+          nextTotalCost > 0 ? Number(((nextPnl / nextTotalCost) * 100).toFixed(2)) : 0;
+        const nowIso = new Date().toISOString();
+
+        const updatedAsset: InvestmentAsset = {
+          ...existing,
+          ...updatedFields,
+          shares: nextShares,
+          averageBuyPrice: nextBuyPrice,
+          averagePrice: nextBuyPrice,
+          currentPrice: nextCurrentPrice,
+          currentValue: nextCurrentValue,
+          pnl: nextPnl,
+          pnlPercentage: nextPnlPercentage,
+          lastPriceUpdate: nowIso,
+          last_price_update: nowIso,
+          lastUpdated: 'Modificado manualmente',
+        };
+
+        set({
+          assets: assets.map((a) => (a.id === id ? updatedAsset : a)),
+        });
+
+        if (userId) {
+          insertCloudAsset(updatedAsset, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for updateAsset:', err)
+          );
+        }
+      },
+
+      withdrawAsset: (id, amount, destinationSourceId, date) => {
+        const { assets, userId, addTransaction } = get();
+        const existing = assets.find((a) => a.id === id);
+        if (!existing) return;
+
+        const curPrice = Number(existing.currentPrice) || Number(existing.averageBuyPrice) || 1;
+        const safeAmount = Math.max(0, Number(amount) || 0);
+        if (safeAmount <= 0) return;
+
+        const sharesWithdrawn = curPrice > 0 ? safeAmount / curPrice : 0;
+        const totalPositionValue = Number((existing.shares * curPrice).toFixed(2));
+        const isFullWithdrawal = safeAmount >= totalPositionValue - 0.05;
+
+        if (isFullWithdrawal) {
+          // Posición liquidada por completo
+          set((state) => ({
+            assets: state.assets.filter((a) => a.id !== id),
+          }));
+          if (userId) {
+            deleteCloudAsset(id, userId).catch((err) =>
+              console.warn('[Store] Cloud sync failed for withdraw deleteAsset:', err)
+            );
+          }
+        } else {
+          // Retirada parcial: se reducen las participaciones correspondientes
+          const remainingShares = Number(Math.max(0, existing.shares - sharesWithdrawn).toFixed(6));
+
+          if (remainingShares <= 0.0001) {
+            set((state) => ({
+              assets: state.assets.filter((a) => a.id !== id),
+            }));
+            if (userId) {
+              deleteCloudAsset(id, userId).catch((err) =>
+                console.warn('[Store] Cloud sync failed for withdraw deleteAsset:', err)
+              );
+            }
+          } else {
+            const nextCurrentValue = Number((remainingShares * curPrice).toFixed(2));
+            const costBasis = remainingShares * existing.averageBuyPrice;
+            const nextPnl = Number((nextCurrentValue - costBasis).toFixed(2));
+            const nextPnlPercentage =
+              costBasis > 0 ? Number(((nextPnl / costBasis) * 100).toFixed(2)) : 0;
+
+            const updatedAsset: InvestmentAsset = {
+              ...existing,
+              shares: remainingShares,
+              currentValue: nextCurrentValue,
+              pnl: nextPnl,
+              pnlPercentage: nextPnlPercentage,
+              lastUpdated: 'Retirada parcial',
+            };
+
+            set((state) => ({
+              assets: state.assets.map((a) => (a.id === id ? updatedAsset : a)),
+            }));
+
+            if (userId) {
+              insertCloudAsset(updatedAsset, userId).catch((err) =>
+                console.warn('[Store] Cloud sync failed for withdraw updateAsset:', err)
+              );
+            }
+          }
+        }
+
+        // Registrar movimiento de ingreso en la cuenta destino seleccionada
+        const txDate = date
+          ? (date.includes('T') ? date : `${date}T12:00:00.000Z`)
+          : new Date().toISOString();
+
+        addTransaction({
+          amount: safeAmount,
+          shares: Number(sharesWithdrawn.toFixed(6)),
+          unitPrice: curPrice,
+          pillar: 'income',
+          categoryId: 'cat-dividends',
+          sourceId: destinationSourceId || undefined,
+          concept: `Retirada de ${existing.name} (${existing.identifier})`,
+          date: txDate,
+        });
       },
 
       updateAssetPrice: (id, newPrice) => {

@@ -156,6 +156,8 @@ export interface Transaction {
   sourceId?: string;                  // Relación opcional con SourceAccount (origen de fondos)
   concept: string;                    // Descripción o nota (ej. 'Compra semanal')
   date: string;                       // ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)
+  shares?: number;                    // Cantidad de participaciones/títulos (en inversiones)
+  unitPrice?: number;                 // Precio unitario de compra de la aportación
   isRecurring?: boolean;              // Indica si proviene de una recurrencia
   isRecurringGenerated?: boolean;     // Generada automáticamente por el motor de recurrencias
   recurrenceId?: string;              // Enlace al ID de la regla padre si aplica
@@ -339,23 +341,34 @@ export function reconcileAssetsFromTransactions(
   brands?: { id: string; name: string }[],
   priceLookup?: (identifier: string) => number | undefined
 ): InvestmentAsset[];
+export function getTransactionsForAsset(
+  asset: InvestmentAsset,
+  transactions: Transaction[]
+): Transaction[];
 ```
 
-#### Ciclo de Vida Reactivo de Posiciones:
+#### Ciclo de Vida Reactivo de Posiciones y Acciones del Store:
 1. **Alta o Compra Adicional (`addAsset`)**:
    - Si no existe: da de alta una nueva posición con su `id` único.
    - Si ya existe (mismo ISIN, identifier, ticker o nombre): **acumula** títulos ($\text{shares} = \text{shares}_{\text{prev}} + \text{shares}_{\text{add}}$) y recalcula el **Precio Medio de Compra ponderado (PMC)** manteniendo una única posición consolidada.
-2. **Borrado de Movimientos (`deleteTransaction`)**:
+2. **Historial de Aportaciones al Índice (`getTransactionsForAsset`)**:
+   - Recupera todas las aportaciones y retiradas ordenadas cronológicamente descendente que correspondan al activo (por ISIN, ticker, nombre o tokens descriptivos).
+   - Permite visualizar en un acordeón todos los ingresos realizados en diferentes momentos a ese mismo índice.
+3. **Edición de Posición (`updateAsset`)**:
+   - `updateAsset(id, updatedFields)`: Modifica nombre, participaciones, precio medio de compra o plataforma, recalculando automáticamente `currentValue`, `pnl` y `pnlPercentage` y sincronizando con Supabase.
+4. **Retirada de Fondos / Liquidación (`withdrawAsset`)**:
+   - Sustituye de manera obligatoria al botón de borrado directo.
+   - `withdrawAsset(id, amount, destinationSourceId, date?)`:
+     - Liquida títulos proporcionales: $\text{withdrawnShares} = \text{amount} / \text{currentPrice}$.
+     - Si $\text{remainingShares} \le 0.0001$, se liquida la posición al 100% y se retira de la cartera.
+     - Si es retirada parcial, se descuentan las participaciones preservando el precio medio de compra original.
+     - Genera de forma atómica una transacción de ingreso (`pillar: 'income'`, categoría `cat-dividends`) vinculada a la cuenta de destino seleccionada (`destinationSourceId`).
+5. **Borrado de Movimientos (`deleteTransaction`)**:
    - Al eliminar una transacción `pillar === 'invest'`, deduce proporcionalmente los títulos y el capital aportado por dicho movimiento del activo correspondiente.
    - Si no restan títulos ($\le 0.0001$), el activo se **elimina automáticamente** de la cartera y de Supabase.
-3. **Modificación de Importe (`updateTransaction`)**:
-   - Ajusta automáticamente las participaciones y el coste amortizado por el delta de la modificación.
-4. **Auto-Sanación de Activos Eclipsados (`reconcileAssetsFromTransactions`)**:
-   - Si un activo en cartera retiene una denominación obsoleta o sustituta (ej. "Vanguard European Stock") por haber compartido ISIN con un movimiento eliminado, y el libro de transacciones activo contiene movimientos para otro fondo (ej. "SP500 IE0007987690"), la función detecta la discrepancia y sana la posición de forma transparente: renombra al fondo activo y recalcula títulos y cotización oficial sin requerir reinicio ni recreación.
+6. **Auto-Sanación de Activos Eclipsados (`reconcileAssetsFromTransactions`)**:
+   - Si un activo en cartera retiene una denominación obsoleta o sustituta por haber compartido ISIN con un movimiento eliminado, la función detecta la discrepancia y sana la posición de forma transparente.
    - Purga automáticamente activos autogenerados (`reconciled-asset-*`) cuyos movimientos asociados hayan sido eliminados.
-5. **Borrado Manual de Activos en Cartera (`deleteAsset`)**:
-   - Permite eliminar posiciones desde la interfaz de Inversiones mediante el botón de papelera visible en móvil (`opacity-80`).
-   - Dispara automáticamente `reconcileInvestments()` para resucitar de forma inmediata cualquier activo que estuviera eclipsado en el libro de transacciones.
 
 
 ### Servicio de Búsqueda y Cotizaciones en Tiempo Real (`marketDataService.ts`)
