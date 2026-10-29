@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
@@ -118,12 +119,12 @@ export const WithdrawInvestmentModal: React.FC<WithdrawInvestmentModalProps> = (
     onClose();
   };
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="withdraw-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
       <div
@@ -316,4 +317,6 @@ export const WithdrawInvestmentModal: React.FC<WithdrawInvestmentModalProps> = (
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

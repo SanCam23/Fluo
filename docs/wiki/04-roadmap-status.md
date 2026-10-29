@@ -1160,6 +1160,11 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Al eliminar uno de los apuntes con `deleteTransaction`, se suprimen ambos de forma atómica para evitar desajustes o dinero fantasma en destino.
 - **[x] Suite de Tests Unitarios Automatizados**:
   - 6 nuevos tests unitarios en [`transfers.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/transfers.test.ts) validando transferencias Banco <-> Banco, Efectivo -> Banco, Banco -> Efectivo, actualización bidireccional y borrado atómico.
+- **[x] Aislamiento con React Portal (`createPortal`) y Elevación `z-[100]` en Modales de Inversión**:
+  - Corrección del conflicto de apilamiento donde `FloatingNavbar` (`z-50`) cubría el botón de confirmación (*"Guardar Cambios"* / *"Confirmar"*) al editar una aportación a un índice desde [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx).
+  - Portales directos a `document.body` mediante `createPortal` en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), [`EditAssetModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/EditAssetModal.tsx) y [`WithdrawInvestmentModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/WithdrawInvestmentModal.tsx).
+  - Elevación de la capa de fondo y contenedor a `z-[100]`, atenuando la barra flotante inferior (`z-50`) tras el backdrop oscurecido y dejando el botón de confirmación 100% visible, interactivo y accesible.
+  - Añadido espaciado inferior de seguridad (`pb-6 sm:pb-2`) en el formulario para ergonomía táctil en dispositivos móviles.
 
 **Validación de Calidad:**
 - Vitest: 135/135 tests unitarios pasando al 100% (8 suites).

@@ -232,7 +232,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 lg:bg-slate-950/85 backdrop-blur-xl lg:backdrop-blur-3xl animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 lg:bg-slate-950/85 backdrop-blur-xl lg:backdrop-blur-3xl animate-fadeIn"
     >
       {/* Liquid Glass Main Modal Sheet */}
       <div

@@ -66,7 +66,7 @@ export const InitialSourceModal: React.FC<InitialSourceModalProps> = ({ isOpen }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-2xl lg:backdrop-blur-3xl animate-fadeIn overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-2xl lg:backdrop-blur-3xl animate-fadeIn overflow-y-auto">
       <div className="relative w-full max-w-md lg:max-w-lg max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl bg-slate-900/95 lg:bg-slate-950/90 backdrop-blur-2xl lg:backdrop-blur-3xl border border-white/20 lg:border-white/15 p-5 sm:p-6 lg:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.25)] flex flex-col gap-3.5 sm:gap-4 text-white my-auto">
         {/* Specular Top Reflection */}
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />

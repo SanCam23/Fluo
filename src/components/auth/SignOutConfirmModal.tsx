@@ -32,7 +32,7 @@ export const SignOutConfirmModal: React.FC<SignOutConfirmModalProps> = ({
   return (
     <div
       onClick={!isLoggingOut ? onClose : undefined}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md lg:backdrop-blur-3xl animate-fadeIn gpu-layer transform-gpu"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md lg:backdrop-blur-3xl animate-fadeIn gpu-layer transform-gpu"
     >
       <div
         onClick={(e) => e.stopPropagation()}

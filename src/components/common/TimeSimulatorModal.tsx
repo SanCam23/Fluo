@@ -76,7 +76,7 @@ export const TimeSimulatorModal: React.FC<TimeSimulatorModalProps> = ({ isOpen, 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
     >
       <div
         className="w-full max-w-lg bg-[#0E1526]/95 lg:bg-slate-950/85 border border-white/20 lg:border-white/15 rounded-3xl p-6 lg:p-8 shadow-2xl backdrop-blur-2xl lg:backdrop-blur-3xl relative overflow-hidden flex flex-col max-h-[90vh] gpu-layer transform-gpu"

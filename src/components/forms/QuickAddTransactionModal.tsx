@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Check,
@@ -1024,10 +1025,10 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md lg:backdrop-blur-3xl transition-all duration-300 gpu-layer transform-gpu"
     >
       <div
         className="w-full max-w-lg max-h-[92vh] flex flex-col bg-[#0E1526]/95 lg:bg-slate-950/80 border border-white/20 lg:border-white/15 rounded-t-3xl sm:rounded-3xl p-6 lg:p-8 shadow-2xl backdrop-blur-2xl lg:backdrop-blur-3xl relative overflow-hidden gpu-layer transform-gpu"
@@ -1068,7 +1069,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4 overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4 overflow-y-auto pr-1 pb-6 sm:pb-2">
           {/* Pillar Selector (Gasto / Ingreso / Inversión) */}
           <div className="grid grid-cols-3 gap-2 bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
             <button
@@ -2278,4 +2279,6 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

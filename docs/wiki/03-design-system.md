@@ -481,3 +481,27 @@ Para transferir fondos entre cuentas bancarias o billetera de efectivo de forma 
 - **Botón "Hacia"**: Botón simétrico en el extremo derecho. Al pulsar, despliega únicamente las cuentas receptoras válidas con exclusión reactiva (`s.id !== selectedSourceId`).
 - **Botón Central de Swap**: Pastilla circular central con flecha que permite permutar origen y destino con un solo toque.
 - **Protección de Cuenta Única**: Si el usuario cuenta con una sola fuente registrada, la tarjeta muestra una alerta ámbar Liquid Glass (`bg-amber-500/10 border-amber-500/25 text-amber-300`) inhabilitando la apertura de selectores y la confirmación hasta disponer de dos o más fuentes.
+
+
+---
+
+## 30. Aislamiento de Capas Modales (`createPortal`) y Jerarquía de Stacking (Z-Index)
+
+Para evitar interferencias visuales y conflictos de apilamiento entre modales de acción y elementos flotantes persistentes (como el dock de navegación `FloatingNavbar`), el sistema implementa una jerarquía rigurosa de z-index combinada con aislamiento en el DOM:
+
+### 30.1. Jerarquía de Apilamiento Global (Stacking Order)
+| Capa Visual | Z-Index | Componentes |
+| :--- | :--- | :--- |
+| **Lienzo y Fondos** | `z-0` | Fondo obsidiana, orbes ambientales difusos (`blur-[150px]`) |
+| **Contenido Principal** | `z-10` | Tarjetas maestras, carrusel de balance, listas de transacciones |
+| **Desplegables en Tarjeta** | `z-20` - `z-40` | Selectores de filtros, menús contextuales en vistas |
+| **Dock Flotante Inferior** | `z-50` | Barra de navegación flotante (`FloatingNavbar`) |
+| **Modales & Overlays** | `z-[100]` | Modales de pantalla completa montados en `document.body` mediante `createPortal` |
+| **Menús Dentro de Modales** | `z-50` (local) | Desplegables de `GlassSelect`, `BrandPicker` y autocompletado dentro del modal |
+
+### 30.2. Aislamiento con `createPortal` en `document.body`
+- **Problema Resuelto**: Cuando un modal se renderizaba dentro de vistas anidadas (por ejemplo, al editar una aportación específica en `InvestmentsView`), su árbol DOM quedaba encapsulado dentro de `<main>`. Dado que `FloatingNavbar` se renderizaba posteriormente en `App.tsx` con `z-50`, el dock flotante se superponía visualmente a la base del modal, ocultando el botón *"Guardar Cambios"*.
+- **Solución Técnica**:
+  - Todos los modales interactivos (`QuickAddTransactionModal`, `EditAssetModal`, `WithdrawInvestmentModal`, etc.) transportan su árbol al nivel raíz del DOM con `createPortal(modalContent, document.body)`.
+  - Capa de telón de fondo (`backdrop`) con `z-[100] bg-black/80 backdrop-blur-md lg:backdrop-blur-3xl`, que atenúa y cubre visualmente la barra de navegación (`z-50`).
+  - Margen inferior ergonómico (`pb-6 sm:pb-2`) en el contenedor del formulario para evitar que el botón de confirmación quede pegado al borde del dispositivo o bloqueado por barras del navegador móvil.
