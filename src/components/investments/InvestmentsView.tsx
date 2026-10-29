@@ -644,69 +644,69 @@ export const InvestmentsView: React.FC = () => {
 
         {/* Global Metrics Cards (Responsive 2 cols on mobile, 4 cols on desktop) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-4 mt-4 pt-3.5 border-t border-white/10">
-          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between min-w-0">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block truncate">
               Patrimonio Invertido
             </span>
-            <span className="text-base lg:text-lg font-bold text-slate-200 light:text-slate-800 block mt-1">
+            <span className="text-base lg:text-lg font-bold text-slate-200 light:text-slate-800 block mt-1 truncate">
               {formatCurrency(totalCost)}
             </span>
-            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5 truncate">
               Coste base total
             </span>
           </div>
 
           <div
-            className={`p-3.5 rounded-2xl border backdrop-blur-md transition-all flex flex-col justify-between ${
+            className={`p-3 sm:p-3.5 rounded-2xl border backdrop-blur-md transition-all flex flex-col justify-between min-w-0 ${
               isOverallProfit
                 ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.15)] light:bg-emerald-50/70 light:border-emerald-200'
                 : 'bg-rose-500/10 border-rose-500/25 shadow-[0_0_15px_rgba(244,63,94,0.15)] light:bg-rose-50/70 light:border-rose-200'
             }`}
           >
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block truncate">
               P&L Total No Realizado
             </span>
             <span
-              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 ${
+              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 truncate ${
                 isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
               {isOverallProfit ? '+' : ''}{formatCurrency(totalPnL)}
             </span>
             <div
-              className={`flex items-center gap-1 text-[11px] font-semibold mt-0.5 ${
+              className={`flex items-center gap-1 text-[11px] font-semibold mt-0.5 truncate ${
                 isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
               {isOverallProfit ? <TrendingUp className="h-3 w-3 flex-shrink-0" /> : <TrendingDown className="h-3 w-3 flex-shrink-0" />}
-              <span>{formatPercentage(totalPnLPercent)}</span>
+              <span className="truncate">{formatPercentage(totalPnLPercent)}</span>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between min-w-0">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block truncate">
               Posiciones Únicas
             </span>
-            <span className="text-base lg:text-lg font-bold text-white light:text-slate-800 block mt-1">
+            <span className="text-xs sm:text-sm lg:text-base font-bold text-white light:text-slate-800 block mt-1 whitespace-nowrap truncate tracking-tight">
               {consolidatedGroups.length} {consolidatedGroups.length === 1 ? 'índice/activo' : 'índices/activos'}
             </span>
-            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5 truncate">
               En cartera
             </span>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block">
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between min-w-0">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 light:text-slate-600 block truncate">
               Rentabilidad Global
             </span>
             <span
-              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 ${
+              className={`text-base lg:text-lg font-bold tracking-tight block mt-1 truncate ${
                 isOverallProfit ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
               }`}
             >
               {isOverallProfit ? '+' : ''}{formatPercentage(totalPnLPercent)}
             </span>
-            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5">
+            <span className="text-[11px] text-slate-400 light:text-slate-500 font-medium block mt-0.5 truncate">
               ROI de cartera
             </span>
           </div>

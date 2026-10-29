@@ -49,6 +49,8 @@ export interface Transaction {
   isRecurring?: boolean;
   isRecurringGenerated?: boolean; // Generada automáticamente por el motor de recurrencias
   recurrenceId?: string;
+  transferId?: string;
+  companionTxId?: string;
   createdAt: number;
 }
 

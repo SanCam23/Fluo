@@ -76,7 +76,16 @@ interface FinanceState {
   setTransactions: (transactions: Transaction[]) => void;
   setAssets: (assets: InvestmentAsset[]) => void;
   setSources: (sources: SourceAccount[]) => void;
-  addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'> & { id?: string; createdAt?: number }) => void;
+  addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'> & { id?: string; createdAt?: number; destinationSourceId?: string }) => void;
+  transferBetweenSources: (params: {
+    amount: number;
+    fromSourceId: string;
+    toSourceId: string;
+    date?: string;
+    concept?: string;
+    isRecurring?: boolean;
+    recurrenceId?: string;
+  }) => { expenseTx: Transaction; incomeTx: Transaction };
   updateTransaction: (id: string, updatedFields: Partial<Omit<Transaction, 'id' | 'createdAt'>>) => void;
   deleteTransaction: (id: string) => void;
   addAsset: (asset: Omit<InvestmentAsset, 'id' | 'lastUpdated'>) => void;
@@ -525,7 +534,44 @@ export const useFinanceStore = create<FinanceState>()(
 
         // Cajero automated companion deposit in cash account:
         // "Cajero, en este caso se registrara como gasto y automaticamente como ingreso en la cuenta en efectivo si el usuario tiene."
-        if (newTx.pillar === 'expense' && newTx.categoryId === 'cat-atm') {
+        // 1. Traspaso entre cuentas / billetera (Companion deposit in destination source)
+        if (
+          newTx.pillar === 'expense' &&
+          txData.destinationSourceId &&
+          txData.destinationSourceId !== newTx.sourceId
+        ) {
+          const destSource = sources.find((s) => s.id === txData.destinationSourceId);
+          const originSource = sources.find((s) => s.id === newTx.sourceId);
+          const transferId = newTx.transferId || `trf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const companionId = generateId('tx');
+
+          newTx.transferId = transferId;
+          newTx.companionTxId = companionId;
+          if (!newTx.concept || !newTx.concept.trim()) {
+            newTx.concept = `Traspaso a ${destSource?.name || 'otra cuenta'}`;
+          }
+
+          const customDesc = newTx.concept?.trim();
+          let incomeConcept = `Traspaso desde ${originSource?.name || 'otra cuenta'}`;
+          if (customDesc && !customDesc.startsWith('Traspaso a ')) {
+            incomeConcept = `Traspaso desde ${originSource?.name || 'otra cuenta'} (${customDesc})`;
+          }
+
+          companionIncomeTx = {
+            id: companionId,
+            amount: newTx.amount,
+            pillar: 'income',
+            categoryId: 'cat-transfer-income',
+            sourceId: txData.destinationSourceId,
+            concept: incomeConcept,
+            date: newTx.date,
+            isRecurring: newTx.isRecurring,
+            recurrenceId: newTx.recurrenceId,
+            createdAt: Date.now() + 1,
+            transferId,
+            companionTxId: newTx.id,
+          };
+        } else if (newTx.pillar === 'expense' && newTx.categoryId === 'cat-atm') {
           const cashSource = sources.find((s) => s.type === 'cash');
           if (cashSource && cashSource.id !== newTx.sourceId) {
             companionIncomeTx = {
@@ -558,32 +604,153 @@ export const useFinanceStore = create<FinanceState>()(
         }
       },
 
+      transferBetweenSources: ({
+        amount,
+        fromSourceId,
+        toSourceId,
+        date,
+        concept,
+        isRecurring,
+        recurrenceId,
+      }) => {
+        const { sources, userId } = get();
+        const fromSource = sources.find((s) => s.id === fromSourceId);
+        const toSource = sources.find((s) => s.id === toSourceId);
+
+        const txDate = date || new Date().toISOString();
+        const transferId = `trf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const expenseId = generateId('tx');
+        const incomeId = generateId('tx');
+
+        const customDesc = concept?.trim();
+        const expenseConcept = customDesc
+          ? `Traspaso a ${toSource?.name || 'otra cuenta'} (${customDesc})`
+          : `Traspaso a ${toSource?.name || 'otra cuenta'}`;
+
+        const incomeConcept = customDesc
+          ? `Traspaso desde ${fromSource?.name || 'otra cuenta'} (${customDesc})`
+          : `Traspaso desde ${fromSource?.name || 'otra cuenta'}`;
+
+        const expenseTx: Transaction = {
+          id: expenseId,
+          amount,
+          pillar: 'expense',
+          categoryId: 'cat-transfer',
+          sourceId: fromSourceId,
+          concept: expenseConcept,
+          date: txDate,
+          isRecurring,
+          recurrenceId,
+          createdAt: Date.now(),
+          transferId,
+          companionTxId: incomeId,
+        };
+
+        const incomeTx: Transaction = {
+          id: incomeId,
+          amount,
+          pillar: 'income',
+          categoryId: 'cat-transfer-income',
+          sourceId: toSourceId,
+          concept: incomeConcept,
+          date: txDate,
+          isRecurring,
+          recurrenceId,
+          createdAt: Date.now() + 1,
+          transferId,
+          companionTxId: expenseId,
+        };
+
+        set((state) => ({
+          transactions: sortTransactionsDesc([expenseTx, incomeTx, ...state.transactions]),
+        }));
+
+        if (userId) {
+          insertCloudTransaction(expenseTx, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for transfer expense:', err)
+          );
+          insertCloudTransaction(incomeTx, userId).catch((err) =>
+            console.warn('[Store] Cloud sync failed for transfer income:', err)
+          );
+        }
+
+        return { expenseTx, incomeTx };
+      },
+
       updateTransaction: (id, updatedFields) => {
         const { userId, transactions, assets } = get();
         const oldTx = transactions.find((tx) => tx.id === id);
 
+        // Companion transfer synchronization: keep paired transfer transaction in sync (amount & date)
+        let companionUpdates: Partial<Transaction> | null = null;
+        let companionId: string | null = null;
+        if (oldTx && (oldTx.transferId || oldTx.companionTxId)) {
+          const companion = transactions.find(
+            (t) =>
+              t.id !== id &&
+              ((oldTx.transferId && t.transferId === oldTx.transferId) ||
+                (oldTx.companionTxId && t.id === oldTx.companionTxId))
+          );
+          if (companion) {
+            companionId = companion.id;
+            companionUpdates = {};
+            if (updatedFields.amount !== undefined) companionUpdates.amount = updatedFields.amount;
+            if (updatedFields.date !== undefined) companionUpdates.date = updatedFields.date;
+          }
+        }
+
         let nextAssets = assets;
-        if (oldTx && oldTx.pillar === 'invest' && updatedFields.amount !== undefined) {
+        if (oldTx && oldTx.pillar === 'invest') {
           const oldAmount = Number(oldTx.amount) || 0;
-          const newAmount = Number(updatedFields.amount) || 0;
-          const diff = newAmount - oldAmount;
+          const newAmount = updatedFields.amount !== undefined ? Number(updatedFields.amount) || 0 : oldAmount;
+          const diffAmount = newAmount - oldAmount;
 
-          if (diff !== 0) {
-            const { identifier: txIdent, name: txName } = parseInvestmentConcept(
-              updatedFields.concept || oldTx.concept
-            );
-            const assetIndex = findMatchingAssetIndex(assets, {
-              identifier: txIdent,
-              name: txName,
+          const { identifier: oldIdent, name: oldName } = parseInvestmentConcept(oldTx.concept);
+          let assetIndex = findMatchingAssetIndex(assets, {
+            identifier: oldIdent,
+            name: oldName,
+          });
+
+          if (assetIndex === -1 && updatedFields.concept) {
+            const { identifier: newIdent, name: newName } = parseInvestmentConcept(updatedFields.concept);
+            assetIndex = findMatchingAssetIndex(assets, {
+              identifier: newIdent,
+              name: newName,
             });
+          }
 
-            if (assetIndex !== -1) {
-              const targetAsset = assets[assetIndex];
-              const avgPrice = Number(targetAsset.averageBuyPrice) || Number(targetAsset.currentPrice) || 1;
-              const currentTotalCost = targetAsset.shares * avgPrice;
-              const newTotalCost = Math.max(0, currentTotalCost + diff);
-              const sharesDiff = avgPrice > 0 ? diff / avgPrice : 0;
-              const remainingShares = Number(Math.max(0, targetAsset.shares + sharesDiff).toFixed(6));
+          if (assetIndex !== -1) {
+            const targetAsset = assets[assetIndex];
+            const avgPrice = Number(targetAsset.averageBuyPrice) || Number(targetAsset.currentPrice) || 1;
+
+            // Derive shares for old tranche and new tranche
+            const oldTxShares =
+              typeof oldTx.shares === 'number' && oldTx.shares > 0
+                ? oldTx.shares
+                : typeof oldTx.unitPrice === 'number' && oldTx.unitPrice > 0
+                ? oldAmount / oldTx.unitPrice
+                : avgPrice > 0
+                ? oldAmount / avgPrice
+                : 0;
+
+            const newTxShares =
+              typeof updatedFields.shares === 'number' && updatedFields.shares > 0
+                ? updatedFields.shares
+                : typeof updatedFields.unitPrice === 'number' && updatedFields.unitPrice > 0
+                ? newAmount / updatedFields.unitPrice
+                : oldTxShares;
+
+            const diffShares = newTxShares - oldTxShares;
+
+            if (
+              diffAmount !== 0 ||
+              diffShares !== 0 ||
+              (updatedFields.concept && updatedFields.concept !== oldTx.concept) ||
+              updatedFields.brandId !== undefined
+            ) {
+              const currentTotalCost = targetAsset.shares * (targetAsset.averageBuyPrice || 1);
+              const newTotalCost = Math.max(0, currentTotalCost + diffAmount);
+              const remainingShares = Number(Math.max(0, targetAsset.shares + diffShares).toFixed(6));
 
               if (remainingShares <= 0.0001 || newTotalCost <= 0.05) {
                 nextAssets = assets.filter((_, idx) => idx !== assetIndex);
@@ -598,8 +765,33 @@ export const useFinanceStore = create<FinanceState>()(
                 const pnl = Number((currentValue - newTotalCost).toFixed(2));
                 const pnlPercentage = newTotalCost > 0 ? Number(((pnl / newTotalCost) * 100).toFixed(2)) : 0;
 
+                let updatedName = targetAsset.name;
+                let updatedIdent = targetAsset.identifier;
+                let updatedIsin = targetAsset.isin;
+                let updatedTicker = targetAsset.ticker;
+                if (updatedFields.concept && updatedFields.concept !== oldTx.concept) {
+                  const { name: cName, identifier: cIdent } = parseInvestmentConcept(updatedFields.concept);
+                  if (cName) updatedName = cName;
+                  if (cIdent) {
+                    updatedIdent = cIdent;
+                    if (isIsin(cIdent)) updatedIsin = cIdent;
+                    else updatedTicker = cIdent;
+                  }
+                }
+
+                const brokerBrand = updatedFields.brandId ? get().getBrandById(updatedFields.brandId) : undefined;
+
                 const updatedAsset: InvestmentAsset = {
                   ...targetAsset,
+                  name: updatedName,
+                  identifier: updatedIdent,
+                  isin: updatedIsin,
+                  ticker: updatedTicker,
+                  brandId:
+                    updatedFields.brandId !== undefined
+                      ? updatedFields.brandId || undefined
+                      : targetAsset.brandId,
+                  platform: brokerBrand ? brokerBrand.name : targetAsset.platform,
                   shares: remainingShares,
                   averageBuyPrice: newAvgPrice,
                   averagePrice: newAvgPrice,
@@ -622,7 +814,11 @@ export const useFinanceStore = create<FinanceState>()(
         set({
           transactions: sortTransactionsDesc(
             transactions.map((tx) =>
-              tx.id === id ? { ...tx, ...updatedFields } : tx
+              (companionId && tx.id === companionId && companionUpdates
+                ? { ...tx, ...companionUpdates }
+                : tx.id === id
+                ? { ...tx, ...updatedFields }
+                : tx)
             )
           ),
           assets: nextAssets,
@@ -632,6 +828,11 @@ export const useFinanceStore = create<FinanceState>()(
           updateCloudTransaction(id, updatedFields, userId).catch((err) =>
             console.warn('[Store] Cloud sync failed for updateTransaction:', err)
           );
+          if (companionId && companionUpdates) {
+            updateCloudTransaction(companionId, companionUpdates, userId).catch((err) =>
+              console.warn('[Store] Cloud sync failed for update companionTransaction:', err)
+            );
+          }
         }
       },
 
@@ -716,11 +917,26 @@ export const useFinanceStore = create<FinanceState>()(
             // Al eliminar cualquiera de las transacciones de una serie recurrente (primera, segunda o posteriores),
             // se cancela/elimina la regla de recurrencia para que no se generen movimientos futuros.
             nextRecurrences = nextRecurrences.filter((r) => r.id !== matchedRule.id);
+
+          }
+        }
+
+                // 3. Companion transfer deletion: if deleting one side of a transfer, delete both sides
+        let companionIdToDelete: string | null = null;
+        if (txToDelete && (txToDelete.transferId || txToDelete.companionTxId)) {
+          const companion = transactions.find(
+            (t) =>
+              t.id !== id &&
+              ((txToDelete.transferId && t.transferId === txToDelete.transferId) ||
+                (txToDelete.companionTxId && t.id === txToDelete.companionTxId))
+          );
+          if (companion) {
+            companionIdToDelete = companion.id;
           }
         }
 
         set({
-          transactions: transactions.filter((tx) => tx.id !== id),
+          transactions: transactions.filter((tx) => tx.id !== id && tx.id !== companionIdToDelete),
           assets: nextAssets,
           recurrences: nextRecurrences,
         });
@@ -729,6 +945,11 @@ export const useFinanceStore = create<FinanceState>()(
           deleteCloudTransaction(id, userId).catch((err) =>
             console.warn('[Store] Cloud sync failed for deleteTransaction:', err)
           );
+          if (companionIdToDelete) {
+            deleteCloudTransaction(companionIdToDelete, userId).catch((err) =>
+              console.warn('[Store] Cloud sync failed for delete companionTransaction:', err)
+            );
+          }
         }
       },
 

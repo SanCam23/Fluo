@@ -929,6 +929,10 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **[x] Reconciliación Multi-Movimiento** ([`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)):
   - `reconcileAssetsFromTransactions` ahora agrupa y totaliza múltiples compras del mismo activo en lugar de descartar las transacciones posteriores.
 
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
+
 **Validación de Calidad:**
 - Vitest: 112/112 tests unitarios pasando (4 nuevos tests de acumulación y ciclo de vida de transacciones).
 - TypeScript: 0 errores (`npx tsc -b`).
@@ -960,6 +964,10 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 - **[x] Botón de Papelera Visible y Táctil en Móvil** ([`src/components/investments/InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx)):
   - Modificado a `opacity-80 hover:opacity-100 active:scale-95`, accesible y visible en cualquier teléfono, tablet o pantalla táctil.
 
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
+
 **Validación de Calidad:**
 - Vitest: 115/115 tests unitarios pasando (+3 nuevos tests específicos para auto-sanación de activos eclipsados y ciclo de vida de `deleteAsset`).
 - TypeScript: 0 errores (`npx tsc -b`).
@@ -987,6 +995,10 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - La purga se persiste de inmediato en `localStorage`, saneando la base de datos local de la versión anterior sin requerir ninguna acción por parte del usuario.
 - **[x] Botón de Cancelación Directa en Widget de Home** ([`src/components/home/RecurrenceSummaryWidget.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecurrenceSummaryWidget.tsx)):
   - Se añadió un botón de papelera Liquid Glass con diálogo nativo de confirmación a cada tarjeta de cobro/pago próximo, permitiendo a los usuarios cancelar cualquier serie periódica directamente sin necesidad de borrar movimientos contables pasados.
+
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
 
 **Validación de Calidad:**
 - Vitest: 119/119 tests unitarios pasando (+4 nuevos tests para ciclo de vida de recurrencias, cascada al borrar apunte inicial, preservación en la 2ª recurrencia y auto-sanación de reglas huérfanas en `useFinanceStore.test.ts`).
@@ -1023,6 +1035,10 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
      - 3 pasadas encadenadas de `.filter()` consolidadas en una sola con evaluación temprana y conteo de fuente sin asignación de arrays intermedios.
    - En [`src/components/analytics/AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx):
      - Consolidación del filtrado temporal y acumulación de métricas en una única pasada con umbrales temporales precalculados fuera del bucle.
+
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
 
 **Validación de Calidad:**
 - Vitest: 119/119 tests unitarios pasando al 100% (7 suites).
@@ -1095,9 +1111,58 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
     - **Swipe a la izquierda**: Revela capa esmeralda *"Retirar fondos"* y abre [`WithdrawInvestmentModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/WithdrawInvestmentModal.tsx).
     - En PC / escritorio: Botones dedicados de acción por clic directo en la tarjeta.
 
+### v0.6.3 (Edición Integral de Inversiones, Autorrelleno 100%, Sincronización de Cuentas y Ajuste Monolínea)
+- **[x] Autorrelleno Total al Editar Aportaciones de Inversión**:
+  - Al editar cualquier aportación desde el historial del índice en [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx) o desde [`RecentTransactionsList.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/RecentTransactionsList.tsx), [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx) pre-rellena el 100% de los datos:
+    - Nombre del activo e Identificador (ISIN / Ticker).
+    - Tipo de instrumento y Divisa.
+    - Participaciones/títulos y Precio medio de compra unitario.
+    - Importe total desembolsado y Cotización oficial verificada.
+    - Broker o plataforma seleccionada en `BrandPicker`.
+    - Cuenta de cargo seleccionada (o la opción `Sin cuenta vinculada (Fondos externos)` si no usó fondos de la app).
+    - Fecha exacta de compra en el selector de fecha.
+- **[x] Sincronización Automática de Saldo en Cuenta ante Cambios de Importe**:
+  - Si el usuario modifica el importe de la aportación (ej. de 100 € a 150 €), el apunte contable (`tx.amount`) se actualiza atómicamente.
+  - El motor de balance [`computeSourceBalance`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts) deduce instantáneamente el nuevo importe (`investExpense = 150 €`), actualizando el saldo de la cuenta de origen.
+  - Si se conmuta hacia *"Fondos externos"*, se elimina el vínculo (`sourceId: undefined`) y se restaura el saldo bancario.
+- **[x] Sincronización de Fecha Original y Orden Cronológico**:
+  - Si el usuario cambia la fecha de compra, el apunte contable original actualiza su propiedad `date`.
+  - La colección se reordena cronológicamente en orden descendente mediante `sortTransactionsDesc`, situando el movimiento en su posición temporal exacta en el historial, estadísticas y gráficos.
+- **[x] Recálculo Matemático Ponderado en Cartera (`updateTransaction`)**:
+  - Calcula el diferencial de títulos ($\\Delta\\text{shares}$) y coste ($\\Delta\\text{cost}$) específico de la aportación modificada, recalculando con exactitud el nuevo PMC ponderado y la plusvalía no realizada del activo en Zustand y Supabase.
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles estrechos de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
+
+- **[x] Ajuste Monolínea y Protección Responsiva de Posiciones Únicas (`InvestmentsView`)**:
+  - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
+  - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
+
+### v0.6.4 (Traspasos Entre Cuentas y Billetera de Efectivo, Interfaz Adaptativa y Doble Apunte Sincronizado)
+- **[x] Conmutación Reactiva de Interfaz en Gasto (`cat-transfer`)**:
+  - Al seleccionar la categoría *"Traspaso"* (`cat-transfer`, icono `ArrowLeftRight`) dentro del panel de gasto en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), el formulario adapta instantáneamente sus controles:
+    - Oculta el buscador de marcas comerciales (`BrandPicker`).
+    - Convierte el concepto en opcional con placeholder descriptivo automático (`Ej. Traspaso a [Destino] (opcional)`).
+    - Muestra la tarjeta de flujo visual y los selectores duales de cuenta de salida y cuenta de llegada.
+- **[x] Tarjeta de Flujo Visual con Selectores *In-Place* Integrados (Sin Desplegables Redundantes)**:
+  - Tarjeta translúcida Liquid Glass con `ArrowLeftRight`, indicador de importe dinámico y representación visual interactiva.
+  - Al pulsar sobre el lado *"Desde"* o sobre el lado *"Hacia"*, se abre directamente un cajón selector integrado dentro de la propia tarjeta para cambiar la cuenta sin desplegables externos.
+  - Eliminación completa de los desplegables inferiores para máxima limpieza y ergonomía móvil.
+  - Botón central de swap interactivo para permutar origen y destino con un solo toque.
+  - Filtrado reactivo (`s.id !== selectedSourceId`) y aviso de seguridad si el usuario dispone de solo 1 fuente registrada.
+- **[x] Doble Apunte Contable Atómico (Gasto en Origen / Ingreso en Destino)**:
+  - Genera simultáneamente dos transacciones enlazadas mediante `transferId` y punteros cruzados `companionTxId`:
+    - Movimiento de salida (`pillar: 'expense'`, `sourceId: originSourceId`).
+    - Movimiento de entrada (`pillar: 'income'`, `sourceId: destinationSourceId`).
+  - El saldo de la cuenta de origen se descuenta, el saldo de la cuenta de destino se incrementa idéntico importe, y el patrimonio líquido total (`computeFinancialSummary`) se mantiene constante ($+X - X = 0$).
+- **[x] Sincronización en Cascada en Edición y Borrado**:
+  - Al actualizar el importe o fecha de una transferencia con `updateTransaction`, se actualiza atómicamente su contrapartida gemela en estado local y Supabase.
+  - Al eliminar uno de los apuntes con `deleteTransaction`, se suprimen ambos de forma atómica para evitar desajustes o dinero fantasma en destino.
+- **[x] Suite de Tests Unitarios Automatizados**:
+  - 6 nuevos tests unitarios en [`transfers.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/transfers.test.ts) validando transferencias Banco <-> Banco, Efectivo -> Banco, Banco -> Efectivo, actualización bidireccional y borrado atómico.
+
 **Validación de Calidad:**
-- Vitest: 125/125 tests unitarios pasando al 100% (7 suites).
+- Vitest: 135/135 tests unitarios pasando al 100% (8 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
 - Servidor de Desarrollo: Vite activo en segundo plano en `http://localhost:5173/`.
 - Wiki: Sincronización completa de los 4 documentos en `/docs/wiki/`.
-

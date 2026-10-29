@@ -168,13 +168,13 @@ Una superficie de cristal legítima en Fluo se compone de 4 capas ópticas:
     - Si se libera antes del umbral, regresa con resorte suave (`cubic-bezier(0.16, 1, 0.3, 1)`).
     - Botón de papelera accesible en hover de escritorio como método alternativo sin alterar el espaciado.
 
-### 12. Tarjetas Duales de Métricas de Inversión (`InvestmentsView`)
-- **Jerarquía Vertical Estricta**:
+### 12. Tarjetas Cuádruples de Métricas de Inversión (`InvestmentsView`)
+- **Jerarquía Vertical Estricta y Prevención de Saltos de Línea**:
   - Evita saturar el eje horizontal en anchos reducidos dividiendo la información en 3 niveles:
     1. Etiqueta superior en mayúsculas (`text-[10px] tracking-wider text-slate-400`).
     2. Importe monetario principal en `text-base font-bold tracking-tight` (blanco en coste base, esmeralda/carmesí en P&L).
     3. Metadato contextual inferior (`Coste base total` o porcentaje ROI con icono vectorial `TrendingUp`/`TrendingDown` en `text-[11px]`).
-- **Simetría Volumétrica**: Ambas tarjetas (`Patrimonio Invertido` y `P&L No Realizado`) comparten altura y padding idénticos (`p-3 rounded-2xl flex flex-col justify-between`).
+- **Simetría Volumétrica y Contención Grid**: Todas las tarjetas comparten altura, aislamiento de columna y padding idéntico (`p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between min-w-0`). La tarjeta de `Posiciones Únicas` aplica `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` para garantizar que la descripción `"2 índices/activos"` no se divida en dos líneas en pantallas estrechas.
 
 ### 13. Iluminación Atmosférica Reactiva Ultra-Suave (`MobileContainer`)
 - **Preservación del Lienzo Obsidiana**: El fondo base `#0B0F19` se mantiene puro, evitando tintes completos o filtros invasivos que afecten a la legibilidad.
@@ -455,4 +455,29 @@ Fluo mantiene dos paradigmas de interacción diferenciados por breakpoint. El br
 - Desglose predictivo de títulos a liquidar y posición restante.
 - Selector Liquid Glass de cuenta destino (`GlassSelect`) y fecha de operación.
 
+---
 
+## 29. Interfaz Adaptativa de Traspasos Liquid Glass (`QuickAddTransactionModal`)
+
+Para transferir fondos entre cuentas bancarias o billetera de efectivo de forma fluida e intuitiva, el modal de creación de movimientos implementa una interfaz adaptativa condicional:
+
+### 29.1. Conmutación Reactiva
+- En el panel de gasto (`pillar === 'expense'`), al seleccionar la categoría **Traspaso** (`cat-transfer`, icono `ArrowLeftRight`, color índigo neón `#6366F1`), la interfaz se transforma automáticamente:
+  - Se sustituye el buscador de marcas comerciales (`BrandPicker`) por selectores duales de cuentas.
+  - El campo de concepto se convierte en opcional con placeholder contextual auto-generado (`Ej. Traspaso a [Destino] (opcional)`).
+  - El botón de acción principal adopta la leyenda *"Confirmar Traspaso"* con el glifo vectorial `ArrowLeftRight`.
+
+### 29.2. Tarjeta Visual de Flujo Monetario Liquid Glass
+- Contenedor orgánico `bg-indigo-500/10 light:bg-indigo-50/70 border border-indigo-500/20 light:border-indigo-200/80 backdrop-blur-xl rounded-2xl p-4 shadow-[0_8px_32px_0_rgba(99,102,241,0.15)] animate-fadeIn`.
+- **Cabecera**: Pastilla índigo con `ArrowLeftRight`, título y subtítulo explicativo de neutralidad patrimonial (*"El saldo se mueve sin alterar tu patrimonio total"*).
+- **Visualizador de Transferencia**: Despliega un carril de balance horizontal con:
+  - Extremo izquierdo: Avatar de origen (`SourceAvatar`) y nombre de la cuenta o billetera de salida.
+  - Centro: Pastilla circular flotante `w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-400/40 text-indigo-300` con flecha direccional `ArrowRight` y badge con el importe en euros.
+  - Extremo derecho: Avatar de destino (`SourceAvatar`) y nombre de la cuenta bancaria o billetera de efectivo receptora.
+
+### 29.3. Selectores Integrados en la Tarjeta (*In-Place Pickers*)
+- **Erradicación de Desplegables Redundantes**: Se suprimen los desplegables inferiores independientes; la propia tarjeta visual actúa como interfaz de selección táctil interactiva.
+- **Botón "Desde"**: Botón vítreo interactivo con avatar, etiqueta, nombre de la cuenta y chevron. Al pulsar, abre un cajón Liquid Glass desplegable integrado que lista todas las cuentas y billeteras disponibles.
+- **Botón "Hacia"**: Botón simétrico en el extremo derecho. Al pulsar, despliega únicamente las cuentas receptoras válidas con exclusión reactiva (`s.id !== selectedSourceId`).
+- **Botón Central de Swap**: Pastilla circular central con flecha que permite permutar origen y destino con un solo toque.
+- **Protección de Cuenta Única**: Si el usuario cuenta con una sola fuente registrada, la tarjeta muestra una alerta ámbar Liquid Glass (`bg-amber-500/10 border-amber-500/25 text-amber-300`) inhabilitando la apertura de selectores y la confirmación hasta disponer de dos o más fuentes.

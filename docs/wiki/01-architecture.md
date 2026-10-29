@@ -360,6 +360,13 @@ Para evitar duplicidad de formularios y unificar la experiencia de usuario bajo 
    - Inserta el activo en la cartera de inversiones (`addAsset`), asociándole `brandId` y el nombre de la plataforma.
    - Registra de forma paralela el apunte en el libro de transacciones (`addTransaction`) con pilar `'invest'`, importe, categoría correspondiente y marca del broker, garantizando que el flujo de caja refleje la salida del capital invertido.
 
+4. **Edición Integral de Movimientos de Inversión (`editingTransaction`)**:
+   - Al editar una aportación histórica desde el historial de un índice (`InvestmentsView.tsx`) o desde el libro diario (`RecentTransactionsList.tsx`):
+     - El formulario pre-rellena automáticamente la totalidad de los datos: Nombre del activo, Identificador/ISIN, Tipo de activo, Divisa, Títulos, Precio medio unitario, Importe total, Broker asociado, Fecha de adquisición y Cuenta de origen (o la opción vítrea `Sin cuenta vinculada (Fondos externos)` si no utilizó saldo bancario).
+     - **Sincronización Reactiva de Importe en Cuenta**: Al variar el importe desembolsado, el apunte en la cuenta seleccionada actualiza de forma síncrona su débito (`investExpense`), recalculando el saldo neto de la fuente y ajustando proporcionalmente las participaciones y el PMC en cartera.
+     - **Sincronización de Fecha Original**: Si el usuario modifica la fecha de adquisición, la fecha del apunte contable (`date`) se actualiza atómicamente, recolocando el movimiento en su posición cronológica exacta.
+     - **Conmutación de Fuente**: Si se cambia la cuenta bancaria o se desvincula hacia fondos externos, el saldo de la cuenta anterior se restablece de inmediato y Supabase sincroniza `source_id: null`.
+
 ---
 
 ## 10. Contextualización Dinámica de Pilares en Home y Refracción Atmosférica
@@ -764,11 +771,25 @@ Para garantizar consistencia absoluta entre los movimientos del libro contable y
   - **Deslizar a la izquierda** (< -80px): Activa la retirada de fondos abriendo `WithdrawInvestmentModal.tsx` (con fondo vítreo esmeralda).
   - En desktop / ordenadores: Se disponen botones de acción directa Liquid Glass (lápiz para editar, flecha de retirada y flecha de despliegue) sin requerir arrastre.
 
+---
 
+## Sistema de Traspasos Entre Cuentas y Efectivo (Companion Transaction Pattern)
 
+Para permitir transferencias directas de fondos entre cuentas bancarias del usuario o entre su billetera de efectivo y una cuenta bancaria (y viceversa), Fluo implementa un sistema de **doble apunte atómico sincronizado**:
 
+### 1. Desencadenante y Adaptación Reactiva en UI
+- Al seleccionar la categoría `cat-transfer` (*"Traspaso"*) dentro del panel de gasto (`pillar: 'expense'`) en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), el formulario se transforma automáticamente:
+  - Oculta el selector de comercios (`BrandPicker`).
+  - Despliega una tarjeta visual Liquid Glass de flujo monetario que muestra en vivo la cuenta de origen, flecha direccional con el importe y cuenta de destino.
+  - Ofrece dos selectores vítreos (`GlassSelect`): *"Desde (Origen)"* y *"Hacia (Destino: Cuenta o Efectivo)"*, filtrando reactivamente las opciones para impedir que la cuenta de origen y de destino coincidan.
 
+### 2. Generación Atómica de Movimientos Gemelos
+- Al confirmar el traspaso, la acción `transferBetweenSources` (o `addTransaction` con `destinationSourceId`) genera dos movimientos complementarios vinculados mediante un identificador de grupo `transferId` y punteros cruzados `companionTxId`:
+  1. **Apunte de Salida (Origen)**: `pillar: 'expense'`, `categoryId: 'cat-transfer'`, `sourceId: fromSourceId`, concepto: `Traspaso a [Destino]`.
+  2. **Apunte de Entrada (Destino)**: `pillar: 'income'`, `categoryId: 'cat-transfer-income'`, `sourceId: toSourceId`, concepto: `Traspaso desde [Origen]`.
+- El motor de balance [`computeSourceBalance`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts) deduce inmediatamente el importe en la cuenta de origen e incrementa idéntico valor en la cuenta de destino.
+- El balance global y patrimonio neto total (`computeFinancialSummary`) se mantiene neutro e inalterado ($+X - X = 0$), reflejando con exactitud contable que la riqueza no varió, sino que cambió de ubicación física.
 
-
-
-
+### 3. Sincronización en Cascada en Edición y Borrado
+- **Edición**: Al modificar el importe o fecha de cualquiera de los dos lados del traspaso mediante `updateTransaction`, el store localiza el movimiento gemelo vía `companionTxId` o `transferId` y replica los cambios atómicamente en ambas transacciones (y en Supabase).
+- **Borrado**: Al eliminar una de las transacciones (ej. deslizando hacia la izquierda en la lista de movimientos recientes), `deleteTransaction` purga automáticamente ambos apuntes para evitar dinero fantasma en destino.

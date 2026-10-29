@@ -162,7 +162,7 @@ export async function updateCloudTransaction(
       }
     }
     if (updatedFields.date !== undefined) patch.date = updatedFields.date;
-    if (updatedFields.sourceId !== undefined) patch.source_id = updatedFields.sourceId || null;
+    if ('sourceId' in updatedFields) patch.source_id = updatedFields.sourceId || null;
     if (updatedFields.isRecurring !== undefined) {
       patch.is_recurring = Boolean(updatedFields.isRecurring);
       patch.recurring_period = updatedFields.isRecurring ? 'monthly' : null;

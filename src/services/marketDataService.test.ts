@@ -88,7 +88,7 @@ describe('Market Data Service - Live Quotes & Cache Resilience', () => {
 
     expect(batch['AAPL'].price).toBeGreaterThan(0);
     expect(batch['BTC'].price).toBeGreaterThan(0);
-  });
+  }, 15000);
 });
 
 describe('Market Data Service - ISIN Detection & Twin Reference Tickers', () => {
@@ -156,7 +156,7 @@ describe('Market Data Service - ISIN Detection & Twin Reference Tickers', () => 
     expect(quoteEuro.price).toBeGreaterThan(0);
     expect(quoteEuro.currency).toBe('EUR');
     expect(quoteEuro.quoteTicker).toBeDefined();
-  });
+  }, 15000);
 
   it('should fallback to cached quote with cutoff date without returning 0 € or resetting historical data', async () => {
     clearMarketQuotesCache();
@@ -169,7 +169,7 @@ describe('Market Data Service - ISIN Detection & Twin Reference Tickers', () => 
     expect(cached).not.toBeNull();
     expect(cached?.price).toBe(initialQuote.price);
     expect(cached?.price).toBeGreaterThan(0);
-  });
+  }, 15000);
 });
 
 describe('Portfolio Dynamics - Real-Time P&L Recalculation', () => {

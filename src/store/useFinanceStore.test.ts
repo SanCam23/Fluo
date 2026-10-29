@@ -1187,5 +1187,148 @@ describe('useFinanceStore - Custom Dates & Chronological Ordering', () => {
       // PnL % = (200 / 2000) * 100 = +10%
       expect(consolidated?.pnlPercentage).toBe(10);
     });
+
+    it('should update account movement debit and asset position when editing an investment transaction amount', () => {
+      const store = useFinanceStore.getState();
+
+      // Configure a bank source account with 1000 €
+      store.addSource({
+        name: 'Cuenta Nómina BBVA',
+        type: 'bank',
+        institution: 'BBVA',
+        initialBalance: 1000,
+        orderIndex: 0,
+      });
+      const source = useFinanceStore.getState().sources.find((s) => s.name === 'Cuenta Nómina BBVA')!;
+      expect(store.getSourceBalance(source.id)!.netBalance).toBe(1000);
+
+      // Create an initial investment: 1 share @ 100 € = 100 € from BBVA
+      store.addAsset({
+        name: 'Apple Inc.',
+        identifier: 'AAPL',
+        ticker: 'AAPL',
+        assetType: 'stock',
+        shares: 1,
+        averageBuyPrice: 100,
+        currentPrice: 150,
+        currency: 'EUR',
+      });
+
+      store.addTransaction({
+        amount: 100,
+        shares: 1,
+        unitPrice: 100,
+        pillar: 'invest',
+        categoryId: 'cat-etf',
+        sourceId: source.id,
+        concept: 'Inversión en Apple Inc. (AAPL)',
+        date: '2026-10-10T12:00:00.000Z',
+      });
+
+      // Account balance must now be 1000 - 100 = 900 €
+      expect(store.getSourceBalance(source.id)!.netBalance).toBe(900);
+      expect(store.getSourceBalance(source.id)!.investExpense).toBe(100);
+
+      const tx = useFinanceStore.getState().transactions.find((t) => t.concept.includes('AAPL'))!;
+
+      // 1. Edit the investment: increase amount from 100 € to 150 € (1.5 shares @ 100 €)
+      store.updateTransaction(tx.id, {
+        amount: 150,
+        shares: 1.5,
+        unitPrice: 100,
+      });
+
+      // Transaction must have new amount
+      const updatedTx = useFinanceStore.getState().transactions.find((t) => t.id === tx.id)!;
+      expect(updatedTx.amount).toBe(150);
+      expect(updatedTx.shares).toBe(1.5);
+
+      // Linked source account movement must automatically update its debit to 150 € (Balance: 1000 - 150 = 850 €)
+      const updatedBalance = store.getSourceBalance(source.id)!;
+      expect(updatedBalance.investExpense).toBe(150);
+      expect(updatedBalance.netBalance).toBe(850);
+
+      // Asset must have 1.5 shares and total cost 150 €
+      const updatedAsset = useFinanceStore.getState().assets.find((a) => a.identifier === 'AAPL')!;
+      expect(updatedAsset.shares).toBe(1.5);
+      expect(updatedAsset.averageBuyPrice).toBe(100);
+      // Market value: 1.5 * 150 = 225 €
+      expect(updatedAsset.currentValue).toBe(225);
+    });
+
+    it('should update the original movement date and maintain chronological order when editing investment date', () => {
+      const store = useFinanceStore.getState();
+
+      store.addTransaction({
+        amount: 100,
+        pillar: 'invest',
+        categoryId: 'cat-etf',
+        concept: 'Inversión en S&P 500 (IE0032126645)',
+        date: '2026-10-01T12:00:00.000Z',
+      });
+
+      store.addTransaction({
+        amount: 50,
+        pillar: 'expense',
+        categoryId: 'cat-groceries',
+        concept: 'Compra Supermercado',
+        date: '2026-10-15T12:00:00.000Z',
+      });
+
+      let txList = useFinanceStore.getState().transactions;
+      // Chronological order: Compra Supermercado (Oct 15) is first, Inversión (Oct 01) is second
+      expect(txList[0].concept).toBe('Compra Supermercado');
+      expect(txList[1].concept).toContain('Inversión');
+
+      const investTx = txList.find((t) => t.concept.includes('Inversión'))!;
+
+      // User changes the date of the old investment movement to Oct 25
+      store.updateTransaction(investTx.id, {
+        date: '2026-10-25T12:00:00.000Z',
+      });
+
+      txList = useFinanceStore.getState().transactions;
+      // Inversión (Oct 25) must now be first in chronological descending order
+      expect(txList[0].id).toBe(investTx.id);
+      expect(txList[0].date).toBe('2026-10-25T12:00:00.000Z');
+      expect(txList[1].concept).toBe('Compra Supermercado');
+    });
+
+    it('should restore source account balance when switching from an account to external funds', () => {
+      const store = useFinanceStore.getState();
+
+      store.addSource({
+        name: 'Cuenta Nómina',
+        type: 'bank',
+        initialBalance: 500,
+        orderIndex: 0,
+      });
+      const source = useFinanceStore.getState().sources.find((s) => s.name === 'Cuenta Nómina')!;
+
+      store.addTransaction({
+        amount: 200,
+        pillar: 'invest',
+        categoryId: 'cat-etf',
+        sourceId: source.id,
+        concept: 'Inversión en Bitcoin (BTC)',
+        date: '2026-10-10T12:00:00.000Z',
+      });
+
+      expect(store.getSourceBalance(source.id)!.netBalance).toBe(300);
+
+      const tx = useFinanceStore.getState().transactions.find((t) => t.concept.includes('BTC'))!;
+
+      // User edits the investment to external funds (sourceId: undefined)
+      store.updateTransaction(tx.id, {
+        sourceId: undefined,
+      });
+
+      const updatedTx = useFinanceStore.getState().transactions.find((t) => t.id === tx.id)!;
+      expect(updatedTx.sourceId).toBeUndefined();
+
+      // Source account balance is fully restored to 500 €
+      expect(store.getSourceBalance(source.id)!.netBalance).toBe(500);
+      expect(store.getSourceBalance(source.id)!.investExpense).toBe(0);
+    });
   });
 });

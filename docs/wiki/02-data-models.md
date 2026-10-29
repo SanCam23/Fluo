@@ -43,6 +43,7 @@ export interface Category {
   7. `cat-bank-interest`: Intereses y Cuentas Remuneradas (`Percent`, `#34D399`)
   8. `cat-refunds`: Devoluciones y Reembolsos (`RotateCcw`, `#6EE7B7`)
   9. `cat-gifts-grants`: Premios, Regalos y Becas (`Gift`, `#A7F3D0`)
+  10. `cat-transfer-income`: Traspaso recibido (`ArrowLeftRight`, `#6366F1`) *(Generado automáticamente como contrapartida en destino)*
   10. `cat-other-income`: Otros Ingresos (`Wallet`, `#059669`)
 - **Gastos (`expense`) - 13 Categorías Semánticas**:
   1. `cat-food`: Supermercado y Alimentación (`ShoppingBag`, `#F87171`)
@@ -57,6 +58,7 @@ export interface Category {
   10. `cat-bizum-expense`: Bizum (`Send`, `#06B6D4`)
   11. `cat-travel`: Viajes (`Plane`, `#38BDF8`)
   12. `cat-gifts`: Regalos (`Gift`, `#F472B6`)
+  13. `cat-transfer`: Traspaso (`ArrowLeftRight`, `#6366F1`) *(Al registrar un traspaso en gasto, genera automáticamente un ingreso por el mismo importe en la cuenta o efectivo de destino)*
   13. `cat-other-expense`: Otros (`MoreHorizontal`, `#94A3B8`)
 - **Inversiones (`invest`) - 5 Categorías**: Fondos y ETFs, Acciones, Criptoactivos, Renta Fija y Depósitos.
 
@@ -184,7 +186,10 @@ export interface Transaction {
 
 ### Operaciones CRUD de Transacciones
 - **Alta (`addTransaction`)**: Inserta el registro local en Zustand preservando la fecha seleccionada (`date` en formato ISO 8601 `YYYY-MM-DDTHH:mm:ss.sssZ`), asignando el `sourceId` seleccionado, reordena la colección global cronológicamente en orden descendente e invoca en segundo plano `insertCloudTransaction` en Supabase.
-- **Edición (`updateTransaction`)**: Actualiza selectivamente los campos modificados (`amount`, `concept`, `pillar`, `categoryId`, `brandId`, `sourceId`, `date`) en memoria, preserva o reordena cronológicamente y sincroniza vía `updateCloudTransaction(id, updatedFields, userId)`.
+- **Edición (`updateTransaction`)**: Actualiza selectivamente los campos modificados (`amount`, `shares`, `unitPrice`, `concept`, `pillar`, `categoryId`, `brandId`, `sourceId`, `date`) en memoria. Si el movimiento corresponde a una inversión (`pillar: 'invest'`), deduce el diferencial de títulos ($\Delta\text{shares}$) y coste ($\Delta\text{cost}$) para reajustar con precisión el Precio Medio de Compra ponderado (PMC) y la valoración viva del activo asociado. Además, si el movimiento posee cuenta vinculada (`sourceId`), actualiza automáticamente el débito (`investExpense`) y saldo neto de la cuenta bancaria, y si cambia la fecha (`date`), reordena cronológicamente la colección global descendente y sincroniza vía `updateCloudTransaction(id, updatedFields, userId)`.
+- **Traspasos Entre Cuentas (`transferBetweenSources` / `addTransaction` con `destinationSourceId`)**:
+  - Emite dos transacciones vinculadas con `transferId` y `companionTxId` cruzados: una de gasto (`pillar: 'expense'`, `categoryId: 'cat-transfer'`) en el origen y otra de ingreso (`pillar: 'income'`, `categoryId: 'cat-transfer-income'`) en el destino.
+  - Sincronización automática: al editar importe o fecha de una de ellas con `updateTransaction`, se actualiza su gemela. Al borrar cualquiera con `deleteTransaction`, se eliminan ambas atómicamente.
 - **Baja (`deleteTransaction`)**: Elimina el registro del estado reactivo y envía la petición de borrado a Supabase vía `deleteCloudTransaction`.
 - **Ordenación Cronológica Garantizada**: Todas las mutaciones de transacciones aplican `sortTransactionsDesc` para garantizar que movimientos con fechas pasadas o futuras se sitúen exactamente en su posición cronológica correspondiente en el historial, estadísticas y gráficos.
 

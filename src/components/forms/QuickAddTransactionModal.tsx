@@ -23,6 +23,9 @@ import {
   Hash,
   Banknote,
   Wallet,
+  ArrowLeftRight,
+  ArrowRight,
+  ChevronDown,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -49,6 +52,11 @@ import {
 import type { AutocompleteAssetMatch } from '../../services/marketDataService';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
 import { getTodayDateString, getYesterdayDateString } from '../../utils/dates';
+import {
+  parseInvestmentConcept,
+  findMatchingAssetIndex,
+  inferAssetTypeFromCategory,
+} from '../../utils/finance';
 import {
   normalizeDecimalInput,
   parsePositiveNumber,
@@ -112,6 +120,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   });
 
   // Source selection state (defaults to activeSourceId or first source by orderIndex)
+  const [activeTransferPicker, setActiveTransferPicker] = useState<'origin' | 'destination' | null>(null);
+  const transferCardRef = useRef<HTMLDivElement>(null);
+
+  const handleSwapSources = () => {
+    if (sortedSources.length < 2) return;
+    const oldOrigin = selectedSourceId;
+    const oldDest = destinationSourceId;
+    setSelectedSourceId(oldDest);
+    setDestinationSourceId(oldOrigin);
+    setActiveTransferPicker(null);
+  };
+
+  const [destinationSourceId, setDestinationSourceId] = useState<string>(() => {
+    const origin = editingTransaction?.sourceId || activeSourceId || sortedSources[0]?.id || '';
+    return sortedSources.find((s) => s.id !== origin)?.id || '';
+  });
+
   const [selectedSourceId, setSelectedSourceId] = useState<string>(() => {
     if (editingTransaction?.sourceId) return editingTransaction.sourceId;
     return activeSourceId || sortedSources[0]?.id || '';
@@ -123,74 +148,6 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
 
   const todayStr = getTodayDateString();
   const yesterdayStr = getYesterdayDateString();
-
-  // Whenever modal opens or activeTab/editingTransaction changes, auto-align state
-  useEffect(() => {
-    if (isOpen) {
-      if (editingTransaction) {
-        setPillar(editingTransaction.pillar);
-        setAmount(editingTransaction.amount.toString());
-        setConcept(editingTransaction.concept);
-        setCategoryId(editingTransaction.categoryId);
-        setBrandId(editingTransaction.brandId || '');
-        setSelectedSourceId(editingTransaction.sourceId || activeSourceId || sortedSources[0]?.id || '');
-        const txDateStr = editingTransaction.date
-          ? editingTransaction.date.substring(0, 10)
-          : getTodayDateString();
-        setSelectedDate(txDateStr);
-        setStartDate(txDateStr);
-        setIsRecurring(!!editingTransaction.isRecurring);
-      } else {
-        setAssetSearchQuery('');
-        setAssetSearchResults([]);
-        setIsAssetDropdownOpen(false);
-        const today = getTodayDateString();
-        setSelectedDate(today);
-        setStartDate(today);
-        setSelectedSourceId(activeSourceId || sortedSources[0]?.id || '');
-        if (initialPillar) {
-          setPillar(initialPillar);
-        } else if (activeTab === 'invest') {
-          setPillar('invest');
-        }
-      }
-    }
-  }, [isOpen, initialPillar, activeTab, editingTransaction, sortedSources, activeSourceId]);
-
-  // Handle Escape key to close modal on desktop
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Source Options for Liquid Glass Select
-  const sourceOptions: GlassSelectOption<string>[] = useMemo(() => {
-    return sortedSources.map((source: SourceAccount) => ({
-      value: source.id,
-      label: source.name,
-      subtitle: source.institution || (source.type === 'bank' ? 'Banco' : 'Efectivo'),
-      icon: <SourceAvatar source={source} size="xs" />,
-    }));
-  }, [sortedSources]);
-
-  // Investment Source Options (Includes option for external funds without debiting accounts)
-  const investSourceOptions: GlassSelectOption<string>[] = useMemo(() => {
-    return [
-      {
-        value: '',
-        label: 'Sin cuenta vinculada (Fondos externos)',
-        subtitle: 'No descuenta saldo de tus cuentas',
-        icon: <Wallet className="h-3.5 w-3.5 text-slate-400" />,
-      },
-      ...sourceOptions,
-    ];
-  }, [sourceOptions]);
 
   // Standard movement fields (Expense / Income)
   const [amount, setAmount] = useState<string>('');
@@ -234,6 +191,184 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     if (pillar !== 'invest') return [];
     return findMatchingExistingAssets(identifier, portfolioAssets);
   }, [identifier, portfolioAssets, pillar]);
+
+  // Whenever modal opens or activeTab/editingTransaction changes, auto-align state
+  useEffect(() => {
+    if (isOpen) {
+      if (editingTransaction) {
+        setPillar(editingTransaction.pillar);
+        setAmount(editingTransaction.amount.toString());
+        setConcept(editingTransaction.concept);
+        setCategoryId(editingTransaction.categoryId);
+        setBrandId(editingTransaction.brandId || '');
+
+        const txDateStr = editingTransaction.date
+          ? editingTransaction.date.substring(0, 10)
+          : getTodayDateString();
+        setSelectedDate(txDateStr);
+        setStartDate(txDateStr);
+        setIsRecurring(!!editingTransaction.isRecurring);
+
+        if (editingTransaction.pillar === 'invest') {
+          // Source: strictly keep empty string if editingTransaction has no sourceId (external funds)
+          setSelectedSourceId(editingTransaction.sourceId || '');
+
+          // Parse concept (e.g. 'Inversión en Vanguard US 500 (IE0032126645)' or 'Tesla (TSLA)')
+          const { name: parsedName, identifier: parsedIdent } = parseInvestmentConcept(editingTransaction.concept);
+
+          // Find matching asset in portfolio
+          const assetIdx = findMatchingAssetIndex(portfolioAssets, {
+            identifier: parsedIdent,
+            name: parsedName,
+          });
+          const matchedAsset = assetIdx !== -1 ? portfolioAssets[assetIdx] : undefined;
+
+          const resolvedName = parsedName || matchedAsset?.name || editingTransaction.concept;
+          const resolvedIdent = parsedIdent || matchedAsset?.identifier || matchedAsset?.ticker || matchedAsset?.isin || '';
+          const resolvedTicker = matchedAsset?.ticker || (resolvedIdent && !isIsin(resolvedIdent) ? resolvedIdent : '');
+          const resolvedIsin = matchedAsset?.isin || (resolvedIdent && isIsin(resolvedIdent) ? resolvedIdent : '');
+          const resolvedType = matchedAsset?.assetType || inferAssetTypeFromCategory(editingTransaction.categoryId, resolvedIdent);
+
+          setAssetName(resolvedName);
+          setIdentifier(resolvedIdent);
+          setTicker(resolvedTicker);
+          setIsin(resolvedIsin);
+          setAssetType(resolvedType);
+          setCurrency(matchedAsset?.currency || 'EUR');
+          setBrokerBrandId(editingTransaction.brandId || matchedAsset?.brandId || '');
+          setAcquisitionDate(txDateStr);
+
+          // Derive price and shares
+          let unitPrice = 0;
+          if (typeof editingTransaction.unitPrice === 'number' && editingTransaction.unitPrice > 0) {
+            unitPrice = editingTransaction.unitPrice;
+          } else if (matchedAsset && typeof matchedAsset.averageBuyPrice === 'number' && matchedAsset.averageBuyPrice > 0) {
+            unitPrice = matchedAsset.averageBuyPrice;
+          } else if (matchedAsset && typeof matchedAsset.currentPrice === 'number' && matchedAsset.currentPrice > 0) {
+            unitPrice = matchedAsset.currentPrice;
+          } else if (typeof editingTransaction.shares === 'number' && editingTransaction.shares > 0) {
+            unitPrice = Number((editingTransaction.amount / editingTransaction.shares).toFixed(4));
+          } else {
+            unitPrice = editingTransaction.amount;
+          }
+
+          let numShares = 0;
+          if (typeof editingTransaction.shares === 'number' && editingTransaction.shares > 0) {
+            numShares = editingTransaction.shares;
+          } else if (unitPrice > 0) {
+            numShares = calculateSharesFromTotal(editingTransaction.amount, unitPrice) ?? 1;
+          } else {
+            numShares = 1;
+          }
+
+          setShares(numShares.toString());
+          setAverageBuyPrice(unitPrice.toString());
+          setTotalInvestedInput(editingTransaction.amount.toString());
+          setCurrentPrice((matchedAsset?.currentPrice || unitPrice).toString());
+          setQuoteVerified(true);
+          setInvestInputMode('total');
+          setAssetSearchQuery('');
+          setAssetSearchResults([]);
+          setIsAssetDropdownOpen(false);
+          setIsAutocompleteOpen(false);
+          setInvestFormErrors([]);
+        } else {
+          setSelectedSourceId(editingTransaction.sourceId || activeSourceId || sortedSources[0]?.id || '');
+        }
+      } else {
+        setAssetSearchQuery('');
+        setAssetSearchResults([]);
+        setIsAssetDropdownOpen(false);
+        setIsAutocompleteOpen(false);
+        setInvestFormErrors([]);
+        setAssetName('');
+        setIdentifier('');
+        setTicker('');
+        setIsin('');
+        setShares('');
+        setAverageBuyPrice('');
+        setTotalInvestedInput('');
+        setCurrentPrice('');
+        setBrokerBrandId('');
+        setInitialFee('');
+        setAmount('');
+        setConcept('');
+        setCategoryId('');
+        setBrandId('');
+    setDestinationSourceId(sortedSources.find((s) => s.id !== (activeSourceId || sortedSources[0]?.id))?.id || '');
+        const today = getTodayDateString();
+        setSelectedDate(today);
+        setStartDate(today);
+        setAcquisitionDate(today);
+        setSelectedSourceId(activeSourceId || sortedSources[0]?.id || '');
+        if (initialPillar) {
+          setPillar(initialPillar);
+        } else if (activeTab === 'invest') {
+          setPillar('invest');
+        } else {
+          setPillar('expense');
+        }
+      }
+    }
+  }, [isOpen, initialPillar, activeTab, editingTransaction, sortedSources, activeSourceId, portfolioAssets]);
+
+  // Handle Escape key to close modal on desktop
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Source Options for Liquid Glass Select
+  const sourceOptions: GlassSelectOption<string>[] = useMemo(() => {
+    return sortedSources.map((source: SourceAccount) => ({
+      value: source.id,
+      label: source.name,
+      subtitle: source.institution || (source.type === 'bank' ? 'Banco' : 'Efectivo'),
+      icon: <SourceAvatar source={source} size="xs" />,
+    }));
+  }, [sortedSources]);
+
+  // Investment Source Options (Includes option for external funds without debiting accounts)
+  const investSourceOptions: GlassSelectOption<string>[] = useMemo(() => {
+    return [
+      {
+        value: '',
+        label: 'Sin cuenta vinculada (Fondos externos)',
+        subtitle: 'No descuenta saldo de tus cuentas',
+        icon: <Wallet className="h-3.5 w-3.5 text-slate-400" />,
+      },
+      ...sourceOptions,
+    ];
+  }, [sourceOptions]);
+
+  // Destination options for transfers (filters out selected origin source)
+  const destinationOptions: GlassSelectOption<string>[] = useMemo(() => {
+    return sortedSources
+      .filter((s) => s.id !== selectedSourceId)
+      .map((source: SourceAccount) => ({
+        value: source.id,
+        label: source.name,
+        subtitle: source.institution || (source.type === 'bank' ? 'Cuenta bancaria' : 'Billetera efectivo'),
+        icon: <SourceAvatar source={source} size="xs" />,
+      }));
+  }, [sortedSources, selectedSourceId]);
+
+  // Keep destination source distinct from origin source
+  useEffect(() => {
+    if (selectedSourceId && destinationSourceId === selectedSourceId) {
+      const nextDest = sortedSources.find((s) => s.id !== selectedSourceId)?.id || '';
+      setDestinationSourceId(nextDest);
+    } else if (!destinationSourceId && sortedSources.length > 1) {
+      const nextDest = sortedSources.find((s) => s.id !== selectedSourceId)?.id || '';
+      setDestinationSourceId(nextDest);
+    }
+  }, [selectedSourceId, destinationSourceId, sortedSources]);
 
   // Recurrence granular configuration (Available for all pillars, including investment DCA)
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
@@ -286,6 +421,9 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       if (assetSearchRef.current && !assetSearchRef.current.contains(e.target as Node)) {
         setIsAssetDropdownOpen(false);
       }
+      if (transferCardRef.current && !transferCardRef.current.contains(e.target as Node)) {
+        setActiveTransferPicker(null);
+      }
       if (autocompleteContainerRef.current && !autocompleteContainerRef.current.contains(e.target as Node)) {
         setIsAutocompleteOpen(false);
       }
@@ -299,6 +437,9 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
   // Filter categories matching the selected pillar
   const availableCategories = categories.filter((c) => c.pillar === pillar);
   const selectedCatId = categoryId || (availableCategories[0]?.id ?? (pillar === 'invest' ? 'cat-etf' : ''));
+  const isTransferMode = pillar === 'expense' && selectedCatId === 'cat-transfer';
+  const originSource = sortedSources.find((s) => s.id === selectedSourceId);
+  const destSource = sortedSources.find((s) => s.id === destinationSourceId);
 
   const categoryOptions: GlassSelectOption[] = availableCategories.map((c) => ({
     value: c.id,
@@ -506,6 +647,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     setAmount('');
     setConcept('');
     setBrandId('');
+    setDestinationSourceId(sortedSources.find((s) => s.id !== (activeSourceId || sortedSources[0]?.id))?.id || '');
     const today = getTodayDateString();
     setSelectedDate(today);
     setStartDate(today);
@@ -567,8 +709,41 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       const numFee = parsePositiveNumber(initialFee) ?? 0;
 
       const brokerBrand = getBrandById(brokerBrandId);
-      const totalAmount = safeShares * safeBuyPrice + numFee;
-      const txDate = acquisitionDate ? new Date(`${acquisitionDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
+      const numTotalInput = parsePositiveNumber(totalInvestedInput);
+      const totalAmount =
+        investInputMode === 'total' && numTotalInput !== null
+          ? numTotalInput + numFee
+          : Number((safeShares * safeBuyPrice + numFee).toFixed(2));
+
+      let txDate: string;
+      if (acquisitionDate) {
+        if (editingTransaction?.date && editingTransaction.date.substring(0, 10) === acquisitionDate) {
+          txDate = editingTransaction.date;
+        } else {
+          txDate = new Date(`${acquisitionDate}T12:00:00.000Z`).toISOString();
+        }
+      } else {
+        txDate = editingTransaction ? editingTransaction.date : new Date().toISOString();
+      }
+
+      if (editingTransaction) {
+        // === EDITING EXISTING INVESTMENT TRANSACTION ===
+        updateTransaction(editingTransaction.id, {
+          amount: totalAmount,
+          shares: safeShares,
+          unitPrice: safeBuyPrice,
+          pillar: 'invest',
+          categoryId: selectedCatId || editingTransaction.categoryId || 'cat-etf',
+          brandId: brokerBrandId || undefined,
+          sourceId: selectedSourceId ? selectedSourceId : undefined,
+          concept: `Inversión en ${assetName.trim()} (${identifier.trim().toUpperCase()})`,
+          date: txDate,
+        });
+
+        resetAllFormState();
+        onClose();
+        return;
+      }
 
       // 1. Register asset in portfolio
       const cleanIdent = identifier.trim().toUpperCase();
@@ -649,6 +824,92 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
       return;
     }
 
+    // ==============================================================
+    // TRANSFER SUBMISSION (Between user's accounts or cash wallet)
+    // ==============================================================
+    if (isTransferMode) {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) return;
+      if (!destinationSourceId || destinationSourceId === selectedSourceId) return;
+
+      const dest = sortedSources.find((s) => s.id === destinationSourceId);
+
+      const customConcept = concept.trim();
+      const expenseConcept = customConcept
+        ? `Traspaso a ${dest?.name || 'otra cuenta'} (${customConcept})`
+        : `Traspaso a ${dest?.name || 'otra cuenta'}`;
+
+      let txDate: string;
+      if (selectedDate === todayStr) {
+        txDate = new Date().toISOString();
+      } else if (selectedDate) {
+        txDate = new Date(`${selectedDate}T12:00:00.000Z`).toISOString();
+      } else {
+        txDate = new Date().toISOString();
+      }
+
+      if (editingTransaction) {
+        updateTransaction(editingTransaction.id, {
+          amount: numAmount,
+          pillar: 'expense',
+          categoryId: 'cat-transfer',
+          sourceId: selectedSourceId,
+          concept: customConcept || editingTransaction.concept || expenseConcept,
+          date: txDate,
+        });
+
+        resetAllFormState();
+        onClose();
+        return;
+      }
+
+      const recurrenceId = isRecurring
+        ? `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+        : undefined;
+
+      addTransaction({
+        amount: numAmount,
+        pillar: 'expense',
+        categoryId: 'cat-transfer',
+        sourceId: selectedSourceId || sortedSources[0]?.id,
+        destinationSourceId,
+        concept: expenseConcept,
+        date: txDate,
+        isRecurring,
+        recurrenceId,
+      });
+
+      if (isRecurring && recurrenceId) {
+        const nextDue = calculateFirstNextDueDate(new Date(txDate), {
+          frequency,
+          dayOfWeek: frequency === 'weekly' ? dayOfWeek : undefined,
+          dayOfMonth: frequency === 'monthly' ? dayOfMonth : undefined,
+          startDate: txDate,
+        });
+
+        addRecurrence({
+          id: recurrenceId,
+          title: expenseConcept,
+          amount: numAmount,
+          pillar: 'expense',
+          categoryId: 'cat-transfer',
+          frequency,
+          dayOfWeek: frequency === 'weekly' ? dayOfWeek : undefined,
+          dayOfMonth: frequency === 'monthly' ? dayOfMonth : undefined,
+          startDate: txDate,
+          endDate: endDate ? new Date(`${endDate}T23:59:59.000Z`).toISOString() : undefined,
+          nextDueDate: nextDue,
+          lastProcessedDate: txDate,
+          isActive: true,
+          autoCharge,
+        });
+      }
+
+      resetAllFormState();
+      onClose();
+      return;
+    }
+
     // Editing existing movement
     if (editingTransaction) {
       const numAmount = parseFloat(amount);
@@ -671,7 +932,7 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
         pillar,
         categoryId: selectedCatId,
         brandId: brandId || undefined,
-        sourceId: selectedSourceId || sortedSources[0]?.id || undefined,
+        sourceId: selectedSourceId ? selectedSourceId : undefined,
         concept: concept.trim(),
         date: txDate,
       });
@@ -1334,44 +1595,14 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                     : 'Fondos externos: no se restará saldo de ninguna de tus cuentas en la app.'}
                 </p>
               </div>
-
-              {/* Date & Initial Fee */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1">
-                    <Calendar className="h-3 w-3 text-indigo-400" />
-                    Fecha Compra
-                  </label>
-                  <input
-                    type="date"
-                    value={acquisitionDate}
-                    onChange={(e) => setAcquisitionDate(e.target.value)}
-                    className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Comisión inicial (€/$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={initialFee}
-                    onChange={(e) => setInitialFee(e.target.value)}
-                    className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
-                  />
-                </div>
-              </div>
             </div>
           ) : (
-            /* ============================================================== */
-            /* GASTO / INGRESO: Formulario Tradicional                        */
-            /* ============================================================== */
             <div className="flex flex-col gap-4">
               {/* Amount Input */}
               <div>
-                <label className="text-xs font-medium text-slate-400">Importe (€)</label>
+                <label className="text-xs font-medium text-slate-400">
+                  {isTransferMode ? 'Importe a Traspasar (€)' : 'Importe (€)'}
+                </label>
                 <div className="relative mt-1">
                   <input
                     type="number"
@@ -1389,96 +1620,6 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 </div>
               </div>
 
-              {/* Concept Input */}
-              <div>
-                <label className="text-xs font-medium text-slate-400">Concepto / Descripción</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Compra semanal, Netflix, Nómina..."
-                  value={concept}
-                  onChange={(e) => setConcept(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 backdrop-blur-md"
-                />
-              </div>
-
-              {/* Fecha del movimiento (Liquid Glass Date Selector) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                    Fecha del movimiento
-                  </label>
-                  {/* Quick Pills */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedDate(todayStr);
-                        setStartDate(todayStr);
-                      }}
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
-                        selectedDate === todayStr
-                          ? pillar === 'income'
-                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
-                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
-                      }`}
-                    >
-                      Hoy
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedDate(yesterdayStr);
-                        setStartDate(yesterdayStr);
-                      }}
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
-                        selectedDate === yesterdayStr
-                          ? pillar === 'income'
-                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
-                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
-                      }`}
-                    >
-                      Ayer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dateInputRef.current?.showPicker?.();
-                        dateInputRef.current?.focus();
-                      }}
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
-                        selectedDate !== todayStr && selectedDate !== yesterdayStr
-                          ? pillar === 'income'
-                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
-                            : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
-                      }`}
-                    >
-                      Elegir fecha
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    required
-                    value={selectedDate}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedDate(val);
-                      if (val) setStartDate(val);
-                    }}
-                    className="w-full rounded-2xl bg-white/5 backdrop-blur-md border border-white/15 pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-400/50 transition-colors [color-scheme:dark] cursor-pointer"
-                  />
-                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                </div>
-              </div>
-
               {/* Category Selector */}
               <div>
                 <GlassSelect
@@ -1489,58 +1630,432 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 />
               </div>
 
-              {/* Informative banner for ATM / Cajero cash companion deposit */}
-              {pillar === 'expense' && selectedCatId === 'cat-atm' && (
-                <div className="p-3 rounded-2xl bg-teal-500/10 light:bg-teal-50/80 border border-teal-500/25 light:border-teal-200 text-xs text-teal-300 light:text-teal-800 flex items-start gap-2.5 animate-fadeIn">
-                  <Banknote className="h-4 w-4 text-teal-400 shrink-0 mt-0.5" />
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-teal-200 light:text-teal-900">Retirada en Cajero Automático</span>
-                    <span className="text-[11px] text-teal-300/80 light:text-teal-700 leading-relaxed">
-                      {sources.some((s) => s.type === 'cash')
-                        ? `Al guardar, se registrará este gasto en la cuenta origen y automáticamente un ingreso del mismo importe en tu cuenta de efectivo ("${
-                            sources.find((s) => s.type === 'cash')?.name
-                          }").`
-                        : 'No tienes una cuenta de efectivo configurada aún. Puedes crear una desde tu Perfil > Fuentes para que las retiradas se abonen solas en tu efectivo.'}
-                    </span>
+              {isTransferMode ? (
+                /* ============================================================== */
+                /* TRANSFER INTERFACE (Cuentas <-> Cuentas / Billetera Efectivo)  */
+                /* ============================================================== */
+                <div className="flex flex-col gap-4 animate-fadeIn">
+                  {/* Visual Transfer Flow Liquid Glass Card with In-Place Interactive Pickers */}
+                  <div
+                    ref={transferCardRef}
+                    className="p-4 rounded-2xl bg-indigo-500/10 light:bg-indigo-50/70 border border-indigo-500/20 light:border-indigo-200/80 backdrop-blur-xl flex flex-col gap-3 shadow-[0_8px_32px_0_rgba(99,102,241,0.15)] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-white light:text-slate-900 block">
+                            Traspaso entre Cuentas y Efectivo
+                          </span>
+                          <span className="text-[11px] text-slate-400 light:text-slate-600 block">
+                            Pulsa sobre el origen o destino para cambiar de cuenta
+                          </span>
+                        </div>
+                      </div>
+                      {parseFloat(amount) > 0 && (
+                        <span className="text-xs font-bold text-indigo-300 light:text-indigo-700 px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30">
+                          {formatCurrency(parseFloat(amount))}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Flow Indicator with In-Place Interactive Buttons */}
+                    <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-white/[0.04] light:bg-white/60 border border-white/10 light:border-slate-200">
+                      {/* Origin Account Interactive Button */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          sortedSources.length >= 2 &&
+                          setActiveTransferPicker(activeTransferPicker === 'origin' ? null : 'origin')
+                        }
+                        className={`flex items-center gap-2 min-w-0 flex-1 p-2 rounded-xl text-left transition-all cursor-pointer ${
+                          activeTransferPicker === 'origin'
+                            ? 'bg-indigo-600/30 border border-indigo-400/50 ring-2 ring-indigo-500/20 shadow-sm'
+                            : 'hover:bg-white/[0.08] border border-transparent'
+                        } ${sortedSources.length < 2 ? 'cursor-default' : ''}`}
+                      >
+                        {originSource && <SourceAvatar source={originSource} size="xs" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] uppercase font-semibold text-slate-400 block truncate">
+                              Desde
+                            </span>
+                            {sortedSources.length >= 2 && (
+                              <ChevronDown
+                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${
+                                  activeTransferPicker === 'origin' ? 'rotate-180 text-indigo-400' : ''
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-white light:text-slate-800 truncate block">
+                            {originSource?.name || 'Selecciona origen'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {originSource?.institution || (originSource?.type === 'bank' ? 'Cuenta bancaria' : 'Billetera efectivo')}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Swap Button in Center */}
+                      <div className="flex flex-col items-center justify-center shrink-0 px-1">
+                        <button
+                          type="button"
+                          title="Intercambiar cuentas (Origen <-> Destino)"
+                          onClick={handleSwapSources}
+                          disabled={sortedSources.length < 2}
+                          className={`w-7 h-7 rounded-full bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-400/40 hover:border-indigo-400/60 flex items-center justify-center text-indigo-300 active:scale-90 transition-all shadow-sm ${
+                            sortedSources.length < 2 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        >
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Destination Account Interactive Button */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          sortedSources.length >= 2 &&
+                          setActiveTransferPicker(activeTransferPicker === 'destination' ? null : 'destination')
+                        }
+                        className={`flex items-center gap-2 min-w-0 flex-1 p-2 rounded-xl text-right justify-end transition-all cursor-pointer ${
+                          activeTransferPicker === 'destination'
+                            ? 'bg-indigo-600/30 border border-indigo-400/50 ring-2 ring-indigo-500/20 shadow-sm'
+                            : 'hover:bg-white/[0.08] border border-transparent'
+                        } ${sortedSources.length < 2 ? 'cursor-default' : ''}`}
+                      >
+                        <div className="min-w-0 flex-1 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-[10px] uppercase font-semibold text-slate-400 block truncate">
+                              Hacia
+                            </span>
+                            {sortedSources.length >= 2 && (
+                              <ChevronDown
+                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${
+                                  activeTransferPicker === 'destination' ? 'rotate-180 text-indigo-400' : ''
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-white light:text-slate-800 truncate block">
+                            {destSource?.name || 'Selecciona destino'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {destSource?.institution || (destSource?.type === 'bank' ? 'Cuenta bancaria' : 'Billetera efectivo')}
+                          </span>
+                        </div>
+                        {destSource && <SourceAvatar source={destSource} size="xs" />}
+                      </button>
+                    </div>
+
+                    {/* In-Place Liquid Glass Drawer for Account Selection */}
+                    {activeTransferPicker && sortedSources.length >= 2 && (
+                      <div className="pt-2.5 border-t border-white/10 flex flex-col gap-1.5 animate-fadeIn">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+                          <span className="font-semibold text-indigo-300">
+                            {activeTransferPicker === 'origin'
+                              ? 'Elige la cuenta o billetera de origen (Desde):'
+                              : 'Elige la cuenta o billetera de destino (Hacia):'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTransferPicker(null)}
+                            className="text-[10px] text-slate-400 hover:text-white cursor-pointer px-1.5 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto pr-0.5 scrollbar-thin">
+                          {(activeTransferPicker === 'origin' ? sourceOptions : destinationOptions).map((opt) => {
+                            const isSelected =
+                              activeTransferPicker === 'origin'
+                                ? opt.value === selectedSourceId
+                                : opt.value === destinationSourceId;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  if (activeTransferPicker === 'origin') {
+                                    setSelectedSourceId(opt.value);
+                                  } else {
+                                    setDestinationSourceId(opt.value);
+                                  }
+                                  setActiveTransferPicker(null);
+                                }}
+                                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600/35 border border-indigo-400/50 text-white font-semibold shadow-sm'
+                                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/5 hover:border-white/15'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  {opt.icon}
+                                  <div className="min-w-0 truncate">
+                                    <span className="text-xs font-medium block truncate text-white">
+                                      {opt.label}
+                                    </span>
+                                    {opt.subtitle && (
+                                      <span className="text-[10px] text-slate-400 block truncate">
+                                        {opt.subtitle}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {isSelected && <Check className="h-4 w-4 text-indigo-400 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Single Account Warning */}
+                    {sortedSources.length < 2 && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                        <span>
+                          Para realizar traspasos necesitas tener al menos dos cuentas o billeteras registradas.
+                          Puedes añadir una cuenta bancaria o tu billetera de efectivo desde tu <strong>Perfil &gt; Mis Fuentes</strong>.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fecha del Traspaso */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                        Fecha del traspaso
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(todayStr);
+                            setStartDate(todayStr);
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate === todayStr
+                              ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(yesterdayStr);
+                            setStartDate(yesterdayStr);
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate === yesterdayStr
+                              ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Ayer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dateInputRef.current?.showPicker?.();
+                            dateInputRef.current?.focus();
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate !== todayStr && selectedDate !== yesterdayStr
+                              ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Elegir fecha
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        ref={dateInputRef}
+                        type="date"
+                        required
+                        value={selectedDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedDate(val);
+                          if (val) setStartDate(val);
+                        }}
+                        className="w-full rounded-2xl bg-white/5 backdrop-blur-md border border-white/15 pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-400/50 transition-colors [color-scheme:dark] cursor-pointer"
+                      />
+                      <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Concept Input (Optional in transfer) */}
+                  <div>
+                    <label className="text-xs font-medium text-slate-400">Concepto / Motivo (opcional)</label>
+                    <input
+                      type="text"
+                      placeholder={`Ej. Traspaso a ${destSource?.name || 'cuenta'} (opcional)`}
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                      className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 backdrop-blur-md"
+                    />
                   </div>
                 </div>
-              )}
+              ) : (
+                /* ============================================================== */
+                /* GASTO / INGRESO TRADICIONAL                                    */
+                /* ============================================================== */
+                <>
+                  {/* Concept Input */}
+                  <div>
+                    <label className="text-xs font-medium text-slate-400">Concepto / Descripción</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Compra semanal, Netflix, Nómina..."
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                      className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 backdrop-blur-md"
+                    />
+                  </div>
 
-              {/* Source Account Selector (Liquid Glass) */}
-              {sourceOptions.length > 0 && (
-                <div>
-                  <GlassSelect
-                    label="Cuenta o Fuente de Dinero"
-                    value={selectedSourceId}
-                    onChange={(val) => setSelectedSourceId(val)}
-                    options={sourceOptions}
-                    placeholder="Selecciona la cuenta o billetera..."
+                  {/* Fecha del movimiento (Liquid Glass Date Selector) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                        Fecha del movimiento
+                      </label>
+                      {/* Quick Pills */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(todayStr);
+                            setStartDate(todayStr);
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate === todayStr
+                              ? pillar === 'income'
+                                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                                : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(yesterdayStr);
+                            setStartDate(yesterdayStr);
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate === yesterdayStr
+                              ? pillar === 'income'
+                                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                                : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Ayer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dateInputRef.current?.showPicker?.();
+                            dateInputRef.current?.focus();
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                            selectedDate !== todayStr && selectedDate !== yesterdayStr
+                              ? pillar === 'income'
+                                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm font-semibold'
+                                : 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm font-semibold'
+                              : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          Elegir fecha
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        ref={dateInputRef}
+                        type="date"
+                        required
+                        value={selectedDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedDate(val);
+                          if (val) setStartDate(val);
+                        }}
+                        className="w-full rounded-2xl bg-white/5 backdrop-blur-md border border-white/15 pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-400/50 transition-colors [color-scheme:dark] cursor-pointer"
+                      />
+                      <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Informative banner for ATM / Cajero cash companion deposit */}
+                  {pillar === 'expense' && selectedCatId === 'cat-atm' && (
+                    <div className="p-3 rounded-2xl bg-teal-500/10 light:bg-teal-50/80 border border-teal-500/25 light:border-teal-200 text-xs text-teal-300 light:text-teal-800 flex items-start gap-2.5 animate-fadeIn">
+                      <Banknote className="h-4 w-4 text-teal-400 shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-teal-200 light:text-teal-900">Retirada en Cajero Automático</span>
+                        <span className="text-[11px] text-teal-300/80 light:text-teal-700 leading-relaxed">
+                          {sources.some((s) => s.type === 'cash')
+                            ? `Al guardar, se registrará este gasto en la cuenta origen y automáticamente un ingreso del mismo importe en tu cuenta de efectivo ("${
+                                sources.find((s) => s.type === 'cash')?.name
+                              }").`
+                            : 'No tienes una cuenta de efectivo configurada aún. Puedes crear una desde tu Perfil > Fuentes para que las retiradas se abonen solas en tu efectivo.'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Source Account Selector (Liquid Glass) */}
+                  {sourceOptions.length > 0 && (
+                    <div>
+                      <GlassSelect
+                        label="Cuenta o Fuente de Dinero"
+                        value={selectedSourceId}
+                        onChange={(val) => setSelectedSourceId(val)}
+                        options={sourceOptions}
+                        placeholder="Selecciona la cuenta o billetera..."
+                      />
+                    </div>
+                  )}
+
+                  {/* Brand Picker with Search */}
+                  <BrandPicker
+                    selectedBrandId={brandId}
+                    onSelectBrand={(id, suggestedCatId) => {
+                      setBrandId(id);
+                      if (suggestedCatId) {
+                        const cat = categories.find((c) => c.id === suggestedCatId);
+                        if (cat && cat.pillar === pillar) {
+                          setCategoryId(suggestedCatId);
+                        }
+                      }
+                      if (id && !concept) {
+                        const brand = getBrandById(id);
+                        if (brand) setConcept(brand.name);
+                      }
+                    }}
+                    categoryId={selectedCatId}
                   />
-                </div>
+                </>
               )}
-
-              {/* Brand Picker with Search */}
-              <BrandPicker
-                selectedBrandId={brandId}
-                onSelectBrand={(id, suggestedCatId) => {
-                  setBrandId(id);
-                  if (suggestedCatId) {
-                    const cat = categories.find((c) => c.id === suggestedCatId);
-                    if (cat && cat.pillar === pillar) {
-                      setCategoryId(suggestedCatId);
-                    }
-                  }
-                  if (id && !concept) {
-                    const brand = getBrandById(id);
-                    if (brand) setConcept(brand.name);
-                  }
-                }}
-                categoryId={selectedCatId}
-              />
             </div>
           )}
 
-          {/* ============================================================== */}
           {/* RECURRENCE TOGGLE & CONFIGURATION (Shared across all pillars)   */}
           {/* ============================================================== */}
           <div className="rounded-2xl border border-white/15 bg-white/[0.06] backdrop-blur-xl p-3.5 transition-all">
@@ -1743,13 +2258,20 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
           {/* Submit Button */}
           <button
             type="submit"
-            className="mt-2 w-full py-3.5 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-400 hover:brightness-110 active:scale-[0.98] font-bold text-white text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            disabled={isTransferMode && (sortedSources.length < 2 || !destinationSourceId || destinationSourceId === selectedSourceId)}
+            className={`mt-2 w-full py-3.5 rounded-full bg-gradient-to-tr from-indigo-600 to-emerald-400 hover:brightness-110 active:scale-[0.98] font-bold text-white text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isTransferMode && (sortedSources.length < 2 || !destinationSourceId || destinationSourceId === selectedSourceId)
+                ? 'opacity-50 cursor-not-allowed'
+                : 'cursor-pointer'
+            }`}
           >
-            <Check className="h-4 w-4 stroke-[3]" />
+            {isTransferMode ? <ArrowLeftRight className="h-4 w-4" /> : <Check className="h-4 w-4 stroke-[3]" />}
             {editingTransaction
               ? 'Guardar Cambios'
               : pillar === 'invest'
               ? 'Guardar Inversión en Cartera'
+              : isTransferMode
+              ? 'Confirmar Traspaso'
               : 'Guardar Movimiento'}
           </button>
         </form>

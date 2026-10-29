@@ -11,6 +11,7 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-bank-interest', name: 'Intereses y Cuentas Remuneradas', pillar: 'income', icon: 'Percent', color: '#34D399' },
   { id: 'cat-refunds', name: 'Devoluciones y Reembolsos', pillar: 'income', icon: 'RotateCcw', color: '#6EE7B7' },
   { id: 'cat-gifts-grants', name: 'Premios, Regalos y Becas', pillar: 'income', icon: 'Gift', color: '#A7F3D0' },
+  { id: 'cat-transfer-income', name: 'Traspaso recibido', pillar: 'income', icon: 'ArrowLeftRight', color: '#6366F1' },
   { id: 'cat-other-income', name: 'Otros Ingresos', pillar: 'income', icon: 'Wallet', color: '#059669' },
 
   // Gastos
@@ -26,6 +27,7 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-bizum-expense', name: 'Bizum', pillar: 'expense', icon: 'Send', color: '#06B6D4' },
   { id: 'cat-travel', name: 'Viajes', pillar: 'expense', icon: 'Plane', color: '#38BDF8' },
   { id: 'cat-gifts', name: 'Regalos', pillar: 'expense', icon: 'Gift', color: '#F472B6' },
+  { id: 'cat-transfer', name: 'Traspaso', pillar: 'expense', icon: 'ArrowLeftRight', color: '#6366F1' },
   { id: 'cat-other-expense', name: 'Otros', pillar: 'expense', icon: 'MoreHorizontal', color: '#94A3B8' },
 
   // Inversiones

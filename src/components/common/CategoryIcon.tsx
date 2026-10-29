@@ -26,6 +26,7 @@ import {
   Send,
   Plane,
   MoreHorizontal,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface CategoryIconProps {
@@ -91,6 +92,8 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
       return <Plane className={className} />;
     case 'morehorizontal':
       return <MoreHorizontal className={className} />;
+    case 'arrowleftright':
+      return <ArrowLeftRight className={className} />;
     default:
       return <CircleDollarSign className={className} />;
   }
