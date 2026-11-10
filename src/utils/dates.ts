@@ -74,3 +74,25 @@ export function sortTransactionsDesc<T extends { date?: string; createdAt?: numb
     return (b.createdAt || 0) - (a.createdAt || 0);
   });
 }
+
+export const MONTH_NAMES_LONG = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+export const MONTH_NAMES_SHORT = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+];
+
+export function formatMonthTitle(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return monthKey;
+  return `${MONTH_NAMES_LONG[m - 1]} ${y}`;
+}
+
+export function formatMonthPill(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return monthKey;
+  return `${MONTH_NAMES_SHORT[m - 1]} '${String(y).slice(-2)}`;
+}

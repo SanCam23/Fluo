@@ -65,6 +65,7 @@ Fluo/
 │   │   │   └── MobileContainer.tsx # Contenedor responsive: max-w-md centrado (<lg) / max-w-7xl centrado (≥lg)
 │   │   ├── home/                   # Vista de Inicio
 │   │   │   ├── HeroBalance.tsx     # Carrusel táctil en móvil / Patrimonio y bandeja paralela de fuentes en PC
+│   │   │   ├── SourceCardContent.tsx # Contenido modular Liquid Glass de tarjetas de fuentes
 │   │   │   ├── MetricPillars.tsx   # Los 3 pilares (Ingresos, Gastos, Inversión)
 │   │   │   ├── DesktopInvestmentWidget.tsx # Widget de cartera de inversiones para columna lateral en PC
 │   │   │   ├── DesktopBudgetsWidget.tsx    # Widget de presupuestos y progreso de categorías en PC
@@ -73,33 +74,59 @@ Fluo/
 │   │   │   └── RecurrenceSummaryWidget.tsx # Widget de pagos y cobros próximos recurrentes
 │   │   ├── investments/            # Vista de Cartera de Inversiones
 │   │   │   ├── InvestmentsView.tsx # Tarjetas consolidadas, rentabilidad P&L, desglose expansible y filtros
+│   │   │   ├── AssetCard.tsx       # Tarjeta modular Liquid Glass de activo de inversión
 │   │   │   ├── WithdrawInvestmentModal.tsx # Modal Liquid Glass de retirada parcial/total hacia cuentas
 │   │   │   └── EditAssetModal.tsx  # Modal Liquid Glass para edición de posición de activo
 │   │   ├── analytics/              # Vista de Estadísticas Financieras
-│   │   │   └── AnalyticsView.tsx   # Selector de periodos, distribución y top marcas
-│   │   └── forms/                  # Formularios modales unificados
-│   │       ├── BrandPicker.tsx     # Buscador reactivo de marcas y brokers con autocompletado
-│   │       └── QuickAddTransactionModal.tsx # Modal unificado de nuevo movimiento (Gasto / Ingreso / Inversión)
-│   ├── context/
-│   │   └── AuthContext.tsx         # Gestión global de sesión Supabase y estado de auth
-│   ├── data/
-│   │   ├── categoriesAndBrands.ts  # Catálogo oficial de categorías y 40+ marcas
-│   │   └── initialMockData.ts      # Semilla inicial con transacciones y activos (importación dinámica bajo demanda)
-│   ├── lib/
-│   │   └── supabaseClient.ts       # Cliente Supabase tipado y mapeadores DB ↔ Frontend
-│   ├── services/
-│   │   ├── cloudSyncService.ts     # Sincronización reactiva bidireccional y CRUD en la nube
-│   │   ├── companySearchService.ts # Motor de búsqueda global de empresas (Clearbit 25M+)
-│   │   ├── marketDataService.ts    # Motor de búsqueda semántica, cotizaciones en vivo y caché resiliente
-│   │   └── recurrenceEngine.ts     # Motor de cálculo de periodicidad y vencimientos
-│   ├── store/
-│   │   └── useFinanceStore.ts      # Store central Zustand con persistencia, Mapas O(1) en memoria y selectores optimizados
-│   ├── types/
-│   │   └── finance.ts              # Modelado TypeScript exhaustivo de entidades
-│   ├── utils/
-│   │   ├── brandLogo.ts            # Resolver multi-CDN con prioridad SVG vectorial
-│   │   ├── currency.ts             # Formateo de divisas (EUR/USD) y porcentajes
-│   │   └── dates.ts                # Operaciones de fechas y cálculo de días
+│   │   │   ├── AnalyticsView.tsx   # Orquestador responsivo (<lg vs ≥lg) de estadísticas y selector de periodos
+│   │   │   ├── GlassTooltip.tsx    # Tooltip universal Recharts Liquid Glass
+│   │   │   ├── BrandRankingCard.tsx # Tarjeta de ranking y volumen de comercios
+│   │   │   ├── CategoryDistributionCard.tsx # Tarjeta con gráfico Donut y desglose por categorías
+│   │   │   ├── CashFlowComparisonCard.tsx # Tarjeta con gráfico de barras Ingresos vs Gastos
+│   │   │   ├── NetWorthEvolutionCard.tsx # Tarjeta de evolución de patrimonio neto
+│   │   │   └── SavingsEvolutionCard.tsx # Tarjeta con gráfico interactivo y selector Ahorro Neto / Acumulado
+│   │   ├── forms/                  # Formularios modales unificados
+│   │   │   ├── BrandPicker.tsx     # Buscador reactivo de marcas y brokers con autocompletado
+│   │   │   ├── QuickAddTransactionModal.tsx # Modal unificado de nuevo movimiento (Gasto / Ingreso / Inversión)
+│   │   │   └── transaction/        # Sub-formularios modulares extraídos
+│   │   │       ├── TransferFlowCard.tsx      # Flujo visual interactivo de traspaso entre cuentas/efectivo
+│   │   │       ├── RecurrenceSection.tsx     # Configuración granular de periodicidad y auto-cargo
+│   │   │       └── InvestmentFormFields.tsx  # Campos de inversión, cotización en tiempo real y buscador
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx         # Gestión global de sesión Supabase y estado de auth
+│   │   ├── data/
+│   │   │   ├── categoriesAndBrands.ts  # Catálogo oficial de categorías y 40+ marcas
+│   │   │   ├── initialMockData.ts      # Semilla inicial con transacciones y activos (importación dinámica bajo demanda)
+│   │   │   └── marketAssetsData.ts     # Catálogo curado de 70+ activos bursátiles e ISINs desacoplado
+│   │   ├── hooks/
+│   │   │   ├── useSecurityLock.ts      # Bloqueo por inactividad y PIN
+│   │   │   └── useSwipeGesture.ts      # Hook unificado de deslizamiento táctil y rubber-banding
+│   │   ├── lib/
+│   │   │   └── supabaseClient.ts       # Cliente Supabase tipado y mapeadores DB ↔ Frontend
+│   │   ├── services/
+│   │   │   ├── cloudSyncService.ts     # Sincronización reactiva bidireccional y CRUD en la nube
+│   │   │   ├── companySearchService.ts # Motor de búsqueda global de empresas (Clearbit 25M+)
+│   │   │   ├── marketDataService.ts    # Motor de búsqueda semántica, cotizaciones en vivo y resolución ISIN/Ticker
+│   │   │   ├── marketQuoteCache.ts     # Almacenamiento, fallback memoria, poda de expiración y deduplicación SWR
+│   │   │   └── recurrenceEngine.ts     # Motor de cálculo de periodicidad y vencimientos
+│   │   ├── store/
+│   │   │   ├── types.ts                # Contratos y firmas de los slices de Zustand
+│   │   │   ├── useFinanceStore.ts      # Store central Zustand componiendo slices de dominio y persistencia
+│   │   │   └── slices/                 # Slices modulares de responsabilidad única
+│   │   │       ├── sourceAccountsSlice.ts # Cuentas y orígenes de dinero
+│   │   │       ├── recurrencesSlice.ts    # Reglas de recurrencia y simulación temporal
+│   │   │       ├── investmentsSlice.ts    # Activos, cotizaciones en vivo, retiradas y P&L
+│   │   │       └── transactionsSlice.ts   # Movimientos, traspasos atómicos y sincronización
+│   │   ├── types/
+│   │   │   └── finance.ts              # Modelado TypeScript exhaustivo de entidades
+│   │   ├── utils/
+│   │   │   ├── brandLogo.ts            # Resolver multi-CDN con prioridad SVG vectorial
+│   │   │   ├── currency.ts             # Formateo de divisas (EUR/USD) y porcentajes
+│   │   │   ├── dates.ts                # Operaciones de fechas y cálculo de días
+│   │   │   ├── finance.ts              # Barrel de utilidades financieras con re-exports 100% compatibles
+│   │   │   ├── financialCalculations.ts# Balances, flujos, ahorro neto y evolución
+│   │   │   ├── investmentMatching.ts   # Coincidencia de activos, parsing de conceptos y auto-corrección
+│   │   │   └── brokerAnalytics.ts      # Métricas de cuentas broker, ranking y series de asignación
 │   ├── App.tsx                     # Orquestador de navegación por pestañas y modales
 │   ├── index.css                   # Tokens @theme Tailwind v4 y clases de cristal
 │   └── main.tsx                    # Punto de entrada con ErrorBoundary
@@ -884,4 +911,26 @@ Para permitir el seguimiento visual comparativo de cada ETF, criptomoneda, acci�
 - **Resolución Determinista en `resolveIsinQuote`**:
   - En [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts), se interceptan los ISIN correspondientes a activos de renta fija no cotizados definidos en `CURATED_MARKET_ASSETS` (`assetType === 'fixed_income'`), devolviendo directamente su precio base de referencia sin desencadenar peticiones HTTP externas.
   - En [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), los métodos `refreshAllAssetPrices` y `syncStaleAssetQuotes` filtran explícitamente los depósitos a plazo fijo (`asset.assetType !== 'deposit'`).
+
+### 9. Optimizaciones de Renderizado y Calidad Arquitectónica (Fase 1)
+- **Extracción de Tooltips Recharts (`GlassTooltip.tsx`)**:
+  - Unificación del componente [`GlassTooltip.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/GlassTooltip.tsx) para Recharts (`AreaChart`, `BarChart`, `LineChart`) con interfaz TypeScript fuertemente tipada (`GlassTooltipProps`), erradicando duplicaciones de código y eliminando tipos `any` en capas analíticas.
+- **Preservación del Árbol de Reconciliación en `HeroBalance.tsx`**:
+  - Sustitución del anti-patrón de subcomponentes funcionales anidados (`SubMetrics`, `SourceCardContent`) declarados dentro del cuerpo de la función por funciones auxiliares de renderizado (`renderSubMetrics`, `renderSourceCardContent`). Esto evita que React desmonte y remonte el DOM en cada interacción o scroll del carrusel, asegurando reconciliación virtual en el lugar a 60 FPS.
+- **Erradicación de Cascadas de Render en `AnalyticsView.tsx`**:
+  - Reemplazo del hook `useEffect` que llamaba a `setActiveChartSection('savings')` de forma síncrona por cálculo de estado derivado (`effectiveChartSection = isCashAccount && activeChartSection === 'assets' ? 'savings' : activeChartSection`), eliminando dobles renderizados y alertas de pureza en React.
+- **Acumulación Pura en `InvestmentAnalyticsView.tsx`**:
+  - Reescritura del cálculo de trayectoria acumulada de inversión (`evolutionData`) mediante bucle puro para evitar reasignación de variables fuera del alcance funcional (`runningInvested`).
+
+### 10. Desacople de Datos y Gestos Táctiles Estandarizados (Fase 2)
+- **Extracción del Directorio de Mercado (`marketAssetsData.ts`)**:
+  - Desacople completo de los catálogos estáticos `CURATED_MARKET_ASSETS` y `FUND_ISIN_EQUIVALENCE_MAP` fuera de [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts) hacia [`src/data/marketAssetsData.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/data/marketAssetsData.ts).
+  - El servicio de mercado reduce su tamaño de 1.431 a 873 líneas, centrándose exclusivamente en peticiones de red, proxying con Yahoo Finance, SWR y persistencia de cotizaciones en caché.
+- **Hook Global de Gestos Táctiles (`useSwipeGesture.ts`)**:
+  - Creación del hook reutilizable [`useSwipeGesture.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSwipeGesture.ts) con función de cálculo matemático de amortiguación elástica (`computeSwipeOffset`) y umbrales de disparo paramétricos.
+  - Elimina la duplicación de listeners táctiles, estados de bloqueo horizontal (`isHorizontal`) y fórmulas de resistencia elástica (`diffX < -110 ? -110 + (diffX + 110) * 0.35 : diffX`) entre [`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx) y [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx).
+- **Modularización de Tarjetas de Inversión (`AssetCard.tsx`)**:
+  - Extracción de [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx) fuera del monolito [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx), reduciendo la vista de 796 a 332 líneas y aislando la renderización de desgloses históricos de aportaciones.
+
+
 

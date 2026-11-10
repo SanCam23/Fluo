@@ -47,6 +47,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Optimización Integral & Consolidación** | ✅ Completado | Eliminación de código muerto (5 archivos), importación dinámica de mock data, Mapas O(1) en store y vistas, y consolidación de bucles en una sola pasada |
 | **Multi-Aportaciones, Fondos Externos & Retiradas** | ✅ Completado | Consolidación visual a 1 tarjeta por índice con historial desplegable de aportaciones, fondos externos opcionales, eliminación de borrado directo y modal de retirada con liquidación hacia cuentas |
 | **Cuentas Broker & Inversión (MyInvestor / Trade Republic)** | ✅ Completado | Módulo híbrido (liquidez + cartera), cálculo de cuánto está dando, entradas al índice y conmutador en Dashboard |
+| **Refactorización de Arquitectura & Slicing de Monolitos (Fases 1, 2 y 3)** | ✅ Completado | Desacoplamiento de catálogo (`marketAssetsData.ts`), hook `useSwipeGesture`, modularización de `finance.ts` en 3 submódulos, slicing de `useFinanceStore` en 4 slices de dominio y extracción de sub-formularios modulares (`TransferFlowCard`, `RecurrenceSection`, `InvestmentFormFields`) |
 
 ---
 
@@ -1218,6 +1219,21 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
     - En [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts), se añade resolución nativa en `resolveIsinQuote` para activos de renta fija no cotizados del catálogo curado (`assetType === 'fixed_income'`), devolviendo inmediatamente su precio base benchmark y almacenándolo en caché SWR sin realizar peticiones de red externas innecesarias.
     - En [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), se excluyen los depósitos bancarios a plazo fijo (`asset.assetType !== 'deposit'`) de los ciclos periódicos de refresco de cotizaciones bursátiles.
 
+- **[x] Optimización y Auditoría Fase 1: Quick Wins, Calidad de Render y Desacople**:
+  - Creación del componente reutilizable y fuertemente tipado [`GlassTooltip.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/GlassTooltip.tsx), eliminando duplicaciones en [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx) e [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx) y purgando tipos `any`.
+  - Reemplazo del anti-patrón de subcomponentes anidados en [`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx) (`SubMetrics` y `SourceCardContent`) por funciones puras de renderizado (`renderSubMetrics`, `renderSourceCardContent`), preservando la reconciliación virtual en el lugar durante el scroll del carrusel y evitando re-montajes del DOM.
+  - Erradicación del efecto en cascada `useEffect` en `AnalyticsView.tsx` mediante evaluación de estado derivado `effectiveChartSection`, eliminando un ciclo extra de render.
+  - Corrección de la acumulación pura en `InvestmentAnalyticsView.tsx` (`evolutionData`) y eliminación de variables no utilizadas en `useFinanceStore.ts` (`_prefix`) y `finance.ts` (`savingsRate`).
+  - Purga de código muerto: eliminación de `src/App.css` y de los archivos boilerplate sin uso `src/assets/react.svg` y `src/assets/vite.svg`.
+
+- **[x] Optimización y Auditoría Fase 2: Desacople de Datos y Gestos Táctiles Estandarizados (DRY)**:
+  - Extracción de catálogos estáticos de mercado (`CURATED_MARKET_ASSETS` y `FUND_ISIN_EQUIVALENCE_MAP`) hacia [`marketAssetsData.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/data/marketAssetsData.ts), adelgazando [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts) de 1.431 a 873 líneas (-558 líneas) con re-exportaciones 100% retrocompatibles.
+  - Creación del hook táctil universal [`useSwipeGesture.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSwipeGesture.ts) con función de resistencia elástica (`computeSwipeOffset`) y umbrales paramétricos de disparo, adoptado en [`SwipeableTransactionItem.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SwipeableTransactionItem.tsx) y [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx).
+  - Extracción del componente de tarjeta de inversión [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx) fuera de [`InvestmentsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentsView.tsx), reduciendo la vista principal de 796 a 332 líneas (-464 líneas).
+  - Incorporación de suite de tests unitarios para cinemática de gestos táctiles en [`useSwipeGesture.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSwipeGesture.test.ts).
+
+
+
 ### v0.6.4 (Traspasos Entre Cuentas y Billetera de Efectivo, Interfaz Adaptativa y Doble Apunte Sincronizado)
 - **[x] Conmutación Reactiva de Interfaz en Gasto (`cat-transfer`)**:
   - Al seleccionar la categoría *"Traspaso"* (`cat-transfer`, icono `ArrowLeftRight`) dentro del panel de gasto en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), el formulario adapta instantáneamente sus controles:
@@ -1247,7 +1263,77 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Añadido espaciado inferior de seguridad (`pb-6 sm:pb-2`) en el formulario para ergonomía táctil en dispositivos móviles.
 
 **Validación de Calidad:**
-- Vitest: 159/159 tests unitarios pasando al 100% (10 suites).
+- Vitest: 162/162 tests unitarios pasando al 100% (11 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
 - Servidor de Desarrollo: Vite activo en segundo plano en `http://localhost:5173/`.
 - Wiki: Sincronización completa de los 4 documentos en `/docs/wiki/`.
+
+---
+
+### v0.4.5 (Auditoría Integral, Desacoplamiento y Slicing Modular de Monolitos)
+
+- **[x] Fase 1: Limpieza de Código Muerto y Rendimiento de Renderizado**:
+  - Eliminación de archivos innecesarios de plantilla (`src/App.css`, `src/assets/react.svg`, `src/assets/vite.svg`).
+  - Extracción de [`GlassTooltip.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/GlassTooltip.tsx) para Recharts, eliminando duplicación y tipos `any`.
+  - Desanidado de componentes internos en render functions puras en [`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx) (`renderSubMetrics`, `renderSourceCardContent`), evitando la destrucción de subárboles DOM durante el scroll del carrusel.
+  - Erradicación de re-renderizados en cascada en [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx) reemplazando `useEffect` con estado derivado puro.
+- **[x] Fase 2: Desacoplamiento de Datos Estáticos, Gestos Unificados y Componente de Activo**:
+  - Extracción de datos estáticos bursátiles a [`marketAssetsData.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/data/marketAssetsData.ts) (-470 líneas en `marketDataService.ts`).
+  - Creación del hook matemático unificado [`useSwipeGesture.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSwipeGesture.ts) con fórmula elástica (*rubber-banding*) y suite de pruebas unitarias [`useSwipeGesture.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useSwipeGesture.test.ts).
+  - Extracción de [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx) (-435 líneas en `InvestmentsView.tsx`).
+- **[x] Fase 3: Reestructuración y Modularización de Monolitos Principales**:
+  - **Modularización de [`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts)**: Reducido de 1.518 a 12 líneas (**-1.506 líneas**) mediante 3 submódulos de dominio y barrel re-export:
+    - [`financialCalculations.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/financialCalculations.ts) (507 líneas): balances, flujos, ahorro neto y evolución patrimonial.
+    - [`investmentMatching.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/investmentMatching.ts) (484 líneas): heurística de ISINs, parsing de conceptos y auto-corrección de títulos.
+    - [`brokerAnalytics.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/brokerAnalytics.ts) (554 líneas): cuentas híbridas broker, ranking de posiciones y series multi-línea.
+  - **Modularización de [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx)**: Reducido de 2.285 a 1.449 líneas (**-836 líneas**) mediante extracción de sub-formularios:
+    - [`TransferFlowCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/transaction/TransferFlowCard.tsx) (238 líneas): flujo visual de traspaso entre cuentas/efectivo.
+    - [`RecurrenceSection.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/transaction/RecurrenceSection.tsx) (239 líneas): periodicidad, switches y días de cobro.
+    - [`InvestmentFormFields.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/transaction/InvestmentFormFields.tsx) (630 líneas): cotización en vivo, buscador inteligente y conmutador €/títulos.
+  - **Slicing de [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts)**: Reducido de 1.780 a 523 líneas (**-1.257 líneas**) componiendo 4 slices independientes de dominio:
+    - [`types.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/types.ts) (103 líneas): interfaces tipadas `StoreSet`, `StoreGet` y contratos de cada slice.
+    - [`sourceAccountsSlice.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/slices/sourceAccountsSlice.ts) (142 líneas): CRUD de cuentas y regla de efectivo único.
+    - [`recurrencesSlice.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/slices/recurrencesSlice.ts) (93 líneas): motor de reglas periódicas y simulador temporal.
+    - [`investmentsSlice.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/slices/investmentsSlice.ts) (524 líneas): P&L en vivo, sincronización SWR y retiradas.
+    - [`transactionsSlice.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/slices/transactionsSlice.ts) (435 líneas): movimientos, traspasos atómicos sincronizados y purga de dependencias.
+- **Métricas de la Fase 3**:
+  - **Líneas reducidas de los monolitos**: **-3.599 líneas**.
+  - **Líneas introducidas en submódulos tipados**: +3.949 líneas.
+  - **Tests**: 162/162 pasando (100%).
+  - **TypeScript**: 0 errores de compilación (`npx tsc -b`).
+
+- **[x] Fase 4: Descomposición de Vistas Analíticas, Tarjetas Visuales y Modularización de Caché**:
+  - **Centralización de Helpers de Fechas y Nombres de Meses**:
+    - Centralizados `MONTH_NAMES_LONG`, `MONTH_NAMES_SHORT`, `formatMonthTitle` y `formatMonthPill` en [`dates.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/dates.ts).
+    - Deduplicados de [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx) y [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx) (-36 líneas).
+  - **Descomposición de [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx)**: Reducido de 1.353 a 647 líneas (**-706 líneas**) extrayendo 5 tarjetas Recharts Liquid Glass independientes:
+    - [`BrandRankingCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/BrandRankingCard.tsx) (102 líneas): Ranking top comercios con logotipos vectoriales.
+    - [`CategoryDistributionCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/CategoryDistributionCard.tsx) (107 líneas): Donut chart interactivo con leyenda y porcentajes.
+    - [`CashFlowComparisonCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/CashFlowComparisonCard.tsx) (114 líneas): Gráfico de barras comparativo Ingresos vs Gastos.
+    - [`NetWorthEvolutionCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/NetWorthEvolutionCard.tsx) (89 líneas): Evolución del patrimonio con curva suavizada.
+    - [`SavingsEvolutionCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/SavingsEvolutionCard.tsx) (415 líneas): Área interactiva con selector dual de ahorro neto / acumulado.
+  - **Descomposición de [`HeroBalance.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/HeroBalance.tsx)**: Reducido de 726 a 605 líneas (**-121 líneas**):
+    - [`SourceCardContent.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/home/SourceCardContent.tsx) (157 líneas): Componente visual de tarjeta individual de cuenta bancaria, efectivo o broker de inversión con soporte para ocultamiento de balance (`Eye`/`EyeOff`).
+  - **Modularización de Caché en [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts)**: Reducido de 960 a 863 líneas (**-97 líneas**):
+    - [`marketQuoteCache.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketQuoteCache.ts) (127 líneas): Gestión desacoplada de persistencia en localStorage, fallback de memoria, poda de registros expirados (>23h), deduplicación de promesas concurrentes (*in-flight*) y marcas de tiempo SWR (*Stale-While-Revalidate*).
+- **Métricas de la Fase 4**:
+  - **Líneas reducidas de archivos monolíticos**: **-960 líneas**.
+  - **Líneas añadidas en tarjetas y submódulos independientes**: **+1.133 líneas**.
+  - **Tests**: 162/162 pasando (100%).
+  - **TypeScript**: 0 errores de compilación (`npx tsc -b`).
+
+- **[x] Limpieza UI: Supresión del Botón Redundante (+) en [`InvestmentAccountView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentAccountView.tsx)**:
+  - Eliminado el botón circular flotante (+) que se mostraba en móvil a la derecha del selector de subpestañas ("Inversiones" vs "Movimientos").
+  - Evita la duplicación de acciones directas ya que la barra de navegación flotante inferior (`FloatingNavbar`) expone de manera universal el botón central (+) para nuevas operaciones.
+  - La barra segmentada de subpestañas pasa a ocupar el ancho armónico en móviles sin saturar la línea visual.
+
+- **[x] Corrección de Truncamiento de Porcentaje en Tarjetas de Inversión ([`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx) & [`InvestmentAccountView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentAccountView.tsx))**:
+  - En [`AssetCard.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/AssetCard.tsx), se resolvió el recorte del porcentaje de rentabilidad en la columna derecha de la tarjeta (`grid-cols-3`):
+    - Se transformó la celda de Rentabilidad en un contenedor adaptativo (`flex flex-col items-end sm:flex-row sm:items-center sm:justify-end sm:gap-1`).
+    - En pantallas móviles estrechas (<640px), el importe en euros (`+120,45 €`) y el porcentaje (`(+8,25%)`) se organizan verticalmente con `whitespace-nowrap`, alineados a la derecha, garantizando que el porcentaje nunca exceda el ancho de columna ni se corte contra el borde derecho de la tarjeta.
+    - En pantallas más anchas (`sm:` ≥640px), se mantienen horizontalmente en una sola línea.
+  - En [`InvestmentAccountView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/investments/InvestmentAccountView.tsx), se protegió la píldora de P&L de las posiciones con `flex-wrap justify-end` y se corrigió el signo duplicado `++` en el porcentaje.
+
+
+
+

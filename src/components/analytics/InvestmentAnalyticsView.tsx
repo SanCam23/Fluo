@@ -23,8 +23,10 @@ import {
 } from 'recharts';
 import type { SourceAccount, TimeRangeFilter } from '../../types/finance';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { formatMonthTitle } from '../../utils/dates';
 import { SourceAvatar } from '../common/SourceAvatar';
 import { AssetProgressionLineChart } from './AssetProgressionLineChart';
+import { GlassTooltip } from './GlassTooltip';
 import { formatCurrency, formatCompactCurrency, formatPercentage, formatAxisCurrency } from '../../utils/currency';
 import {
   computeInvestmentAccountSummary,
@@ -44,39 +46,6 @@ interface InvestmentAnalyticsViewProps {
   setTimeRange: (range: TimeRangeFilter) => void;
   onOpenAddModal?: () => void;
 }
-
-function formatMonthTitle(monthKey: string): string {
-  const [y, m] = monthKey.split('-').map(Number);
-  if (!y || !m || m < 1 || m > 12) return monthKey;
-  const monthNames = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-  return `${monthNames[m - 1]} ${y}`;
-}
-
-const GlassTooltip: React.FC<any> = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-2xl bg-[#0F1626]/95 light:bg-white/95 border border-white/20 light:border-slate-300/80 p-3 shadow-2xl backdrop-blur-2xl text-xs flex flex-col gap-1.5 z-50">
-        {label && <span className="font-bold text-slate-300 light:text-slate-800">{label}</span>}
-        {payload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: entry.color || entry.fill }}
-              />
-              <span className="text-slate-300 light:text-slate-600">{entry.name}:</span>
-            </div>
-            <span className="font-bold text-white light:text-slate-900">{formatCurrency(entry.value ?? 0)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 export const InvestmentAnalyticsView: React.FC<InvestmentAnalyticsViewProps> = ({
   source,
@@ -211,18 +180,19 @@ export const InvestmentAnalyticsView: React.FC<InvestmentAnalyticsViewProps> = (
   // Evolution Area Chart Data
   const evolutionData = useMemo(() => {
     let runningInvested = 0;
-    return monthlyFlows.map((m) => {
+    const points: Array<{ label: string; invested: number; value: number }> = [];
+    for (const m of monthlyFlows) {
       runningInvested += m.invested;
-      // Estimate valuation based on running invested plus a proportion of unrealized PnL
       const estimatedValue = runningInvested > 0
         ? runningInvested * (1 + (summary.unrealizedPnLPercentage / 100))
         : 0;
-      return {
+      points.push({
         label: m.label,
         invested: Number(runningInvested.toFixed(2)),
         value: Number(estimatedValue.toFixed(2)),
-      };
-    });
+      });
+    }
+    return points;
   }, [monthlyFlows, summary.unrealizedPnLPercentage]);
 
   // Liquidity and Health metrics

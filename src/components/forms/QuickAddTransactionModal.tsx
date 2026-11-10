@@ -4,29 +4,11 @@ import { createPortal } from 'react-dom';
 import {
   X,
   Check,
-  Repeat,
-  Info,
-  Clock,
-  Search,
-  TrendingUp,
-  TrendingDown,
-  Sparkles,
-  Layers,
   Calendar,
-  RefreshCw,
-  LineChart,
-  Coins,
-  ShieldCheck,
-  Landmark,
   Pencil,
-  AlertTriangle,
-  DollarSign,
-  Hash,
   Banknote,
   Wallet,
   ArrowLeftRight,
-  ArrowRight,
-  ChevronDown,
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type {
@@ -38,6 +20,9 @@ import type {
   SourceAccount,
 } from '../../types/finance';
 import { BrandPicker } from './BrandPicker';
+import { TransferFlowCard } from './transaction/TransferFlowCard';
+import { RecurrenceSection } from './transaction/RecurrenceSection';
+import { InvestmentFormFields } from './transaction/InvestmentFormFields';
 import { GlassSelect } from '../common/GlassSelect';
 import type { GlassSelectOption } from '../common/GlassSelect';
 import { CategoryIcon } from '../common/CategoryIcon';
@@ -51,7 +36,6 @@ import {
   findMatchingExistingAssets,
 } from '../../services/marketDataService';
 import type { AutocompleteAssetMatch } from '../../services/marketDataService';
-import { formatCurrency, formatPercentage } from '../../utils/currency';
 import { getTodayDateString, getYesterdayDateString } from '../../utils/dates';
 import {
   parseInvestmentConcept,
@@ -68,20 +52,6 @@ import {
 } from '../../utils/investmentValidation';
 
 export type InvestInputMode = 'total' | 'shares';
-
-const ASSET_TYPE_OPTIONS: GlassSelectOption<AssetType>[] = [
-  { value: 'stock', label: 'Acciones Bursátiles', icon: <LineChart className="h-3.5 w-3.5 text-indigo-400" /> },
-  { value: 'etf', label: 'ETFs Cotizados', icon: <TrendingUp className="h-3.5 w-3.5 text-indigo-400" /> },
-  { value: 'index_fund', label: 'Fondos Indexados', icon: <Layers className="h-3.5 w-3.5 text-indigo-400" /> },
-  { value: 'crypto', label: 'Criptomonedas', icon: <Coins className="h-3.5 w-3.5 text-amber-400" /> },
-  { value: 'fixed_income', label: 'Renta Fija / Bonos', icon: <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> },
-  { value: 'deposit', label: 'Depósitos Remunerados', icon: <Landmark className="h-3.5 w-3.5 text-indigo-400" /> },
-];
-
-const CURRENCY_OPTIONS: GlassSelectOption<'EUR' | 'USD'>[] = [
-  { value: 'EUR', label: 'EUR (€)', icon: <span className="font-bold text-xs text-indigo-400">€</span> },
-  { value: 'USD', label: 'USD ($)', icon: <span className="font-bold text-xs text-emerald-400">$</span> },
-];
 
 interface QuickAddTransactionModalProps {
   isOpen: boolean;
@@ -1005,24 +975,6 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
     onClose();
   };
 
-  const assetTypeLabels: Record<AssetType, string> = {
-    stock: 'Acción',
-    etf: 'ETF',
-    index_fund: 'Fondo Indexado',
-    crypto: 'Criptomoneda',
-    fixed_income: 'Renta Fija',
-    deposit: 'Depósito',
-  };
-
-  const assetTypeColors: Record<AssetType, string> = {
-    stock: 'bg-blue-500/20 text-blue-300 border-blue-500/30 light:bg-blue-500/10 light:text-blue-700 light:border-blue-500/30',
-    etf: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 light:bg-indigo-500/10 light:text-indigo-700 light:border-indigo-500/30',
-    index_fund: 'bg-purple-500/20 text-purple-300 border-purple-500/30 light:bg-purple-500/10 light:text-purple-700 light:border-purple-500/30',
-    crypto: 'bg-amber-500/20 text-amber-300 border-amber-500/30 light:bg-amber-500/15 light:text-amber-800 light:border-amber-500/35',
-    fixed_income: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 light:bg-emerald-500/10 light:text-emerald-700 light:border-emerald-500/30',
-    deposit: 'bg-teal-500/20 text-teal-300 border-teal-500/30 light:bg-teal-500/10 light:text-teal-700 light:border-teal-500/30',
-  };
-
   if (!isOpen) return null;
 
   const modalContent = (
@@ -1120,483 +1072,50 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
           {/* INVERSIÓN: Formulario Completo de Activos con Cotización Real   */}
           {/* ============================================================== */}
           {pillar === 'invest' ? (
-            <div className="flex flex-col gap-4">
-              {/* Smart Search Bar with Real-time Floating Dropdown */}
-              <div className="relative" ref={assetSearchRef}>
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Search className="h-3.5 w-3.5 text-indigo-400" />
-                    Búsqueda Inteligente de Activos
-                  </span>
-                  <span className="text-[10px] text-indigo-300 font-normal">
-                    S&P 500, Apple, Santander, BTC, ISIN...
-                  </span>
-                </label>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Busca por nombre, índice, Ticker o código ISIN..."
-                    value={assetSearchQuery}
-                    onFocus={() => {
-                      if (assetSearchQuery.trim().length > 0 && assetSearchResults.length > 0) {
-                        setIsAssetDropdownOpen(true);
-                      }
-                    }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setAssetSearchQuery(val);
-                      if (!val.trim()) {
-                        setIsAssetDropdownOpen(false);
-                      }
-                    }}
-                    className="w-full rounded-2xl bg-white/[0.08] border border-white/15 pl-10 pr-9 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 backdrop-blur-md shadow-inner"
-                  />
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-
-                  {isSearchingAssets && (
-                    <RefreshCw className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 animate-spin" />
-                  )}
-                </div>
-
-                {/* Floating Dropdown Card (Liquid Glass) */}
-                {isAssetDropdownOpen && assetSearchResults.length > 0 && (
-                  <div className="absolute z-40 left-0 right-0 top-full mt-2 bg-[#0E1526]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 shadow-[0_16px_40px_rgba(0,0,0,0.6)] max-h-60 overflow-y-auto divide-y divide-white/5 animate-fadeIn">
-                    {assetSearchResults.map((item) => {
-                      const isPositive = item.change24h >= 0;
-                      return (
-                        <button
-                          key={`${item.identifier}-${item.name}`}
-                          type="button"
-                          onClick={() => handleSelectAsset(item)}
-                          className="w-full text-left p-2.5 rounded-xl hover:bg-white/[0.08] transition-all flex items-center justify-between gap-3 cursor-pointer group"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
-                                {item.name}
-                              </span>
-                              <span
-                                className={`px-1.5 py-0.2 rounded-md text-[10px] font-semibold border ${
-                                  assetTypeColors[item.assetType]
-                                }`}
-                              >
-                                {assetTypeLabels[item.assetType]}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                              <span className="font-mono text-slate-300 font-semibold">{item.identifier}</span>
-                              {item.isin && item.isin !== item.identifier && (
-                                <>
-                                  <span>•</span>
-                                  <span className="font-mono text-[10px] text-slate-400">{item.isin}</span>
-                                </>
-                              )}
-                              {item.benchmarkOrIndex && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-indigo-400/90 text-[10px]">{item.benchmarkOrIndex}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span className="text-xs font-bold text-white block">
-                              {formatCurrency(item.basePrice, item.currency)}
-                            </span>
-                            <span
-                              className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
-                                isPositive ? 'text-emerald-400' : 'text-rose-400'
-                              }`}
-                            >
-                              {isPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                              {formatPercentage(item.change24h)}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Selected Asset Information Badge */}
-              {identifier && (
-                <div className="p-3 rounded-2xl bg-indigo-500/10 light:bg-indigo-50/70 border border-indigo-500/25 light:border-indigo-200 flex items-center justify-between backdrop-blur-md">
-                  <div className="min-w-0 pr-2">
-                    <span className="text-[10px] uppercase font-bold text-indigo-300 light:text-indigo-700 tracking-wider flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" /> Activo Detectado
-                    </span>
-                    <p className="text-xs font-bold text-white truncate mt-0.5">{assetName}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="px-1.5 py-0.2 rounded bg-white/10 light:bg-indigo-100/80 font-mono text-[10px] text-indigo-200 light:text-indigo-800 border border-white/10 light:border-indigo-200">
-                        {identifier}
-                      </span>
-                      <span className={`px-2 py-0.2 rounded text-[10px] font-semibold border ${assetTypeColors[assetType]}`}>
-                        {assetTypeLabels[assetType]}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-400 light:text-slate-600 block">Cotización Oficial</span>
-                    <div className="flex items-center gap-1 justify-end">
-                      {isFetchingQuote ? (
-                        <RefreshCw className="h-3.5 w-3.5 text-indigo-400 animate-spin" />
-                      ) : (
-                        <span className="text-sm font-extrabold text-emerald-400 light:text-emerald-700">
-                          {formatCurrency(parseFloat(currentPrice) || 0, currency)}
-                        </span>
-                      )}
-                    </div>
-                    {change24h !== undefined && (
-                      <span
-                        className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${
-                          change24h >= 0 ? 'text-emerald-400 light:text-emerald-700' : 'text-rose-400 light:text-rose-700'
-                        }`}
-                      >
-                        {change24h >= 0 ? '+' : ''}{formatPercentage(change24h)} 24h
-                      </span>
-                    )}
-                    {isOfflineCached && (
-                      <span className="text-[9px] text-amber-300 light:text-amber-800 block">Dato en caché</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Name & Ticker / ISIN Manual Inputs */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-xs font-medium text-slate-400">Nombre / Título</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Apple Inc., S&P 500..."
-                    value={assetName}
-                    onChange={(e) => setAssetName(e.target.value)}
-                    className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                  />
-                </div>
-
-                <div className="relative" ref={autocompleteContainerRef}>
-                  <label className="text-xs font-medium text-slate-400 flex items-center justify-between">
-                    <span>Ticker o ISIN</span>
-                    {matchingExistingAssets.length > 0 && (
-                      <span className="text-[10px] text-indigo-400 font-normal flex items-center gap-1">
-                        <Sparkles className="h-2.5 w-2.5 animate-pulse" />
-                        {matchingExistingAssets.length} {matchingExistingAssets.length === 1 ? 'coincidencia' : 'coincidencias'}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="AAPL, IE0032126645..."
-                    value={identifier}
-                    onFocus={() => {
-                      if (matchingExistingAssets.length > 0) setIsAutocompleteOpen(true);
-                    }}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      setIdentifier(val);
-                      setIsAutocompleteOpen(true);
-                    }}
-                    className="mt-1 w-full rounded-xl bg-white/[0.07] border border-white/15 px-3 py-2 text-xs font-mono uppercase text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                  />
-
-                  {/* Floating Dropdown for Autocompleting Existing Matches (Liquid Glass) */}
-                  {isAutocompleteOpen && matchingExistingAssets.length > 0 && (
-                    <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-[#0E1526]/95 light:bg-white/95 backdrop-blur-2xl border border-indigo-500/30 light:border-indigo-200 rounded-2xl p-2 shadow-[0_12px_36px_rgba(0,0,0,0.6)] light:shadow-[0_12px_24px_rgba(15,23,42,0.1)] divide-y divide-white/5 light:divide-slate-200 max-h-60 overflow-y-auto animate-fadeIn">
-                      <div className="px-2 py-1 text-[10px] font-bold text-indigo-300 light:text-indigo-600 uppercase tracking-wider flex items-center justify-between">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" /> Pinchar para autocompletar
-                        </span>
-                        <span className="text-[9px] text-slate-400 font-normal">
-                          Coincide con existente
-                        </span>
-                      </div>
-
-                      {matchingExistingAssets.map((match) => (
-                        <button
-                          key={`${match.source}-${match.identifier}-${match.isin || ''}`}
-                          type="button"
-                          onClick={() => handleApplyAutocompleteMatch(match)}
-                          className="w-full text-left p-2 rounded-xl hover:bg-indigo-500/15 light:hover:bg-indigo-50/80 transition-all flex items-center justify-between gap-2.5 cursor-pointer group mt-1"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-white light:text-slate-900 group-hover:text-indigo-300 light:group-hover:text-indigo-600 transition-colors truncate">
-                                {match.name}
-                              </span>
-                              {match.source === 'portfolio' ? (
-                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 light:bg-emerald-50 light:text-emerald-700 border border-emerald-500/30 shrink-0">
-                                  En cartera
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-semibold bg-indigo-500/15 text-indigo-300 light:bg-indigo-50 light:text-indigo-700 border border-indigo-500/30 shrink-0">
-                                  {match.assetType === 'index_fund' ? 'Fondo Indexado' : match.assetType.toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 light:text-slate-500 mt-0.5 font-mono">
-                              <span className="font-semibold text-slate-300 light:text-slate-700">{match.identifier}</span>
-                              {match.isin && match.isin !== match.identifier && (
-                                <>
-                                  <span>•</span>
-                                  <span>ISIN: {match.isin}</span>
-                                </>
-                              )}
-                              {match.quoteTicker && match.quoteTicker !== match.identifier && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-indigo-400">Ref: {match.quoteTicker}</span>
-                                </>
-                              )}
-                              {match.platform && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-slate-300 light:text-slate-700">{match.platform}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            {match.currentPrice > 0 && (
-                              <span className="text-xs font-bold text-emerald-400 light:text-emerald-700 block">
-                                {formatCurrency(match.currentPrice, match.currency)}
-                              </span>
-                            )}
-                            <span className="text-[10px] text-indigo-400 light:text-indigo-600 group-hover:underline flex items-center gap-0.5 justify-end mt-0.5 font-semibold">
-                              Rellenar <Check className="h-3 w-3" />
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Autocompletion notification badge */}
-              {autocompletedNotice && (
-                <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 light:bg-emerald-50 border border-emerald-500/25 light:border-emerald-200 text-emerald-300 light:text-emerald-800 text-[11px] font-medium flex items-center justify-between animate-fadeIn">
-                  <span className="flex items-center gap-1.5 truncate">
-                    <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                    Datos autocompletados desde: <strong className="font-semibold truncate">{autocompletedNotice}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAutocompletedNotice(null)}
-                    className="text-emerald-400 hover:text-emerald-200 text-xs ml-2 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              {/* Asset Class & Currency */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <GlassSelect<AssetType>
-                    label="Tipo de Activo"
-                    value={assetType}
-                    onChange={(val) => setAssetType(val)}
-                    options={ASSET_TYPE_OPTIONS}
-                    size="sm"
-                  />
-                </div>
-
-                <div>
-                  <GlassSelect<'EUR' | 'USD'>
-                    label="Divisa"
-                    value={currency}
-                    onChange={(val) => setCurrency(val)}
-                    options={CURRENCY_OPTIONS}
-                    size="sm"
-                  />
-                </div>
-              </div>
-
-              {/* ──── Investment Input Mode Selector (Liquid Glass Segmented Control) ──── */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setInvestInputMode('total')}
-                  className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                    investInputMode === 'total'
-                      ? 'bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
-                  }`}
-                >
-                  <DollarSign className="h-3.5 w-3.5" />
-                  Por Importe Total
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInvestInputMode('shares')}
-                  className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                    investInputMode === 'shares'
-                      ? 'bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
-                  }`}
-                >
-                  <Hash className="h-3.5 w-3.5" />
-                  Por Nº de Títulos
-                </button>
-              </div>
-
-              {/* ──── Primary Input: depends on active mode ──── */}
-              {investInputMode === 'total' ? (
-                <>
-                  {/* Total Amount Input (Primary in "by total" mode) */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300">
-                      Importe Total Desembolsado ({currency})
-                    </label>
-                    <div className="relative mt-1">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        required
-                        placeholder="Ej. 500, 1000, 2500.50"
-                        value={totalInvestedInput}
-                        onChange={(e) => handleTotalInvestedChange(e.target.value)}
-                        className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                        {currency}
-                      </span>
-                    </div>
-                    {/* Auto-calculated shares estimate */}
-                    {(() => {
-                      const numTotal = parsePositiveNumber(totalInvestedInput);
-                      const numPrice = parsePositiveNumber(averageBuyPrice);
-                      if (numTotal !== null && numPrice !== null) {
-                        const estShares = calculateSharesFromTotal(numTotal, numPrice);
-                        if (estShares !== null) {
-                          return (
-                            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-indigo-300/80 light:text-indigo-600 leading-snug">
-                              <Info className="h-3 w-3 mt-0.5 shrink-0 text-indigo-400/60" />
-                              A la cotización de {formatCurrency(numPrice, currency)}, compras aprox. <strong className="text-indigo-200 light:text-indigo-700">{estShares.toLocaleString('es-ES', { maximumFractionDigits: 6 })}</strong> títulos.
-                            </p>
-                          );
-                        }
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Shares / Decimal Units (Primary in "by shares" mode) */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300">
-                      Cantidad de Títulos / Participaciones (soporta decimales)
-                    </label>
-                    <div className="relative mt-1">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        required
-                        placeholder="Ej. 10, 12.5 o 0.045 BTC"
-                        value={shares}
-                        onChange={(e) => handleSharesChange(e.target.value)}
-                        className="w-full rounded-2xl bg-white/[0.08] border border-white/15 px-4 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                        unidades
-                      </span>
-                    </div>
-                    {/* Auto-calculated total estimate */}
-                    {(() => {
-                      const numShares = parsePositiveNumber(shares);
-                      const numPrice = parsePositiveNumber(averageBuyPrice);
-                      if (numShares !== null && numPrice !== null) {
-                        const estTotal = calculateTotalFromShares(numShares, numPrice);
-                        if (estTotal !== null) {
-                          return (
-                            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-indigo-300/80 light:text-indigo-600 leading-snug">
-                              <Info className="h-3 w-3 mt-0.5 shrink-0 text-indigo-400/60" />
-                              Inversión total estimada: <strong className="text-indigo-200 light:text-indigo-700">{formatCurrency(estTotal, currency)}</strong>
-                            </p>
-                          );
-                        }
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </>
-              )}
-
-              {/* ──── Unit Buy Price (always visible, editable) ──── */}
-              <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col gap-2.5">
-                <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Info className="h-3.5 w-3.5 text-indigo-400" />
-                  Precio de Compra por Título ({currency})
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  required
-                  placeholder="Ej. 124.50"
-                  value={averageBuyPrice}
-                  onChange={(e) => handleUnitPriceChange(e.target.value)}
-                  className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-indigo-400"
-                />
-
-                {/* Unverified quote warning */}
-                {identifier && !isFetchingQuote && !quoteVerified && (
-                  <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-500/10 light:bg-amber-50 border border-amber-500/20 light:border-amber-200 text-amber-400 light:text-amber-800 text-[11px] leading-relaxed">
-                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      No se pudo verificar la cotización real en tiempo real. Introduce el precio unitario de compra manualmente para continuar.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* ──── Validation Errors Panel ──── */}
-              {investFormErrors.length > 0 && (
-                <div className="flex flex-col gap-1 p-3 rounded-2xl bg-rose-500/10 light:bg-rose-50 border border-rose-500/20 light:border-rose-200 animate-fadeIn">
-                  {investFormErrors.map((err, idx) => (
-                    <p key={idx} className="text-[11px] text-rose-400 light:text-rose-700 flex items-start gap-1.5">
-                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                      {err}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              {/* Broker Selection using BrandPicker (Identical to New Movement) */}
-              <BrandPicker
-                selectedBrandId={brokerBrandId}
-                onSelectBrand={(id) => setBrokerBrandId(id)}
-                categoryId="cat-invest"
-                label="Broker o Entidad Financiera (Opcional)"
-                placeholder="Busca tu broker (MyInvestor, Trade Republic, Degiro, Kraken...)"
-              />
-
-              {/* Source Account Selector for Investment Outflow (Optional) */}
-              <div>
-                <GlassSelect
-                  label="Cuenta o Fuente de Cargo (Opcional)"
-                  value={selectedSourceId}
-                  onChange={(val) => setSelectedSourceId(val)}
-                  options={investSourceOptions}
-                  placeholder="Selecciona cuenta de origen o fondos externos..."
-                />
-                <p className="mt-1 text-[11px] text-slate-400">
-                  {selectedSourceId
-                    ? 'Se registrará una salida vinculada de tu cuenta seleccionada.'
-                    : 'Fondos externos: no se restará saldo de ninguna de tus cuentas en la app.'}
-                </p>
-              </div>
-            </div>
+            <InvestmentFormFields
+              assetSearchRef={assetSearchRef}
+              assetSearchQuery={assetSearchQuery}
+              setAssetSearchQuery={setAssetSearchQuery}
+              isAssetDropdownOpen={isAssetDropdownOpen}
+              setIsAssetDropdownOpen={setIsAssetDropdownOpen}
+              isSearchingAssets={isSearchingAssets}
+              assetSearchResults={assetSearchResults}
+              handleSelectAsset={handleSelectAsset}
+              identifier={identifier}
+              setIdentifier={setIdentifier}
+              assetName={assetName}
+              setAssetName={setAssetName}
+              assetType={assetType}
+              setAssetType={setAssetType}
+              currency={currency}
+              setCurrency={setCurrency}
+              currentPrice={currentPrice}
+              isFetchingQuote={isFetchingQuote}
+              change24h={change24h}
+              isOfflineCached={isOfflineCached}
+              autocompleteContainerRef={autocompleteContainerRef}
+              matchingExistingAssets={matchingExistingAssets}
+              isAutocompleteOpen={isAutocompleteOpen}
+              setIsAutocompleteOpen={setIsAutocompleteOpen}
+              handleApplyAutocompleteMatch={handleApplyAutocompleteMatch}
+              autocompletedNotice={autocompletedNotice}
+              setAutocompletedNotice={setAutocompletedNotice}
+              investInputMode={investInputMode}
+              setInvestInputMode={setInvestInputMode}
+              totalInvestedInput={totalInvestedInput}
+              handleTotalInvestedChange={handleTotalInvestedChange}
+              shares={shares}
+              handleSharesChange={handleSharesChange}
+              averageBuyPrice={averageBuyPrice}
+              handleUnitPriceChange={handleUnitPriceChange}
+              quoteVerified={quoteVerified}
+              investFormErrors={investFormErrors}
+              brokerBrandId={brokerBrandId}
+              setBrokerBrandId={(id) => setBrokerBrandId(id || '')}
+              selectedSourceId={selectedSourceId}
+              setSelectedSourceId={setSelectedSourceId}
+              investSourceOptions={investSourceOptions}
+            />
           ) : (
             <div className="flex flex-col gap-4">
               {/* Amount Input */}
@@ -1636,196 +1155,22 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
                 /* TRANSFER INTERFACE (Cuentas <-> Cuentas / Billetera Efectivo)  */
                 /* ============================================================== */
                 <div className="flex flex-col gap-4 animate-fadeIn">
-                  {/* Visual Transfer Flow Liquid Glass Card with In-Place Interactive Pickers */}
-                  <div
-                    ref={transferCardRef}
-                    className="p-4 rounded-2xl bg-indigo-500/10 light:bg-indigo-50/70 border border-indigo-500/20 light:border-indigo-200/80 backdrop-blur-xl flex flex-col gap-3 shadow-[0_8px_32px_0_rgba(99,102,241,0.15)] transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
-                          <ArrowLeftRight className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white light:text-slate-900 block">
-                            Traspaso entre Cuentas y Efectivo
-                          </span>
-                          <span className="text-[11px] text-slate-400 light:text-slate-600 block">
-                            Pulsa sobre el origen o destino para cambiar de cuenta
-                          </span>
-                        </div>
-                      </div>
-                      {parseFloat(amount) > 0 && (
-                        <span className="text-xs font-bold text-indigo-300 light:text-indigo-700 px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30">
-                          {formatCurrency(parseFloat(amount))}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Flow Indicator with In-Place Interactive Buttons */}
-                    <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-white/[0.04] light:bg-white/60 border border-white/10 light:border-slate-200">
-                      {/* Origin Account Interactive Button */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          sortedSources.length >= 2 &&
-                          setActiveTransferPicker(activeTransferPicker === 'origin' ? null : 'origin')
-                        }
-                        className={`flex items-center gap-2 min-w-0 flex-1 p-2 rounded-xl text-left transition-all cursor-pointer ${
-                          activeTransferPicker === 'origin'
-                            ? 'bg-indigo-600/30 border border-indigo-400/50 ring-2 ring-indigo-500/20 shadow-sm'
-                            : 'hover:bg-white/[0.08] border border-transparent'
-                        } ${sortedSources.length < 2 ? 'cursor-default' : ''}`}
-                      >
-                        {originSource && <SourceAvatar source={originSource} size="xs" />}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] uppercase font-semibold text-slate-400 block truncate">
-                              Desde
-                            </span>
-                            {sortedSources.length >= 2 && (
-                              <ChevronDown
-                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${
-                                  activeTransferPicker === 'origin' ? 'rotate-180 text-indigo-400' : ''
-                                }`}
-                              />
-                            )}
-                          </div>
-                          <span className="text-xs font-bold text-white light:text-slate-800 truncate block">
-                            {originSource?.name || 'Selecciona origen'}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block truncate">
-                            {originSource?.institution || (originSource?.type === 'bank' ? 'Cuenta bancaria' : 'Billetera efectivo')}
-                          </span>
-                        </div>
-                      </button>
-
-                      {/* Swap Button in Center */}
-                      <div className="flex flex-col items-center justify-center shrink-0 px-1">
-                        <button
-                          type="button"
-                          title="Intercambiar cuentas (Origen <-> Destino)"
-                          onClick={handleSwapSources}
-                          disabled={sortedSources.length < 2}
-                          className={`w-7 h-7 rounded-full bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-400/40 hover:border-indigo-400/60 flex items-center justify-center text-indigo-300 active:scale-90 transition-all shadow-sm ${
-                            sortedSources.length < 2 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-                          }`}
-                        >
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Destination Account Interactive Button */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          sortedSources.length >= 2 &&
-                          setActiveTransferPicker(activeTransferPicker === 'destination' ? null : 'destination')
-                        }
-                        className={`flex items-center gap-2 min-w-0 flex-1 p-2 rounded-xl text-right justify-end transition-all cursor-pointer ${
-                          activeTransferPicker === 'destination'
-                            ? 'bg-indigo-600/30 border border-indigo-400/50 ring-2 ring-indigo-500/20 shadow-sm'
-                            : 'hover:bg-white/[0.08] border border-transparent'
-                        } ${sortedSources.length < 2 ? 'cursor-default' : ''}`}
-                      >
-                        <div className="min-w-0 flex-1 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <span className="text-[10px] uppercase font-semibold text-slate-400 block truncate">
-                              Hacia
-                            </span>
-                            {sortedSources.length >= 2 && (
-                              <ChevronDown
-                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${
-                                  activeTransferPicker === 'destination' ? 'rotate-180 text-indigo-400' : ''
-                                }`}
-                              />
-                            )}
-                          </div>
-                          <span className="text-xs font-bold text-white light:text-slate-800 truncate block">
-                            {destSource?.name || 'Selecciona destino'}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block truncate">
-                            {destSource?.institution || (destSource?.type === 'bank' ? 'Cuenta bancaria' : 'Billetera efectivo')}
-                          </span>
-                        </div>
-                        {destSource && <SourceAvatar source={destSource} size="xs" />}
-                      </button>
-                    </div>
-
-                    {/* In-Place Liquid Glass Drawer for Account Selection */}
-                    {activeTransferPicker && sortedSources.length >= 2 && (
-                      <div className="pt-2.5 border-t border-white/10 flex flex-col gap-1.5 animate-fadeIn">
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
-                          <span className="font-semibold text-indigo-300">
-                            {activeTransferPicker === 'origin'
-                              ? 'Elige la cuenta o billetera de origen (Desde):'
-                              : 'Elige la cuenta o billetera de destino (Hacia):'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTransferPicker(null)}
-                            className="text-[10px] text-slate-400 hover:text-white cursor-pointer px-1.5 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
-                          >
-                            Cerrar
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto pr-0.5 scrollbar-thin">
-                          {(activeTransferPicker === 'origin' ? sourceOptions : destinationOptions).map((opt) => {
-                            const isSelected =
-                              activeTransferPicker === 'origin'
-                                ? opt.value === selectedSourceId
-                                : opt.value === destinationSourceId;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => {
-                                  if (activeTransferPicker === 'origin') {
-                                    setSelectedSourceId(opt.value);
-                                  } else {
-                                    setDestinationSourceId(opt.value);
-                                  }
-                                  setActiveTransferPicker(null);
-                                }}
-                                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-indigo-600/35 border border-indigo-400/50 text-white font-semibold shadow-sm'
-                                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/5 hover:border-white/15'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  {opt.icon}
-                                  <div className="min-w-0 truncate">
-                                    <span className="text-xs font-medium block truncate text-white">
-                                      {opt.label}
-                                    </span>
-                                    {opt.subtitle && (
-                                      <span className="text-[10px] text-slate-400 block truncate">
-                                        {opt.subtitle}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                {isSelected && <Check className="h-4 w-4 text-indigo-400 shrink-0" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Single Account Warning */}
-                    {sortedSources.length < 2 && (
-                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
-                        <span>
-                          Para realizar traspasos necesitas tener al menos dos cuentas o billeteras registradas.
-                          Puedes añadir una cuenta bancaria o tu billetera de efectivo desde tu <strong>Perfil &gt; Mis Fuentes</strong>.
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <TransferFlowCard
+                    sortedSources={sortedSources}
+                    selectedSourceId={selectedSourceId}
+                    destinationSourceId={destinationSourceId}
+                    activeTransferPicker={activeTransferPicker}
+                    setActiveTransferPicker={setActiveTransferPicker}
+                    onSelectOrigin={(id) => setSelectedSourceId(id)}
+                    onSelectDestination={(id) => setDestinationSourceId(id)}
+                    onSwap={handleSwapSources}
+                    amount={amount}
+                    originSource={originSource}
+                    destSource={destSource}
+                    sourceOptions={sourceOptions}
+                    destinationOptions={destinationOptions}
+                    transferCardRef={transferCardRef}
+                  />
 
                   {/* Fecha del Traspaso */}
                   <div>
@@ -2057,204 +1402,23 @@ export const QuickAddTransactionModal: React.FC<QuickAddTransactionModalProps> =
             </div>
           )}
 
-          {/* RECURRENCE TOGGLE & CONFIGURATION (Shared across all pillars)   */}
-          {/* ============================================================== */}
-          <div className="rounded-2xl border border-white/15 bg-white/[0.06] backdrop-blur-xl p-3.5 transition-all">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`p-2 rounded-xl border transition-colors ${
-                    isRecurring
-                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                      : 'bg-white/5 border-white/10 text-slate-400'
-                  }`}
-                >
-                  <Repeat className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-white block">
-                    {pillar === 'invest' ? 'Aportación periódica recurrente' : 'Hacer recurrente'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 block">
-                    {pillar === 'invest'
-                      ? 'Programa aportaciones periódicas en este activo'
-                      : `Automatiza este ${pillar === 'income' ? 'ingreso' : 'gasto'}`}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isRecurring}
-                onClick={() => setIsRecurring(!isRecurring)}
-                className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 border ${
-                  isRecurring
-                    ? 'bg-indigo-600/80 border-indigo-400/60 shadow-[0_0_12px_rgba(99,102,241,0.5)]'
-                    : 'bg-white/10 border-white/15'
-                }`}
-              >
-                <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                    isRecurring ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {isRecurring && (
-              <div className="mt-3.5 pt-3 border-t border-white/10 flex flex-col gap-3 animate-fadeIn">
-                <div>
-                  <label className="text-[11px] font-medium text-slate-400 block mb-1.5">
-                    Frecuencia de Repetición
-                  </label>
-                  <div className="grid grid-cols-4 gap-1 p-1 bg-white/5 rounded-xl border border-white/10">
-                    {(
-                      [
-                        { id: 'weekly', label: 'Semanal' },
-                        { id: 'biweekly', label: 'Quincenal' },
-                        { id: 'monthly', label: 'Mensual' },
-                        { id: 'yearly', label: 'Anual' },
-                      ] as const
-                    ).map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setFrequency(f.id)}
-                        className={`py-1.5 text-[11px] font-medium rounded-lg transition-all cursor-pointer ${
-                          frequency === f.id
-                            ? 'bg-indigo-500/30 border border-indigo-400/40 text-white shadow-sm font-semibold'
-                            : 'text-slate-400 hover:text-slate-200 border border-transparent'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {frequency === 'weekly' && (
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-400 block mb-1.5">
-                      Día de la semana
-                    </label>
-                    <div className="grid grid-cols-7 gap-1">
-                      {[
-                        { day: 1, label: 'L' },
-                        { day: 2, label: 'M' },
-                        { day: 3, label: 'X' },
-                        { day: 4, label: 'J' },
-                        { day: 5, label: 'V' },
-                        { day: 6, label: 'S' },
-                        { day: 7, label: 'D' },
-                      ].map((item) => (
-                        <button
-                          key={item.day}
-                          type="button"
-                          onClick={() => setDayOfWeek(item.day)}
-                          className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                            dayOfWeek === item.day
-                              ? 'bg-indigo-500/40 border-indigo-400 text-white shadow-md shadow-indigo-500/20'
-                              : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {frequency === 'monthly' && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-medium text-slate-400">
-                      Día de cobro en el mes (1 - 31)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={dayOfMonth}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val)) {
-                            setDayOfMonth(Math.max(1, Math.min(31, val)));
-                          }
-                        }}
-                        className="w-24 rounded-xl bg-white/10 border border-white/15 px-3 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:border-indigo-400"
-                      />
-                      <span className="text-xs text-slate-400">
-                        {dayOfMonth === 1
-                          ? 'Día 1 de cada mes'
-                          : dayOfMonth >= 29
-                          ? `Día ${dayOfMonth} (con ajuste a fin de mes)`
-                          : `Día ${dayOfMonth} de cada mes`}
-                      </span>
-                    </div>
-
-                    {dayOfMonth >= 29 && (
-                      <div className="flex items-start gap-1.5 p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] leading-relaxed">
-                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>
-                          En meses de menos de {dayOfMonth} días (ej. febrero o abril), la regla se ejecutará automáticamente el último día disponible.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-400 block mb-1">
-                      Fecha de inicio
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-400 block mb-1">
-                      Fecha fin (opcional)
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      min={startDate}
-                      placeholder="Sin fecha fin"
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full rounded-xl bg-[#131B2E] border border-white/15 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
-                    />
-                  </div>
-                </div>
-
-                <label className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/10 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-indigo-400" />
-                    <div>
-                      <span className="text-[11px] font-semibold text-slate-200 block">
-                        Registrar automáticamente
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        {autoCharge
-                          ? 'Inserta el movimiento en la app en su fecha'
-                          : 'Solo recordatorio sin crear transacción'}
-                      </span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={autoCharge}
-                    onChange={(e) => setAutoCharge(e.target.checked)}
-                    className="h-4 w-4 rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-0 cursor-pointer"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
+          <RecurrenceSection
+            pillar={pillar}
+            isRecurring={isRecurring}
+            setIsRecurring={setIsRecurring}
+            frequency={frequency}
+            setFrequency={setFrequency}
+            dayOfWeek={dayOfWeek}
+            setDayOfWeek={setDayOfWeek}
+            dayOfMonth={dayOfMonth}
+            setDayOfMonth={setDayOfMonth}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            autoCharge={autoCharge}
+            setAutoCharge={setAutoCharge}
+          />
 
           {/* Submit Button */}
           <button

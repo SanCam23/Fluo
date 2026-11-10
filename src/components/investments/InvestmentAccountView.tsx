@@ -203,40 +203,29 @@ export const InvestmentAccountView: React.FC<InvestmentAccountViewProps> = ({
       {/* ══════════════════════════════════════════════════════════════════
           2. NAVEGACIÓN POR SUBPESTAÑAS (INVERSIONES VS MOVIMIENTOS)
           ══════════════════════════════════════════════════════════════════ */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.06] light:bg-slate-200/80 border border-white/10 light:border-slate-300 w-full sm:w-auto overflow-x-auto scrollbar-none">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('holdings')}
-            className={`flex-1 sm:flex-initial min-w-max flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'holdings'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white light:text-slate-600'
-            }`}
-          >
-            Inversiones ({summary.assetsCount})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('activity')}
-            className={`flex-1 sm:flex-initial min-w-max flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'activity'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white light:text-slate-600'
-            }`}
-          >
-            Movimientos ({sourceTransactions.length})
-          </button>
-        </div>
+      <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.06] light:bg-slate-200/80 border border-white/10 light:border-slate-300 w-full sm:w-auto overflow-x-auto scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('holdings')}
+          className={`flex-1 sm:flex-initial min-w-max flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'holdings'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white light:text-slate-600'
+          }`}
+        >
+          Inversiones ({summary.assetsCount})
+        </button>
 
         <button
           type="button"
-          onClick={onOpenAddModal}
-          className="flex sm:hidden items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white shadow-md cursor-pointer"
-          title="Nueva Operación"
+          onClick={() => setActiveSubTab('activity')}
+          className={`flex-1 sm:flex-initial min-w-max flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'activity'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white light:text-slate-600'
+          }`}
         >
-          <Plus className="h-4 w-4 stroke-[2.5]" />
+          Movimientos ({sourceTransactions.length})
         </button>
       </div>
 
@@ -315,17 +304,18 @@ export const InvestmentAccountView: React.FC<InvestmentAccountViewProps> = ({
                           {formatCurrency(currentValue, asset.currency)}
                         </span>
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mt-1 border ${
+                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full mt-1 border flex-wrap justify-end ${
                             isProfit
                               ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                               : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                           }`}
                         >
-                          {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          <span>
-                            {isProfit ? '+' : ''}
-                            {formatCurrency(pnl, asset.currency)} ({isProfit ? '+' : ''}
-                            {formatPercentage(pnlPercentage)})
+                          {isProfit ? <TrendingUp className="h-3 w-3 shrink-0" /> : <TrendingDown className="h-3 w-3 shrink-0" />}
+                          <span className="whitespace-nowrap">
+                            {isProfit ? '+' : ''}{formatCurrency(pnl, asset.currency)}
+                          </span>
+                          <span className="text-[10px] font-medium whitespace-nowrap">
+                            ({formatPercentage(pnlPercentage)})
                           </span>
                         </span>
                       </div>

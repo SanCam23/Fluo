@@ -620,3 +620,52 @@ Para erradicar por completo truncados antiestéticos con puntos suspensivos (*"A
 - **Ganancia Neta Acumulada**:
   - Los gráficos obtienen más de 30px horizontales extra en pantallas móviles (~10-12% de incremento de superficie trazable), permitiendo curvas más suaves, mayor separación entre nodos de datos y una lectura notablemente más espaciosa sin recortes.
 
+### 31.11. Tooltip Reutilizable de Cristal Líquido (`GlassTooltip.tsx`)
+- **Especificación Visual**:
+  - Contenedor flotante de ultra alta fidelidad: `rounded-2xl bg-[#0F1626]/95 light:bg-white/95 border border-white/20 light:border-slate-300/80 p-3 shadow-2xl backdrop-blur-2xl text-xs flex flex-col gap-1.5 z-50 pointer-events-none`.
+  - Tipografía semántica: etiqueta superior en negrita `text-slate-300 light:text-slate-800`, indicador de color circular `h-2 w-2 rounded-full`, valor numérico principal en blanco brillante `text-white light:text-slate-900`.
+  - Totalmente desacoplado de las vistas para uso universal en cualquier gráfico Recharts de la aplicación.
+
+### 31.12. Gestos Táctiles con Resistencia Elástica (`useSwipeGesture.ts`)
+- **Cinemática de Interacción Móvil**:
+  - Deslizamiento táctil con bloqueo angular horizontal (`Math.abs(diffX) > Math.abs(diffY)` tras superar 6px de movimiento).
+  - Resistencia elástica tipo iOS (*rubber-banding*): desplazamiento lineal directo hasta `maxDistance` (100–110px), seguido de amortiguación logarítmica con factor `0.35` más allá del umbral.
+  - Indicadores visuales bajo relieve:
+    - Deslizamiento a la derecha: Fondo índigo translúcido (`bg-indigo-600/90 text-white backdrop-blur-xl`) revelando el botón *"Editar"*.
+    - Deslizamiento a la izquierda: Fondo rojo coral (`bg-rose-600/90 text-white backdrop-blur-xl`) para *"Eliminar"* o esmeralda (`bg-emerald-600`) para *"Retirar fondos"*.
+  - Disparo de acción en umbral seguro de 80px en el evento `onTouchEnd`, retornando suavemente a posición neutra con curva cúbica `cubic-bezier(0.16, 1, 0.3, 1)`.
+
+### 31.13. Sub-formularios Modulares Liquid Glass (`src/components/forms/transaction/`)
+- **Tarjeta de Flujo de Traspaso (`TransferFlowCard.tsx`)**:
+  - Representación visual del flujo entre cuentas de origen y destino con botón central de inversión rápida (`ArrowLeftRight`), badges de color y drawer desplegable in-situ para selección inmediata sin cambiar de pantalla.
+- **Sección de Recurrencia Granular (`RecurrenceSection.tsx`)**:
+  - Switch interactivo iOS, segmented control de periodicidad (semanal, quincenal, mensual, anual), selectores de día de semana/mes, límite de finalización y conmutador de auto-registro en fecha.
+- **Campos de Inversión & Cotización en Vivo (`InvestmentFormFields.tsx`)**:
+  - Buscador predictivo con dropdown flotante (`bg-[#0E1526]/95 backdrop-blur-2xl border border-white/15`), selector dual de entrada (Total € vs Títulos), recálculo reactivo instantáneo y selector de broker.
+
+### 31.14. Tarjetas Modulares de Analítica y Estadísticas (`src/components/analytics/`)
+- **Tarjeta de Ahorro y Evolución Interactiva (`SavingsEvolutionCard.tsx`)**:
+  - Encapsula el gráfico de área Recharts con selector integrado de modo ("Ahorro Neto" vs "Ahorro Acumulado").
+  - Mantiene el sustrato `bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/10`, gradientes semánticos esmeralda/coral y tooltips vítreos contextuales.
+- **Tarjeta de Distribución por Categorías (`CategoryDistributionCard.tsx`)**:
+  - Gráfico Donut de Recharts con leyenda interactiva, badges porcentuales y lista expandible de categorías filtradas.
+- **Tarjeta de Flujo de Caja Comparativo (`CashFlowComparisonCard.tsx`)**:
+  - Gráfico de barras agrupadas con gradientes de columnas (Ingresos vs Gastos) y formateo de ejes optimizado.
+- **Tarjeta de Evolución del Patrimonio Neto (`NetWorthEvolutionCard.tsx`)**:
+  - Gráfico de área ascendente de patrimonio consolidado con línea guía y formateo monetario compacto.
+- **Tarjeta de Ranking de Comercios (`BrandRankingCard.tsx`)**:
+  - Lista de los 5 comercios principales con avatar CDN vectorial (`SourceAvatar`), barra de progreso porcentual y totalización mensual.
+
+### 31.15. Contenido Modular de Cuentas y Fuentes (`SourceCardContent.tsx`)
+- Desacoplamiento del contenido de tarjetas individuales de cuentas bancarias, billeteras de efectivo y cuentas de broker/inversión.
+- Unifica el renderizado de cabecera con avatar institucional, saldo principal de gran impacto (`text-4xl font-extrabold`) con soporte para ocultamiento (`showBalance`), y submétricas automáticas (número de movimientos y balance inicial para cuentas estándar, o capital invertido, efectivo remanente y P&L no realizado para brokers).
+
+### 31.16. Ergonomía Responsiva en Métricas de Rentabilidad (`AssetCard.tsx`)
+- En grids de 3 columnas (`Precio medio`, `Actual`, `Rentabilidad`), la celda de rentabilidad agrupa tanto el valor monetario (`+120,45 €`) como el porcentaje relativo (`(+8,25%)`).
+- Para evitar que la cifra de porcentaje se corte por la derecha en móviles estrechos (<640px), la celda adopta disposición vertical adaptativa (`flex flex-col items-end sm:flex-row sm:items-center sm:justify-end sm:gap-1`) con `whitespace-nowrap`, alineando a la derecha tanto la ganancia/pérdida como el porcentaje en líneas independientes y asegurando un 100% de visibilidad sin desbordamientos.
+
+
+
+
+
+

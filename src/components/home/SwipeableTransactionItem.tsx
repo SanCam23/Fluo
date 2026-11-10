@@ -1,4 +1,5 @@
-import { useState, useRef, memo } from 'react';
+import { useState, memo } from 'react';
+import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { Trash2, Repeat, Pencil } from 'lucide-react';
 import type { Transaction, Category, Brand } from '../../types/finance';
 import { BrandAvatar } from '../common/BrandAvatar';
@@ -20,14 +21,7 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
   onDelete,
   onEdit,
 }) => {
-  const [offsetX, setOffsetX] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const isHorizontal = useRef<boolean | null>(null);
-  const currentOffset = useRef(0);
 
   const isIncome = tx.pillar === 'income';
   const isInvest = tx.pillar === 'invest';
@@ -39,66 +33,23 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
     }, 280);
   };
 
-  // Touch handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isDeleting) return;
-    const touch = e.touches[0];
-    startX.current = touch.clientX;
-    startY.current = touch.clientY;
-    isHorizontal.current = null;
-    currentOffset.current = 0;
-    setIsSwiping(true);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isDeleting) return;
-    const touch = e.touches[0];
-    const diffX = touch.clientX - startX.current;
-    const diffY = touch.clientY - startY.current;
-
-    // Detect gesture direction on first significant movement
-    if (isHorizontal.current === null) {
-      if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
-        isHorizontal.current = Math.abs(diffX) > Math.abs(diffY);
-      }
-    }
-
-    if (isHorizontal.current) {
-      // Swiping to the left (Delete) or right (Edit) with elastic resistance past thresholds
-      if (diffX < 0) {
-        const clamped = diffX < -100 ? -100 + (diffX + 100) * 0.35 : diffX;
-        currentOffset.current = clamped;
-        setOffsetX(clamped);
-      } else {
-        const clamped = diffX > 100 ? 100 + (diffX - 100) * 0.35 : diffX;
-        currentOffset.current = clamped;
-        setOffsetX(clamped);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (isDeleting) return;
-    setIsSwiping(false);
-    if (currentOffset.current <= -80) {
-      triggerDelete();
-    } else if (currentOffset.current >= 80) {
-      setOffsetX(0);
-      currentOffset.current = 0;
-      onEdit?.(tx);
-    } else {
-      setOffsetX(0);
-      currentOffset.current = 0;
-    }
-    isHorizontal.current = null;
-  };
+  const {
+    offsetX,
+    isSwiping,
+    isPastLeftThreshold: isPastDeleteThreshold,
+    isPastRightThreshold: isPastEditThreshold,
+    touchHandlers,
+  } = useSwipeGesture({
+    threshold: 80,
+    maxDistance: 100,
+    disabled: isDeleting,
+    onSwipeLeft: triggerDelete,
+    onSwipeRight: () => onEdit?.(tx),
+  });
 
   const handleMouseLeave = () => {
     // No-op: mouse-drag swipe disabled. Actions accessible via hover buttons.
   };
-
-  const isPastDeleteThreshold = offsetX <= -80;
-  const isPastEditThreshold = offsetX >= 80;
 
   return (
     <div
@@ -153,10 +104,8 @@ export const SwipeableTransactionItem: React.FC<SwipeableTransactionItemProps> =
 
       {/* Foreground card that slides */}
       <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        {...touchHandlers}
+        onTouchCancel={touchHandlers.onTouchEnd}
         onClick={() => {
           if (!isSwiping && Math.abs(offsetX) < 5) {
             onEdit?.(tx);
