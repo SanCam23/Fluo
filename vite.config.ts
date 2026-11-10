@@ -112,9 +112,8 @@ function quoteDevProxyPlugin(): PluginOption {
           }
 
           if (!cRes.ok) {
-            res.statusCode = 502;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: `Upstream error ${cRes.status}` }));
+            res.end(JSON.stringify({ error: `Upstream error ${cRes.status}`, price: null, symbol: rawSymbol }));
             return;
           }
 
@@ -128,6 +127,12 @@ function quoteDevProxyPlugin(): PluginOption {
               const valid = closeList.filter((p: unknown) => typeof p === 'number' && !isNaN(p as number) && (p as number) > 0);
               if (valid.length > 0) price = valid[valid.length - 1] as number;
             }
+          }
+
+          if (isNaN(price) || price <= 0) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Could not extract valid price', price: null, symbol: rawSymbol }));
+            return;
           }
 
           const prevClose = Number(meta?.previousClose || meta?.chartPreviousClose);

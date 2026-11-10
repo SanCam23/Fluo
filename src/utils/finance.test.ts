@@ -5,6 +5,9 @@ import {
   computeSourceBalance,
   computeFinancialSummary,
   getTransactionsForAsset,
+  computeAssetProgressionSeries,
+  getAssetProgressionColor,
+  isInvestmentSource,
 } from './finance';
 import type { Transaction, SourceAccount, InvestmentAsset } from '../types/finance';
 
@@ -387,5 +390,166 @@ describe('Historial de Aportaciones por Activo (getTransactionsForAsset)', () =>
     expect(result[0].id).toBe('tx-4'); // 15 Feb (más reciente)
     expect(result[1].id).toBe('tx-3'); // 10 Feb
     expect(result[2].id).toBe('tx-1'); // 10 Ene
+  });
+});
+
+describe('Progresión por Activo y Líneas de Inversión (computeAssetProgressionSeries)', () => {
+  const sampleAssets: InvestmentAsset[] = [
+    {
+      id: 'asset-sp500',
+      name: 'Vanguard S&P 500 ETF',
+      identifier: 'IE0032126645',
+      isin: 'IE0032126645',
+      assetType: 'etf',
+      shares: 10,
+      averageBuyPrice: 80,
+      currentPrice: 84.74,
+      currency: 'EUR',
+      lastUpdated: '2026-10-31',
+      platform: 'MyInvestor',
+    },
+    {
+      id: 'asset-btc',
+      name: 'Bitcoin',
+      identifier: 'BTC',
+      ticker: 'BTC',
+      assetType: 'crypto',
+      shares: 0.05,
+      averageBuyPrice: 60000,
+      currentPrice: 68000,
+      currency: 'EUR',
+      lastUpdated: '2026-10-31',
+      platform: 'Binance',
+    },
+  ];
+
+  const sampleTransactions: Transaction[] = [
+    {
+      id: 'tx-inv-1',
+      amount: 400,
+      pillar: 'invest',
+      categoryId: 'cat-invest',
+      concept: 'Compra Vanguard S&P 500 ETF',
+      shares: 5,
+      unitPrice: 80,
+      date: '2026-08-10T10:00:00.000Z',
+      createdAt: 1,
+    },
+    {
+      id: 'tx-inv-2',
+      amount: 400,
+      pillar: 'invest',
+      categoryId: 'cat-invest',
+      concept: 'Aportación Vanguard S&P 500 ETF',
+      shares: 5,
+      unitPrice: 80,
+      date: '2026-09-15T10:00:00.000Z',
+      createdAt: 2,
+    },
+    {
+      id: 'tx-inv-3',
+      amount: 3000,
+      pillar: 'invest',
+      categoryId: 'cat-invest',
+      concept: 'Compra Bitcoin',
+      shares: 0.05,
+      unitPrice: 60000,
+      date: '2026-07-20T10:00:00.000Z',
+      createdAt: 3,
+    },
+  ];
+
+  const fixedRefDate = new Date(2026, 9, 31); // 31 Oct 2026
+
+  it('devuelve series y metadatos vacíos si no hay activos', () => {
+    const res = computeAssetProgressionSeries([], []);
+    expect(res.series).toEqual([]);
+    expect(res.assetsMeta).toEqual([]);
+  });
+
+  it('genera metadatos de activos con valoración actual y rentabilidad precisa', () => {
+    const res = computeAssetProgressionSeries(sampleAssets, sampleTransactions, 6, fixedRefDate);
+
+    expect(res.assetsMeta.length).toBe(2);
+
+    const sp500Meta = res.assetsMeta.find((m) => m.id === 'asset-sp500')!;
+    expect(sp500Meta.currentValue).toBe(847.40); // 10 * 84.74
+    expect(sp500Meta.investedCost).toBe(800.00); // 10 * 80
+    expect(sp500Meta.unrealizedPnL).toBe(47.40);
+    expect(sp500Meta.unrealizedPnLPercentage).toBeCloseTo(5.93, 1);
+    expect(sp500Meta.color).toBe('#6366F1'); // Indigo
+
+    const btcMeta = res.assetsMeta.find((m) => m.id === 'asset-btc')!;
+    expect(btcMeta.currentValue).toBe(3400.00); // 0.05 * 68000
+    expect(btcMeta.investedCost).toBe(3000.00); // 0.05 * 60000
+    expect(btcMeta.unrealizedPnL).toBe(400.00);
+    expect(btcMeta.color).toBe('#F59E0B'); // Bitcoin Gold
+  });
+
+  it('genera cubos cronológicos mensuales con el valor exacto actual en el mes en curso', () => {
+    const res = computeAssetProgressionSeries(sampleAssets, sampleTransactions, 6, fixedRefDate);
+
+    // 6 meses
+    expect(res.series.length).toBe(6);
+
+    const latestPoint = res.series[res.series.length - 1];
+    expect(latestPoint.date).toBe('2026-10');
+    expect(latestPoint.asset_asset_sp500).toBe(847.40);
+    expect(latestPoint.asset_asset_btc).toBe(3400.00);
+    expect(latestPoint.totalValue).toBeCloseTo(847.40 + 3400.00, 2);
+    expect(latestPoint.totalCost).toBeCloseTo(800.00 + 3000.00, 2);
+  });
+
+  it('asigna colores icónicos y consistentes a activos clave como Bitcoin y ETFs', () => {
+    expect(getAssetProgressionColor(sampleAssets[1], 1)).toBe('#F59E0B');
+  });
+});
+
+describe('Identificación de Cuentas de Inversión y Exclusión de Efectivo (isInvestmentSource)', () => {
+  it('identifica correctamente cuentas de broker o inversión', () => {
+    const brokerSource: SourceAccount = {
+      id: 'src-myinv',
+      name: 'MyInvestor Cartera',
+      type: 'investment',
+      institution: 'MyInvestor',
+      orderIndex: 0,
+      createdAt: '2026-01-01',
+    };
+    expect(isInvestmentSource(brokerSource)).toBe(true);
+  });
+
+  it('excluye estrictamente las cuentas de efectivo para no mezclar inversiones', () => {
+    const cashSource: SourceAccount = {
+      id: 'src-cash',
+      name: 'Billetera Efectivo',
+      type: 'cash',
+      institution: 'Efectivo',
+      orderIndex: 1,
+      createdAt: '2026-01-01',
+    };
+    expect(isInvestmentSource(cashSource)).toBe(false);
+
+    // Incluso si un usuario nombra su efectivo con la palabra "inversión"
+    const trickyCashSource: SourceAccount = {
+      id: 'src-cash-2',
+      name: 'Efectivo para inversión',
+      type: 'cash',
+      institution: 'Efectivo',
+      orderIndex: 2,
+      createdAt: '2026-01-01',
+    };
+    expect(isInvestmentSource(trickyCashSource)).toBe(false);
+  });
+
+  it('retorna false para cuentas bancarias corrientes estándar', () => {
+    const bankSource: SourceAccount = {
+      id: 'src-bbva',
+      name: 'Nómina BBVA',
+      type: 'bank',
+      institution: 'BBVA',
+      orderIndex: 0,
+      createdAt: '2026-01-01',
+    };
+    expect(isInvestmentSource(bankSource)).toBe(false);
   });
 });

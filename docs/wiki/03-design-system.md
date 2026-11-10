@@ -505,3 +505,118 @@ Para evitar interferencias visuales y conflictos de apilamiento entre modales de
   - Todos los modales interactivos (`QuickAddTransactionModal`, `EditAssetModal`, `WithdrawInvestmentModal`, etc.) transportan su árbol al nivel raíz del DOM con `createPortal(modalContent, document.body)`.
   - Capa de telón de fondo (`backdrop`) con `z-[100] bg-black/80 backdrop-blur-md lg:backdrop-blur-3xl`, que atenúa y cubre visualmente la barra de navegación (`z-50`).
   - Margen inferior ergonómico (`pb-6 sm:pb-2`) en el contenedor del formulario para evitar que el botón de confirmación quede pegado al borde del dispositivo o bloqueado por barras del navegador móvil.
+
+
+---
+
+## 31. Vista Especializada de Cuentas Broker & Inversión (`InvestmentAccountView`)
+
+El componente `InvestmentAccountView.tsx` traslada la experiencia de brokers de vanguardia (MyInvestor, Trade Republic, Scalable) al sistema de diseño Liquid Glass:
+
+### 31.1. Tarjeta Maestra de Desglose Patrimonial
+- **Cabecera**: Avatar de la entidad (`SourceAvatar`), nombre de la cuenta y badge de alta jerarquía `Broker & Inversión` con orbe pulsante índigo (`bg-indigo-400`).
+- **Métricas Cuádruples**:
+  1. *Patrimonio en Cuenta*: Tipografía extrabold con total consolidado (Efectivo + Cartera).
+  2. *Capital Invertido*: Desembolso total en coste de adquisición.
+  3. *Cuánto está dando*: Indicador semántico de rentabilidad con glifo dinámico `TrendingUp` o `TrendingDown` y color esmeralda (`text-emerald-400`) o coral (`text-rose-400`).
+  4. *Efectivo Disponible*: Liquidez líquida no invertida lista para operar.
+- **Barra de Distribución de Activos**: Carril vítreo con gradiente índigo-violeta para activos invertidos y esmeralda-turquesa para liquidez, con porcentajes dinámicos calibrados al 100%.
+
+### 31.2. Selector de Pestañas Integrado
+- Conmutador táctil `[ Mis Inversiones (N) ]` y `[ Traspasos y Movimientos (M) ]` con cápsulas Liquid Glass reactivas.
+
+### 31.3. Tarjetas de Posición y Desglose de Aportaciones al Índice
+- Cada activo asociado despliega su tarjeta Liquid Glass con ticker, títulos en custodia, cotización viva, valor total y rendimiento en euros y porcentaje.
+- Al hacer clic en la posición o en el chevron indicador, despliega un cajón acordeón con el **historial de aportaciones realizadas a ese índice en dicha cuenta**, permitiendo visualizar y editar cada entrada con un solo toque.
+
+### 31.4. Módulo de Analítica Especializada de Inversiones (`InvestmentAnalyticsView`)
+El componente `InvestmentAnalyticsView.tsx` aplica el lenguaje Liquid Glass a las estadísticas de carteras de inversión:
+- **Master Hero Card de Rendimiento**:
+  - Sustrato `bg-gradient-to-br from-indigo-500/10 via-white/[0.04] to-emerald-500/10 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 shadow-2xl`.
+  - Muestra en posición estelar el badge *"Cuánto está dando"* con glifos vectoriales dinámicos `TrendingUp` / `TrendingDown`, colores semánticos (`text-emerald-400` / `text-rose-400`) y halo translúcido.
+  - Submétricas de Liquidez, Capital Invertido y Aportaciones del periodo en pastillas vítreas `bg-white/[0.04] rounded-2xl p-3 border border-white/5`.
+- **Selector Segmentado de 4 Vistas**:
+  - Cápsula horizontal `flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl`.
+  - Pestañas con glifo Lucide y rótulo responsive:
+    - *Distribución* (`PieChart`)
+    - *Posiciones* (`Layers`)
+    - *Flujo Mensual* (`BarChart3`)
+    - *Evolución* (`TrendingUp`)
+  - Estado activo con lente elevada `bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 shadow-[0_2px_10px_rgba(99,102,241,0.2)]`.
+- **Paleta Cromática de Clases de Activo (`ASSET_TYPE_CONFIG`)**:
+  - `ETF`: `#6366F1` (Índigo neón)
+  - `Fondo Indexado`: `#8B5CF6` (Violeta)
+  - `Acción`: `#3B82F6` (Azul eléctrico)
+  - `Criptomoneda`: `#F59E0B` (Ámbar)
+  - `Renta Fija`: `#10B981` (Esmeralda)
+  - `Depósito`: `#14B8A6` (Cerceta)
+  - `Efectivo / Liquidez`: `#06B6D4` (Cian brillante)
+- **Tarjeta de Diagnóstico de Salud y Liquidez**:
+  - Contenedor con brillo tenue `bg-indigo-500/5 border border-indigo-500/15 rounded-2xl p-4`.
+  - Evalúa *Cash Drag* frente a *Despliegue de Capital* mediante un medidor visual horizontal continuo y recomendaciones cuantitativas.
+
+### 31.5. Componente Visual de Progresión Multi-Línea (`AssetProgressionLineChart`)
+Traslada la experiencia de terminales financieras profesionales (Google Finance, TradingView) al lenguaje estético Liquid Glass:
+- **Sustrato y Relieve Vítreo**:
+  - Contenedor `bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]`.
+  - Destello cenital especular: `pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent`.
+- **Líneas Recharts Dinámicas**:
+  - Curvas spline suaves `type="monotone"` con grosor óptico calibrado `strokeWidth={2.4}`.
+  - Puntos de anclaje con bisel exterior translúcido `dot={{ r: 2.5 }}` y `activeDot={{ r: 5.5, stroke: '#fff', strokeWidth: 1.5 }}`.
+  - Trazado vectorial independiente para cada activo activo, eliminando saturación visual mediante el selector de visibilidad.
+- **Paleta Cromática de Progresión (`ASSET_PROGRESSION_PALETTE`)**:
+  - Identidad garantizada: Bitcoin (`#F59E0B` Dorado), Ethereum (`#8B5CF6` Violeta neón), ETFs bursátiles principales (`#6366F1` Índigo).
+  - Rotación armónica en 12 tonalidades contrastadas para carteras multiactivo.
+- **Píldoras Interactivas de Control Táctil**:
+  - Cada activo cuenta con una cápsula vítrea que indica su punto cromático, nombre, ticker, valoración en euros y badge de P&L.
+  - Al pulsar sobre la cápsula: conmuta la visibilidad de su línea (activa/inactiva con atenuación óptica a `opacity-40`).
+  - Botón de ojo (`Eye`): aísla esa posición para inspeccionar su línea de forma individual sin interferencia de otros activos.
+- **Tooltip Vítreo de Precisión (`AssetProgressionTooltip`)**:
+  - `rounded-2xl bg-[#0F1626]/95 light:bg-white/95 border border-white/20 p-3.5 shadow-2xl backdrop-blur-2xl`.
+  - Ordena automáticamente las posiciones de mayor a menor valor en ese punto temporal y desglosa el sumatorio total en la cabecera.
+
+### 31.6. Calibración Ergonómica de Barras Segmentadas y Pestañas Tipográficas
+Para erradicar por completo truncados antiestéticos con puntos suspensivos (*"Aho...", "Cat...", "Me..."*) y amontonamiento en móviles:
+- **Supresión de Iconos Redundantes**:
+  - Los selectores de estadísticas adoptan un diseño puramente tipográfico estilo Apple Segmented Control. Al prescindir de glifos vectoriales que consumían ~20px por pestaña, cada rótulo dispone del 100% de su espacio natural.
+- **Nombres Completos Garantizados (Sin Truncar)**:
+  - Se eliminan las clases `truncate` y `min-w-0` forzadas.
+  - Regla CSS estricta: `min-w-max whitespace-nowrap` en cada botón. Ninguna palabra es recortada con puntos suspensivos ("Ahorro", "Categorías", "Mensual", "Patrimonio", "Activos", "Distribución", "Posiciones", "Flujos", "Evolución").
+- **Amplitud y Desplazamiento Fluido en Pantallas Estrechas**:
+  - Contenedor con `overflow-x-auto scrollbar-none` y `gap-1 p-1`.
+  - En smartphones de ancho estándar (≥390px), las pestañas se distribuyen equitativamente (`flex-1`). En dispositivos más estrechos (<380px), el contenedor permite un deslizamiento táctil horizontal sin deformar las palabras.
+
+### 31.7. Contextualización Visual de Cuentas de Efectivo en Estadísticas
+- **Ocultación Dinámica de Módulos Bursátiles**:
+  - Al inspeccionar una cuenta de efectivo (`activeSource.type === 'cash'`), la pestaña *"Activos"* se retira de la barra segmentada móvil (`lg:hidden`).
+  - El gráfico inferior a ancho completo `<AssetProgressionLineChart />` queda condicionado por `!isCashAccount`, evitando ruido visual con ETFs o criptomonedas ajenos al efectivo físico.
+- **Transformación de Tarjeta de Evolución**:
+  - La tarjeta de patrimonio adapta su titular a *"Evolución de Saldo en Efectivo"* y subtítulo a *"Saldo acumulado disponible en efectivo"*, mientras que el selector móvil muestra la píldora concisa *"Saldo"* en lugar de *"Patrimonio"*.
+
+### 31.8. Calibración Óptica de Márgenes de Eje Y en Gráficos Móviles (`formatAxisCurrency`)
+- **Erradicación de Recortes Laterales (Clipping por `overflow-hidden`)**:
+  - Anteriormente, márgenes negativos como `margin={{ left: -20 }}` desplazaban las etiquetas del eje Y fuera del lienzo SVG, provocando que la tarjeta vítrea recortara el primer dígito en pantallas de smartphone estrechas (ej. *"63,9 mil €"* se leía truncado).
+  - Se calibró `margin={{ top: 10, right: 10, left: 4, bottom: 0 }}` junto a `width={48}` y `tickMargin={4}` en `<YAxis />`, garantizando un colchón interior de 10-20px que impide cualquier recorte perimetral.
+- **Formateador Compacto Especializado para Ejes (`formatAxisCurrency`)**:
+  - Sustituye la notación extendida de `Intl` (`"mil €"`, 10 caracteres) por un estándar financiero conciso europeo (`"k€"` y `"M€"`, 4-5 caracteres: `500€`, `1,2k€`, `64k€`, `125k€`, `1M€`).
+  - Reduce el ancho requerido por número en más del 55%, liberando espacio horizontal para las curvas de datos sin sacrificar legibilidad.
+
+### 31.9. Erradicación del Warning de Dimensiones en Recharts (`width(0) and height(0)`)
+- **Causa Raíz de Recharts en Contenedores Ocultos**:
+  - Cuando Recharts (`ResponsiveContainer`) se monta dentro de un elemento con `display: none` (`hidden` en Tailwind), `ResizeObserver` registra dimensiones de $0 \times 0$ píxeles y emite una advertencia en la consola del navegador.
+- **Renderizado Reactivo Condicional con Hook `useMediaQuery`**:
+  - Se sustituyó la ocultación visual pasiva por CSS (`hidden lg:flex` y `lg:hidden`) por renderizado condicional desacoplado (`!isDesktop ? <MobileCharts /> : <DesktopCharts />`) gobernado por `useMediaQuery('(min-width: 1024px)')`.
+  - Los gráficos de escritorio no se montan en el DOM si el usuario está en móvil, y viceversa, erradicando por completo el cálculo de contenedores con dimensiones cero y optimizando el rendimiento de renderizado en smartphones.
+  - Se añadió la propiedad `minWidth={0}` a todos los componentes `<ResponsiveContainer />` para prevenir problemas de desbordamiento en contenedores flex/grid.
+
+### 31.10. Calibración de Anchura Máxima y Canvas Horizontal en Gráficos Móviles
+- **Optimización de Padding en Tarjetas Contenedoras**:
+  - Para maximizar el ancho disponible del gráfico en pantallas de smartphone sin comprimir los elementos visuales, se sustituyó el padding uniforme `p-5` (20px por lado) por un padding asimétrico responsivo `px-3.5 sm:px-5 py-4 sm:py-5` en [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx) y [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx) (y `px-3 sm:px-5` en [`AssetProgressionLineChart.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AssetProgressionLineChart.tsx)).
+  - Esta reducción controlada gana instantáneamente entre 10px y 14px de anchura neta para el lienzo SVG.
+- **Ajuste de Márgenes SVG de Recharts**:
+  - Márgenes horizontales del gráfico reducidos a `margin={{ top: 10, right: 4, left: 0, bottom: 0 }}` (antes `right: 10, left: 4`).
+- **Compactación del Eje Y**:
+  - Gracias al formateador compacto `formatAxisCurrency` (que requiere típicamente solo 24-28px para cifras como `64k€` o `1,2k€`), el ancho reservado para el eje vertical se redujo de `width={48}` a `width={38} tickMargin={2}`.
+- **Ganancia Neta Acumulada**:
+  - Los gráficos obtienen más de 30px horizontales extra en pantallas móviles (~10-12% de incremento de superficie trazable), permitiendo curvas más suaves, mayor separación entre nodos de datos y una lectura notablemente más espaciosa sin recortes.
+

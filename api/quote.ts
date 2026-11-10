@@ -187,7 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleChartResult(fbData, fallbackSymbol, res);
       }
     }
-    return res.status(502).json({ error: `Could not fetch quote for ${rawSymbol}` });
+    return res.status(200).json({ error: `Could not fetch quote for ${rawSymbol}`, price: null, symbol: rawSymbol });
   }
 
   return handleChartResult(chartData, targetSymbol, res);
@@ -196,7 +196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 function handleChartResult(data: any, symbol: string, res: VercelResponse) {
   const result = data?.chart?.result?.[0];
   if (!result) {
-    return res.status(502).json({ error: 'No chart data returned by Yahoo' });
+    return res.status(200).json({ error: 'No chart data returned by Yahoo', price: null, symbol });
   }
 
   const meta = result.meta;
@@ -212,7 +212,7 @@ function handleChartResult(data: any, symbol: string, res: VercelResponse) {
   }
 
   if (isNaN(price) || price <= 0) {
-    return res.status(502).json({ error: 'Could not extract valid price' });
+    return res.status(200).json({ error: 'Could not extract valid price', price: null, symbol });
   }
 
   const prevClose = Number(meta.previousClose || meta.chartPreviousClose);

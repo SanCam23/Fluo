@@ -1,11 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
   Layers,
   ArrowUpRight,
   ArrowDownRight,
-  PieChart as PieIcon,
   BarChart3,
   Flame,
   PiggyBank,
@@ -29,13 +28,17 @@ import {
 } from 'recharts';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { TimeRangeFilter } from '../../types/finance';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { BrandAvatar } from '../common/BrandAvatar';
 import { SourceAvatar } from '../common/SourceAvatar';
-import { formatCurrency, formatCompactCurrency } from '../../utils/currency';
+import { InvestmentAnalyticsView } from './InvestmentAnalyticsView';
+import { AssetProgressionLineChart } from './AssetProgressionLineChart';
+import { formatCurrency, formatCompactCurrency, formatAxisCurrency } from '../../utils/currency';
 import {
   computeSavingsMetrics,
   generateSavingsEvolution,
   type SavingsEvolutionPoint,
+  isInvestmentSource,
 } from '../../utils/finance';
 
 interface CustomTooltipProps {
@@ -172,13 +175,24 @@ export const AnalyticsView: React.FC = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const [activeChartSection, setActiveChartSection] = useState<'savings' | 'categories' | 'comparison' | 'networth'>('savings');
+  const [activeChartSection, setActiveChartSection] = useState<'savings' | 'categories' | 'comparison' | 'networth' | 'assets'>('savings');
   const [savingsChartMode, setSavingsChartMode] = useState<'accumulated' | 'net'>('accumulated');
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const activeSource = useMemo(
     () => (activeSourceId ? getSourceById(activeSourceId) : null),
     [getSourceById, activeSourceId]
   );
+  const isInvestAccount = Boolean(activeSource && isInvestmentSource(activeSource));
+  const isCashAccount = Boolean(
+    activeSource && (activeSource.type === 'cash' || activeSource.institution?.toLowerCase() === 'efectivo')
+  );
+
+  useEffect(() => {
+    if (isCashAccount && activeChartSection === 'assets') {
+      setActiveChartSection('savings');
+    }
+  }, [isCashAccount, activeChartSection]);
 
   // Isolate transactions to selected source account or show global if null
   const sourceScopedTransactions = useMemo(() => {
@@ -515,7 +529,19 @@ export const AnalyticsView: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Selection Mode (Periodo vs Mes) & Options */}
+      {isInvestAccount && activeSource ? (
+        <InvestmentAnalyticsView
+          source={activeSource}
+          filterType={filterType}
+          setFilterType={setFilterType}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          timeRange={timeRange}
+          setTimeRange={setTimeRange}
+        />
+      ) : (
+        <>
+          {/* 1. Selection Mode (Periodo vs Mes) & Options */}
       <div className="flex items-center gap-2 w-full">
         {/* Toggle Mode Segmented Control */}
         <div className="inline-flex p-0.5 rounded-full bg-white/[0.06] light:bg-slate-200/80 border border-white/10 light:border-slate-300 flex-shrink-0">
@@ -780,7 +806,7 @@ export const AnalyticsView: React.FC = () => {
       {/* 3. Helper Renderers for Chart Sections */}
       {(() => {
         const renderSavingsChart = () => (
-          <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3 relative overflow-hidden transition-all duration-300">
+          <div className="rounded-3xl bg-slate-900/60 light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 px-3.5 sm:px-5 py-4 sm:py-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-3 relative overflow-hidden transition-all duration-300">
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
             {/* Ambient Glow */}
@@ -829,10 +855,10 @@ export const AnalyticsView: React.FC = () => {
 
             {/* Area Chart Container */}
             <div className="h-60 w-full pt-2 relative z-10">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart
                   data={savingsEvolutionData}
-                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                  margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
                 >
                   <defs>
                     <linearGradient id="savingsAreaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -860,7 +886,9 @@ export const AnalyticsView: React.FC = () => {
                     fontSize={9}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => formatCompactCurrency(v)}
+                    width={38}
+                    tickMargin={2}
+                    tickFormatter={(v) => formatAxisCurrency(v)}
                   />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
                   <Tooltip content={<SavingsCustomTooltip />} />
@@ -922,7 +950,7 @@ export const AnalyticsView: React.FC = () => {
               <>
                 {/* Donut Chart with Centered Total */}
                 <div className="relative h-60 w-full flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <PieChart>
                       <Tooltip content={<GlassTooltip />} />
                       <Pie
@@ -985,7 +1013,7 @@ export const AnalyticsView: React.FC = () => {
         );
 
         const renderComparisonChart = () => (
-          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
+          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 px-3.5 sm:px-5 py-4 sm:py-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
             <div className="flex items-center justify-between gap-2">
@@ -1007,10 +1035,10 @@ export const AnalyticsView: React.FC = () => {
             </div>
 
             <div className="h-64 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart
                   data={monthlyComparisonData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  margin={{ top: 10, right: 4, left: 0, bottom: 0 }}
                 >
                   <XAxis
                     dataKey="label"
@@ -1024,7 +1052,9 @@ export const AnalyticsView: React.FC = () => {
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
+                    width={38}
+                    tickMargin={2}
+                    tickFormatter={(v) => formatAxisCurrency(v)}
                   />
                   <Tooltip content={<GlassTooltip />} />
                   <Bar
@@ -1076,13 +1106,21 @@ export const AnalyticsView: React.FC = () => {
         );
 
         const renderNetWorthChart = () => (
-          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 p-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
+          <div className="rounded-3xl bg-white/[0.07] light:bg-white/85 backdrop-blur-2xl border border-white/15 light:border-slate-300/80 px-3.5 sm:px-5 py-4 sm:py-5 shadow-2xl light:shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex flex-col gap-4 relative overflow-hidden">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">Evolución de Patrimonio</h3>
-                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">Balance acumulado + Cartera de inversión</p>
+                <h3 className="text-sm font-bold text-white light:text-slate-900 truncate">
+                  {isCashAccount ? 'Evolución de Saldo en Efectivo' : 'Evolución de Patrimonio'}
+                </h3>
+                <p className="text-[11px] text-slate-400 light:text-slate-500 truncate">
+                  {isCashAccount
+                    ? 'Saldo acumulado disponible en efectivo'
+                    : activeSource
+                    ? `Evolución del saldo en ${activeSource.name}`
+                    : 'Balance acumulado + Cartera de inversión'}
+                </p>
               </div>
               <span className="text-xs font-bold text-indigo-400 light:text-indigo-700 bg-indigo-500/10 light:bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-500/20 light:border-indigo-200 flex-shrink-0 whitespace-nowrap">
                 {formatCurrency(netWorthData[netWorthData.length - 1]?.netWorth || 0)}
@@ -1090,10 +1128,10 @@ export const AnalyticsView: React.FC = () => {
             </div>
 
             <div className="h-64 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart
                   data={netWorthData}
-                  margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
+                  margin={{ top: 10, right: 4, left: 0, bottom: 0 }}
                 >
                   <defs>
                     <linearGradient id="gradientNetWorth" x1="0" y1="0" x2="0" y2="1">
@@ -1113,13 +1151,15 @@ export const AnalyticsView: React.FC = () => {
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`}
+                    width={38}
+                    tickMargin={2}
+                    tickFormatter={(v) => formatAxisCurrency(v)}
                   />
                   <Tooltip content={<GlassTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="netWorth"
-                    name="Patrimonio Neto"
+                    name={isCashAccount ? 'Saldo Efectivo' : 'Patrimonio Neto'}
                     stroke="#818CF8"
                     strokeWidth={2.5}
                     fillOpacity={1}
@@ -1131,85 +1171,114 @@ export const AnalyticsView: React.FC = () => {
           </div>
         );
 
+        const renderAssetProgressionChart = () => (
+          <AssetProgressionLineChart
+            assets={assets}
+            transactions={transactions}
+            title="Progresión de Inversiones (ETFs, Cripto, Acciones)"
+            subtitle="Evolución del dinero invertido y valor de mercado de cada activo en cartera"
+          />
+        );
+
         return (
           <>
-            {/* Section Switcher: Tipos de Visualización (Mobile only, <lg) */}
-            <div className="lg:hidden flex items-center gap-1 bg-white/[0.06] light:bg-slate-200/70 p-1 rounded-2xl border border-white/10 light:border-slate-300">
-              <button
-                type="button"
-                onClick={() => setActiveChartSection('savings')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeChartSection === 'savings'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                <PiggyBank className="h-3.5 w-3.5" />
-                <span>Ahorro</span>
-              </button>
+            {!isDesktop ? (
+              <>
+                {/* Section Switcher: Tipos de Visualización (Mobile only, <lg) */}
+                <div className="flex items-center gap-1 p-1 bg-white/[0.06] light:bg-slate-200/70 rounded-2xl border border-white/10 light:border-slate-300 overflow-x-auto scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartSection('savings')}
+                    className={`flex-1 min-w-max py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center whitespace-nowrap transition-all cursor-pointer ${
+                      activeChartSection === 'savings'
+                        ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                    }`}
+                  >
+                    Ahorro
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveChartSection('categories')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeChartSection === 'categories'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                <PieIcon className="h-3.5 w-3.5" />
-                <span>Categorías</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartSection('categories')}
+                    className={`flex-1 min-w-max py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center whitespace-nowrap transition-all cursor-pointer ${
+                      activeChartSection === 'categories'
+                        ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                    }`}
+                  >
+                    Categorías
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveChartSection('comparison')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeChartSection === 'comparison'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                <span>Mensual</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartSection('comparison')}
+                    className={`flex-1 min-w-max py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center whitespace-nowrap transition-all cursor-pointer ${
+                      activeChartSection === 'comparison'
+                        ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                    }`}
+                  >
+                    Mensual
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveChartSection('networth')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeChartSection === 'networth'
-                    ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>Patrimonio</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartSection('networth')}
+                    className={`flex-1 min-w-max py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center whitespace-nowrap transition-all cursor-pointer ${
+                      activeChartSection === 'networth'
+                        ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                    }`}
+                  >
+                    {isCashAccount ? 'Saldo' : 'Patrimonio'}
+                  </button>
 
-            {/* Mobile View: Single Tab (<lg) */}
-            <div className="lg:hidden flex flex-col gap-4">
-              {activeChartSection === 'savings' && renderSavingsChart()}
-              {activeChartSection === 'categories' && renderCategoriesChart()}
-              {activeChartSection === 'comparison' && renderComparisonChart()}
-              {activeChartSection === 'networth' && renderNetWorthChart()}
-            </div>
+                  {!isCashAccount && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveChartSection('assets')}
+                      className={`flex-1 min-w-max py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center whitespace-nowrap transition-all cursor-pointer ${
+                        activeChartSection === 'assets'
+                          ? 'bg-white/20 text-white shadow-sm font-bold light:bg-white light:text-indigo-600 light:shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900'
+                      }`}
+                    >
+                      Activos
+                    </button>
+                  )}
+                </div>
 
-            {/* Desktop View: All 4 charts in expansive 2x2 grid (≥lg) */}
-            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-6 items-start">
-              {/* Left Column */}
+                {/* Mobile View: Single Tab (<lg) */}
+                <div className="flex flex-col gap-4">
+                  {activeChartSection === 'savings' && renderSavingsChart()}
+                  {activeChartSection === 'categories' && renderCategoriesChart()}
+                  {activeChartSection === 'comparison' && renderComparisonChart()}
+                  {activeChartSection === 'networth' && renderNetWorthChart()}
+                  {activeChartSection === 'assets' && !isCashAccount && renderAssetProgressionChart()}
+                </div>
+              </>
+            ) : (
+              /* Desktop View: All 4 charts in expansive 2x2 grid + Full Width Asset Progression (≥lg) */
               <div className="flex flex-col gap-6">
-                {renderSavingsChart()}
-                {renderComparisonChart()}
-              </div>
+                <div className="grid grid-cols-2 gap-6 items-start">
+                  {/* Left Column */}
+                  <div className="flex flex-col gap-6">
+                    {renderSavingsChart()}
+                    {renderComparisonChart()}
+                  </div>
 
-              {/* Right Column */}
-              <div className="flex flex-col gap-6">
-                {renderCategoriesChart()}
-                {renderNetWorthChart()}
+                  {/* Right Column */}
+                  <div className="flex flex-col gap-6">
+                    {renderCategoriesChart()}
+                    {renderNetWorthChart()}
+                  </div>
+                </div>
+
+                {/* Full-width Multi-Line Progression Chart for each asset (excluded for cash accounts) */}
+                {!isCashAccount && renderAssetProgressionChart()}
               </div>
-            </div>
+            )}
           </>
         );
       })()}
@@ -1308,6 +1377,8 @@ export const AnalyticsView: React.FC = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

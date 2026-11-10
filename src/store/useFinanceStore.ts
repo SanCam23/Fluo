@@ -1231,7 +1231,9 @@ export const useFinanceStore = create<FinanceState>()(
         set({ isLiveUpdating: true });
         try {
           const state = get();
-          const queries = state.assets.map((a) => {
+          const queries = state.assets
+            .filter((a) => a.assetType !== 'deposit')
+            .map((a) => {
             const cleanIdent = a.identifier?.trim().toUpperCase() || '';
             const curatedMatch = CURATED_MARKET_ASSETS.find(
               (c) =>
@@ -1316,6 +1318,7 @@ export const useFinanceStore = create<FinanceState>()(
         const now = Date.now();
 
         const staleAssets = state.assets.filter((a) => {
+          if (a.assetType === 'deposit') return false;
           const ts = a.lastPriceUpdate || a.last_price_update;
           if (!ts) return true;
           const parsed = new Date(ts).getTime();

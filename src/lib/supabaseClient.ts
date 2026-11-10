@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Transaction, InvestmentAsset, PillarType, AssetType, SourceAccount, SourceType } from '../types/finance';
+import { isInvestmentSource } from '../utils/finance';
 
 // ==============================================================================
 // Database Schema Interfaces matching exact Supabase PostgreSQL tables
@@ -297,11 +298,22 @@ export function mapAssetToDbInvestment(asset: InvestmentAsset, userId: string): 
  * Maps a row from `public.source_accounts` to the frontend `SourceAccount` type.
  */
 export function mapDbSourceAccountToSource(row: DbSourceAccount): SourceAccount {
+  const isInvest =
+    row.type === ('investment' as any) ||
+    isInvestmentSource({
+      id: row.id,
+      name: row.name,
+      institution: row.institution || undefined,
+      type: row.type,
+      orderIndex: 0,
+      createdAt: '',
+    });
+
   return {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    type: row.type,
+    type: isInvest ? 'investment' : row.type,
     institution: row.institution || undefined,
     brandId: row.brand_id || undefined,
     initialBalance: row.initial_balance !== null && row.initial_balance !== undefined ? Number(row.initial_balance) : 0,

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FastForward, Loader2, Lock, ShieldCheck, User } from 'lucide-react';
 import { useFinanceStore } from './store/useFinanceStore';
 import { useAuth } from './context/AuthContext';
@@ -12,6 +12,8 @@ import { RecurrenceSummaryWidget } from './components/home/RecurrenceSummaryWidg
 import { DesktopInvestmentWidget } from './components/home/DesktopInvestmentWidget';
 import { DesktopBudgetsWidget } from './components/home/DesktopBudgetsWidget';
 import { RecentTransactionsList } from './components/home/RecentTransactionsList';
+import { InvestmentAccountView } from './components/investments/InvestmentAccountView';
+import { isInvestmentSource } from './utils/finance';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { PWAInstallPrompt } from './components/common/PWAInstallPrompt';
 import type { PillarType, Transaction } from './types/finance';
@@ -66,6 +68,7 @@ export default function App() {
   const hasHydratedFromCloud = useFinanceStore((state) => state.hasHydratedFromCloud);
   const purgeUserData = useFinanceStore((state) => state.purgeUserData);
   const sources = useFinanceStore((state) => state.sources);
+  const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const syncStaleAssetQuotes = useFinanceStore((state) => state.syncStaleAssetQuotes);
 
   const {
@@ -88,6 +91,12 @@ export default function App() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<PillarType | 'all'>('all');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) || null : null),
+    [sources, activeSourceId]
+  );
+  const isInvestAccount = Boolean(activeSource && isInvestmentSource(activeSource));
 
   // Synchronize authenticated user with store and fetch cloud data
   useEffect(() => {
@@ -257,23 +266,34 @@ export default function App() {
               {/* 1. Patrimonio y Fuentes (Sin deslizamiento en PC) */}
               <HeroBalance selectedPillar={selectedPillar} />
 
-              {/* 2. KPIs del Mes (Ingresos, Gastos, Cartera/Ahorro) */}
-              <MetricPillars
-                selectedPillar={selectedPillar}
-                onSelectPillar={setSelectedPillar}
-              />
+              {/* Si la cuenta seleccionada es de Inversión / Broker (MyInvestor, Trade Republic, etc.) */}
+              {isInvestAccount && activeSource ? (
+                <InvestmentAccountView
+                  source={activeSource}
+                  onOpenAddModal={() => setIsAddModalOpen(true)}
+                  onEditTransaction={setEditingTransaction}
+                />
+              ) : (
+                <>
+                  {/* 2. KPIs del Mes (Ingresos, Gastos, Cartera/Ahorro) */}
+                  <MetricPillars
+                    selectedPillar={selectedPillar}
+                    onSelectPillar={setSelectedPillar}
+                  />
 
-              {/* 3. Próximos Pagos y Cobros Recurrentes (en móvil) */}
-              <div className="lg:hidden">
-                <RecurrenceSummaryWidget />
-              </div>
+                  {/* 3. Próximos Pagos y Cobros Recurrentes (en móvil) */}
+                  <div className="lg:hidden">
+                    <RecurrenceSummaryWidget />
+                  </div>
 
-              {/* 4. Historial de Movimientos Recientes */}
-              <RecentTransactionsList
-                selectedPillar={selectedPillar}
-                onSelectPillar={setSelectedPillar}
-                onEditTransaction={setEditingTransaction}
-              />
+                  {/* 4. Historial de Movimientos Recientes */}
+                  <RecentTransactionsList
+                    selectedPillar={selectedPillar}
+                    onSelectPillar={setSelectedPillar}
+                    onEditTransaction={setEditingTransaction}
+                  />
+                </>
+              )}
             </div>
 
             {/* ── Columna Secundaria (4 de 12 columnas) — visible solo en PC (lg+) ── */}

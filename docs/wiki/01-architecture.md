@@ -793,3 +793,95 @@ Para permitir transferencias directas de fondos entre cuentas bancarias del usua
 ### 3. Sincronización en Cascada en Edición y Borrado
 - **Edición**: Al modificar el importe o fecha de cualquiera de los dos lados del traspaso mediante `updateTransaction`, el store localiza el movimiento gemelo vía `companionTxId` o `transferId` y replica los cambios atómicamente en ambas transacciones (y en Supabase).
 - **Borrado**: Al eliminar una de las transacciones (ej. deslizando hacia la izquierda en la lista de movimientos recientes), `deleteTransaction` purga automáticamente ambos apuntes para evitar dinero fantasma en destino.
+
+
+---
+
+## 20. Arquitectura de Cuentas Broker & Inversión (Estilo MyInvestor, Trade Republic, DEGIRO)
+
+Las entidades de inversión y brokers no operan como cuentas corrientes estándar. No reflejan únicamente transacciones o transferencias bancarias de entrada, sino que representan un ecosistema híbrido entre liquidez en efectivo y activos financieros en cartera:
+
+### 1. Modelo Híbrido de Capital (Liquidez + Cartera)
+- **Efectivo / Liquidez sin Invertir (`cashBalance`)**:
+  - Saldo disponible en cuenta para operar en bolsa o traspasar a otros bancos:
+    $$\text{cashBalance} = \text{initialBalance} + \sum \text{income} - \sum \text{expense} - \sum \text{investExpense}$$
+  - Los ingresos son habitualmente traspasos entrantes desde cuentas corrientes del usuario.
+  - Las compras de activos (`pillar: 'invest'`) descuentan liquidez de la cuenta y la convierten en participaciones bursátiles.
+- **Capital Invertido (`investedCapital`)**:
+  - Coste total de adquisición de las posiciones en custodia asignadas a este broker.
+- **Valor Actual de Mercado (`portfolioMarketValue`)**:
+  - Valoración en vivo de las participaciones custodiadas multiplicadas por su cotización oficial en tiempo real.
+- **Cuánto está dando (Rendimiento / P&L Latente)**:
+  - Plusvalía o minusvalía viva generada por las inversiones asociadas:
+    $$\text{PnL} = \text{portfolioMarketValue} - \text{investedCapital}$$
+  - Calculada en euros y porcentaje ($+\text{X € } (+\text{Y%})$).
+- **Patrimonio Total en Cuenta (`totalAccountValue`)**:
+  - Riqueza neta total custodiada en la entidad:
+    $$\text{totalAccountValue} = \text{cashBalance} + \text{portfolioMarketValue}$$
+
+### 2. Detección Inteligente y Enrutamiento en UI
+- **Función Heurística `isInvestmentSource`**:
+  - Identifica si una cuenta es de inversión si `source.type === 'investment'` o si su nombre o institución coincide con brokers catalogados (`MyInvestor`, `Trade Republic`, `DEGIRO`, `Scalable Capital`, `Indexa Capital`, `Interactive Brokers`, etc.).
+- **Conmutación Automática en Dashboard**:
+  - Al seleccionar o deslizar hacia una cuenta broker en `HeroBalance`, la vista principal conmuta de forma reactiva de la lista de movimientos bancarios ordinarios hacia el componente especializado **`InvestmentAccountView.tsx`**.
+
+### 3. Vínculo de Posiciones y Aportaciones al Índice
+- Las posiciones de inversión se asocian a la cuenta mediante:
+  1. `asset.sourceId === source.id`
+  2. Coincidencia entre la plataforma del activo y la entidad del broker (`asset.platform === source.institution`).
+  3. Movimientos históricos de aportación en los que el usuario eligió esta cuenta como origen de pago (`tx.sourceId === source.id`).
+- Al pulsar sobre cualquier activo dentro del broker, se despliega un cajón interactivo con **todas las entradas de aportación** realizadas a ese índice en dicha cuenta, con fecha, importe y acceso directo para editar.
+
+### 4. Analítica Especializada de Inversiones en /stats (`InvestmentAnalyticsView.tsx`)
+Cuando el usuario accede a la sección de Estadísticas (`/stats` o `AnalyticsView`) y tiene seleccionada una cuenta broker de inversión (`isInvestmentSource(activeSource) === true`), la vista sustituye las métricas convencionales de gastos domésticos y comercios (irrelevantes en un broker) por un panel analítico financiero de alta fidelidad:
+- **Hero Card de Cartera Broker**:
+  - Resumen patrimonial en vivo: Patrimonio Total en Cuenta, Liquidez disponible (`cashBalance`), Capital Invertido (`investedCapital`), Aportaciones del Periodo (`periodInflows`) y la métrica principal **"Cuánto está dando"** con plusvalía/minusvalía neta (`unrealizedPnL` y `unrealizedPnLPercentage`) en semántica esmeralda/coral.
+- **Selector de 4 Pestañas Analíticas Interactivas**:
+  1. **Distribución de Activos (Asset Allocation)**: Gráfico de dona (Recharts `PieChart`) con desglose porcentual por clases de activos (ETFs, Fondos Indexados, Acciones, Criptomonedas, Renta Fija, Depósitos, Efectivo / Liquidez sin invertir), con leyenda de colores estandarizados y porcentajes sobre el total custodiado.
+  2. **Top Posiciones & Ponderación**: Ranking de activos ordenados por peso en cartera (`portfolioWeight`), con coste base, valor de mercado actual, número de participaciones y rentabilidad individual (€ y %).
+  3. **Flujo de Capital Mensual (Bar Chart)**: Gráfico de barras mensual comparando aportaciones/traspasos entrantes desde bancos (`inflow`), compras de activos e inversión neta (`invested`) y retiradas de liquidez hacia cuentas bancarias (`withdrawn`).
+  4. **Evolución de Cartera (Area Chart)**: Gráfico de área comparativo que proyecta el coste acumulado invertido frente a la valoración viva de mercado a lo largo del tiempo.
+- **Diagnóstico de Eficiencia y Liquidez (Cash Drag Diagnostic)**:
+  - Tarjeta de salud financiera que analiza la proporción de efectivo ocioso vs capital productivo (`efficiencyRatio`), emitiendo recomendaciones automáticas (alta liquidez / arrastre de efectivo, nivel óptimo o inversión plena).
+- **Aislamiento Multicuenta**: Si el usuario conmuta al "Patrimonio Total" consolidado (`activeSourceId: null`) o a una cuenta bancaria ordinaria, la vista revierte automáticamente a las analíticas de ahorro y gastos del hogar sin recargar la página.
+
+### 5. Motor de Progresión de Inversiones Multi-Línea (`AssetProgressionLineChart.tsx`)
+Para permitir el seguimiento visual comparativo de cada ETF, criptomoneda, acción o fondo de inversión en el apartado de Estadísticas (/stats):
+- **Generador de Series Temporales Individualizadas (`computeAssetProgressionSeries`)**:
+  - Reconstruye para cada activo su trayectoria cronológica mes a mes calculando participaciones acumuladas, aportaciones netas y valoraciones de mercado vivas.
+  - Sincroniza al céntimo el valor del mes actual con la cotización viva oficial (`shares * currentPrice`).
+- **Integración Dual en Estadísticas**:
+  1. **Vista Global / Consolidada (`AnalyticsView.tsx`)**:
+     - En móvil (<1024px): Incorpora la pestaña *"Activos"* (`activeChartSection === 'assets'`) junto a Ahorro, Categorías, Mensual y Patrimonio.
+     - En escritorio (≥1024px): Despliega el gráfico de líneas a ancho completo (`w-full`) debajo de la cuadrícula 2x2.
+  2. **Vista Broker / Especializada (`InvestmentAnalyticsView.tsx`)**:
+     - En la sección *"Evolución"*, incorpora un conmutador Liquid Glass con dos modos: *"Líneas por Activo (ETFs, Monedas)"* (por defecto) y *"Total Cartera (€)"*.
+- **Interactividad Avanzada**:
+  - Filtrado instantáneo por clase de activo: Todos, ETFs, Cripto / Monedas, Acciones, Fondos Indexados.
+  - Conmutador de métrica: Valor de Mercado (€) vs Coste Invertido (€).
+  - Píldoras táctiles interactivas por activo: permiten encender/apagar líneas individuales o aislar una posición específica con un clic.
+
+### 6. Desacople y Aislamiento de Inversiones en Cuentas de Efectivo (`type === 'cash'`)
+- En el apartado de Estadísticas (`/stats` en `AnalyticsView.tsx`), cuando el usuario selecciona una cuenta de efectivo físico (`activeSource.type === 'cash'`):
+  - **Exclusión de Métricas y Gráficos de Inversión**: Se oculta por completo la pestaña de *"Activos"* en el conmutador móvil y se suprime la renderización de `<AssetProgressionLineChart />` tanto en dispositivos móviles como en la vista de escritorio (PC/Tablet).
+  - **Fallback Reactivo de Pestaña**: Si el usuario navegaba por la pestaña *"Activos"* y selecciona la cuenta de efectivo, un hook `useEffect` redirige inmediatamente la vista a *"Ahorro"*.
+  - **Semántica Especializada de Saldo**: La tarjeta de evolución patrimonial sustituye su nomenclatura a *"Evolución de Saldo en Efectivo"* (pestaña móvil: *"Saldo"*, tooltip: *"Saldo Efectivo"*), eliminando cualquier mención a carteras de inversión.
+  - **Blindaje en Heurística Financiera**: La función `isInvestmentSource` comprueba preventivamente `if (source.type === 'cash') return false;`, impidiendo que el motor analítico confunda efectivo con entidades de inversión.
+
+### 7. Ciclo de Vida Responsivo de Gráficos Recharts (`useMediaQuery`)
+- **Problema de Montaje en Elementos Ocultos (`display: none`)**:
+  - En arquitecturas responsive que alternan entre vistas móviles (<1024px) y de escritorio (≥1024px), si ambas vistas coexisten en el DOM ocultadas mediante clases CSS (`hidden lg:flex` / `lg:hidden`), la biblioteca Recharts (`ResponsiveContainer`) registra tamaño $0\times 0$ en la vista oculta y dispara alertas en consola.
+- **Hook `useMediaQuery`**:
+  - El hook [`useMediaQuery.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useMediaQuery.ts) escucha de forma eficiente la media query `(min-width: 1024px)`.
+  - Permite conmutar condicionalmente en React la renderización (`!isDesktop ? <MobileView /> : <DesktopView />`), asegurando que solo los gráficos visibles son montados en el árbol DOM, reduciendo el consumo de memoria y eliminando por completo cualquier advertencia de dimensiones cero.
+
+### 8. Resiliencia del Proxy de Cotizaciones y Resolución de Renta Fija / Bonos
+- **Tratamiento de Activos Sin Ticker Bursátil en Yahoo Finance**:
+  - Ciertos activos catalogados como deuda pública o bonos soberanos (ej. Bonos del Tesoro a 3 años con ISIN `ES0000012K21`) y depósitos bancarios a plazo fijo (`assetType: 'deposit'`) no cotizan en mercados de valores tradicionales ni disponen de ticker en Yahoo Finance.
+- **Evitación de Errores de Red 502 (Bad Gateway) en Consola**:
+  - Anteriormente, una respuesta 404 del endpoint upstream de Yahoo provocaba que el middleware proxy local en [`vite.config.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/vite.config.ts) y la función serverless [`api/quote.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/api/quote.ts) emitieran un código HTTP 502, el cual generaba errores rojos no controlados en la consola del navegador.
+  - El proxy ahora responde con código HTTP 200 y carga útil estructurada `{ error: 'Upstream error 404', price: null, symbol: rawSymbol }`. De este modo, la capa de servicios (`marketDataService.ts`) procesa el fallo de forma limpia mediante SWR (Stale-While-Revalidate), sirviendo la última cotización en caché o el precio base del catálogo sin polucionar la consola.
+- **Resolución Determinista en `resolveIsinQuote`**:
+  - En [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts), se interceptan los ISIN correspondientes a activos de renta fija no cotizados definidos en `CURATED_MARKET_ASSETS` (`assetType === 'fixed_income'`), devolviendo directamente su precio base de referencia sin desencadenar peticiones HTTP externas.
+  - En [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), los métodos `refreshAllAssetPrices` y `syncStaleAssetQuotes` filtran explícitamente los depósitos a plazo fijo (`asset.assetType !== 'deposit'`).
+

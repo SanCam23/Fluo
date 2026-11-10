@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Landmark,
+  TrendingUp,
   Wallet,
   Plus,
   ChevronUp,
@@ -14,9 +15,20 @@ import {
 } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import type { SourceAccount, SourceType } from '../../types/finance';
-import { computeSourceBalance } from '../../utils/finance';
+import { computeSourceBalance, isInvestmentSource } from '../../utils/finance';
 import { formatCurrency } from '../../utils/currency';
 import { SourceAvatar } from '../common/SourceAvatar';
+
+const COMMON_BROKERS = [
+  'MyInvestor',
+  'Trade Republic',
+  'DEGIRO',
+  'Scalable Capital',
+  'Indexa Capital',
+  'Interactive Brokers',
+  'HeyTrade',
+  'Trading 212',
+];
 
 const COMMON_BANKS = [
   'BBVA',
@@ -113,7 +125,7 @@ export const SourceAccountManager: React.FC = () => {
           type: formType,
           institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
           initialBalance: initialBalanceNum,
-          color: formType === 'cash' ? '#10b981' : '#6366f1',
+          color: formType === 'cash' ? '#10b981' : formType === 'investment' ? '#6366f1' : '#4f46e5',
         });
       } else {
         addSource({
@@ -122,7 +134,7 @@ export const SourceAccountManager: React.FC = () => {
           institution: formType === 'cash' ? 'Efectivo' : formInstitution.trim() || undefined,
           initialBalance: initialBalanceNum,
           orderIndex: sortedSources.length,
-          color: formType === 'cash' ? '#10b981' : '#6366f1',
+          color: formType === 'cash' ? '#10b981' : formType === 'investment' ? '#6366f1' : '#4f46e5',
         });
       }
     } catch (err: any) {
@@ -234,8 +246,17 @@ export const SourceAccountManager: React.FC = () => {
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                   <SourceAvatar source={source} size="sm" />
                   <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-bold text-white light:text-slate-900 truncate">
+                    <span className="text-xs font-bold text-white light:text-slate-900 truncate flex items-center gap-1.5">
                       {source.name}
+                      {isInvestmentSource(source) ? (
+                        <span className="px-1.5 py-0.2 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[9px] font-semibold">
+                          Broker
+                        </span>
+                      ) : source.type === 'cash' ? (
+                        <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold">
+                          Efectivo
+                        </span>
+                      ) : null}
                     </span>
                     <div className="flex items-center gap-2 text-[10px] text-slate-400 light:text-slate-500 mt-0.5 truncate">
                       <span className="truncate">Saldo: <strong className="text-white light:text-slate-800 font-semibold">{formatCurrency(balanceInfo.netBalance)}</strong></span>
@@ -321,14 +342,14 @@ export const SourceAccountManager: React.FC = () => {
                   );
                   return (
                     <div className="flex flex-col gap-1.5">
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         <button
                           type="button"
                           onClick={() => {
                             setFormType('bank');
-                            if (formInstitution === 'Efectivo') setFormInstitution('BBVA');
+                            if (formInstitution === 'Efectivo' || !formInstitution) setFormInstitution('BBVA');
                           }}
-                          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                             formType === 'bank'
                               ? 'bg-indigo-500/25 border-indigo-400 text-white'
                               : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
@@ -339,6 +360,26 @@ export const SourceAccountManager: React.FC = () => {
                         </button>
                         <button
                           type="button"
+                          onClick={() => {
+                            setFormType('investment');
+                            if (formInstitution === 'Efectivo' || formInstitution === 'BBVA' || !formInstitution) {
+                              setFormInstitution('MyInvestor');
+                            }
+                            if (!formName || formName === 'Cuenta Nómina') {
+                              setFormName('MyInvestor Cartera');
+                            }
+                          }}
+                          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                            formType === 'investment'
+                              ? 'bg-indigo-500/25 border-indigo-400 text-white'
+                              : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>Inversión</span>
+                        </button>
+                        <button
+                          type="button"
                           disabled={hasExistingCash}
                           onClick={() => {
                             if (hasExistingCash) return;
@@ -346,7 +387,7 @@ export const SourceAccountManager: React.FC = () => {
                             if (!formName || formName === 'Cuenta Nómina') setFormName('Billetera');
                             setFormInstitution('Efectivo');
                           }}
-                          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
+                          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl border text-xs font-semibold transition-all ${
                             hasExistingCash
                               ? 'opacity-40 cursor-not-allowed bg-white/[0.02] border-white/5 text-slate-500'
                               : formType === 'cash'
@@ -381,7 +422,7 @@ export const SourceAccountManager: React.FC = () => {
                   />
                 </div>
 
-                {/* Institution */}
+                {/* Institution (Bank or Broker) */}
                 {formType === 'bank' && (
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-semibold text-slate-300">Banco / Entidad</label>
@@ -393,7 +434,7 @@ export const SourceAccountManager: React.FC = () => {
                       className="w-full rounded-xl bg-white/[0.06] border border-white/15 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
                     />
                     <div className="flex items-center gap-1 flex-wrap mt-1">
-                      {COMMON_BANKS.slice(0, 4).map((bank) => (
+                      {COMMON_BANKS.slice(0, 5).map((bank) => (
                         <button
                           key={bank}
                           type="button"
@@ -401,6 +442,36 @@ export const SourceAccountManager: React.FC = () => {
                           className="px-2 py-0.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 text-[10px] text-slate-400 hover:text-white cursor-pointer"
                         >
                           {bank}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {formType === 'investment' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-300">Broker / Entidad de Inversión</label>
+                    <input
+                      type="text"
+                      value={formInstitution}
+                      onChange={(e) => setFormInstitution(e.target.value)}
+                      placeholder="Ej. MyInvestor, Trade Republic, DEGIRO..."
+                      className="w-full rounded-xl bg-white/[0.06] border border-white/15 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                    />
+                    <div className="flex items-center gap-1 flex-wrap mt-1">
+                      {COMMON_BROKERS.map((broker) => (
+                        <button
+                          key={broker}
+                          type="button"
+                          onClick={() => {
+                            setFormInstitution(broker);
+                            if (!formName || formName.includes('Cartera') || formName === 'Cuenta Nómina') {
+                              setFormName(`${broker} Cartera`);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-[10px] text-indigo-300 hover:text-white cursor-pointer"
+                        >
+                          {broker}
                         </button>
                       ))}
                     </div>

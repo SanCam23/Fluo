@@ -1052,6 +1052,25 @@ export async function resolveIsinQuote(
   const cached = getQuoteFromCache(cleanIsin);
   const candidateTicker = quoteTickerHint || cached?.quoteTicker || curated?.quoteTicker;
 
+  // 0. Non-quoted fixed income / treasury bond with curated official benchmark price
+  if (curated?.assetType === 'fixed_income' && !curated.ticker && !curated.quoteTicker && !equivalence) {
+    const result: MarketQuoteResult = {
+      identifier: cleanIsin,
+      name: curated.name,
+      ticker: cleanIsin,
+      isin: cleanIsin,
+      quoteTicker: cleanIsin,
+      price: curated.basePrice || 100,
+      change24h: curated.change24h || 0,
+      currency: curated.currency || 'EUR',
+      lastUpdated: 'Oficial',
+      lastPriceUpdate: new Date().toISOString(),
+      isOfflineCached: true,
+    };
+    saveQuoteToCache(result);
+    return result;
+  }
+
   // 1. Ruta 1: Direct ISIN quote via proxy / FT Markets (fastest & most up to date NAV)
   const isinQuote = await fetchYahooChartQuote(cleanIsin);
   if (isinQuote && isinQuote.price > 0) {

@@ -2,15 +2,35 @@ import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, PieChart, ChevronRight, Coins } from 'lucide-react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
+import { isInvestmentSource, getAssetsForSource } from '../../utils/finance';
 
 export const DesktopInvestmentWidget: React.FC = () => {
   const assets = useFinanceStore((state) => state.assets);
+  const sources = useFinanceStore((state) => state.sources);
+  const transactions = useFinanceStore((state) => state.transactions);
+  const activeSourceId = useFinanceStore((state) => state.activeSourceId);
   const setActiveTab = useFinanceStore((state) => state.setActiveTab);
+
+  const activeSource = useMemo(
+    () => (activeSourceId ? sources.find((s) => s.id === activeSourceId) || null : null),
+    [sources, activeSourceId]
+  );
+  const isInvestAccount = Boolean(activeSource && isInvestmentSource(activeSource));
+
+  const scopedAssets = useMemo(() => {
+    if (!isInvestAccount || !activeSource) return assets;
+    const holdings = getAssetsForSource(activeSource, transactions, assets);
+    return holdings.map((h) => ({
+      ...h.asset,
+      shares: h.shares,
+      averageBuyPrice: h.averageBuyPrice,
+    }));
+  }, [isInvestAccount, activeSource, transactions, assets]);
 
   const { totalCost, totalValue, totalPnL, totalPnLPercent, isProfit } = useMemo(() => {
     let cost = 0;
     let val = 0;
-    assets.forEach((a) => {
+    scopedAssets.forEach((a) => {
       const fee = a.initialFee || 0;
       cost += a.shares * a.averageBuyPrice + fee;
       val += a.shares * a.currentPrice;
@@ -24,10 +44,10 @@ export const DesktopInvestmentWidget: React.FC = () => {
       totalPnLPercent: pnlPct,
       isProfit: pnl >= 0,
     };
-  }, [assets]);
+  }, [scopedAssets]);
 
   const topAssets = useMemo(() => {
-    return [...assets]
+    return [...scopedAssets]
       .sort((a, b) => b.shares * b.currentPrice - a.shares * a.currentPrice)
       .slice(0, 3);
   }, [assets]);
@@ -43,7 +63,7 @@ export const DesktopInvestmentWidget: React.FC = () => {
             <PieChart className="h-4 w-4" />
           </div>
           <span className="text-xs font-bold text-white light:text-slate-900 uppercase tracking-wider">
-            Cartera de Inversiones
+            {isInvestAccount && activeSource ? `Cartera en ${activeSource.name}` : 'Cartera de Inversiones'}
           </span>
         </div>
 

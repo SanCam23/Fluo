@@ -46,6 +46,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
 | **Auto-Sanación de Fondos Eclipsados & Purga Huérfana** | ✅ Completado | Detección reactiva de discrepancias en `reconcileAssetsFromTransactions`, auto-renombrado y recálculo según movimientos activos, purga de `reconciled-asset-*` huérfanos y botón de borrado visible en móvil (`opacity-80`) |
 | **Optimización Integral & Consolidación** | ✅ Completado | Eliminación de código muerto (5 archivos), importación dinámica de mock data, Mapas O(1) en store y vistas, y consolidación de bucles en una sola pasada |
 | **Multi-Aportaciones, Fondos Externos & Retiradas** | ✅ Completado | Consolidación visual a 1 tarjeta por índice con historial desplegable de aportaciones, fondos externos opcionales, eliminación de borrado directo y modal de retirada con liquidación hacia cuentas |
+| **Cuentas Broker & Inversión (MyInvestor / Trade Republic)** | ✅ Completado | Módulo híbrido (liquidez + cartera), cálculo de cuánto está dando, entradas al índice y conmutador en Dashboard |
 
 ---
 
@@ -1138,6 +1139,85 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - En la cuadrícula cuádruple de métricas de inversión, el indicador de posiciones ("X índices/activos") incorpora `text-xs sm:text-sm lg:text-base font-bold whitespace-nowrap truncate tracking-tight` y `p-3 sm:p-3.5 min-w-0`.
   - Garantiza que el texto permanezca estrictamente en una única línea en cualquier ancho de pantalla (desde móviles de 375px hasta escritorios) sin saltos de línea antiestéticos ni desbordamiento de tarjeta.
 
+
+### v0.6.5 (Cuentas Broker & Inversión Estilo MyInvestor y Trade Republic)
+- **[x] Tipado y Modelo Híbrido de Cuenta Broker (`type: 'investment'`)**:
+  - Ampliación de `SourceType` a `'bank' | 'cash' | 'investment'` con soporte para entidades custodias de valores.
+  - Integración en `SourceAccountManager.tsx` de selector triple con presets rápidos de brokers europeos (MyInvestor, Trade Republic, DEGIRO, Scalable Capital, Indexa Capital, Interactive Brokers, HeyTrade, Trading 212).
+  - Función heurística `isInvestmentSource` para detección automática por tipo o nombre institucional.
+- **[x] Cálculo Integral de Métricas Financieras (`computeInvestmentAccountSummary`)**:
+  - Liquidez disponible sin invertir (`cashBalance`).
+  - Capital invertido en cartera (`investedCapital`).
+  - Valor de mercado vivo de los activos (`portfolioMarketValue`).
+  - Indicador *"Cuánto está dando"* con plusvalía/minusvalía neta en euros y porcentaje (`unrealizedPnL` y `unrealizedPnLPercentage`).
+  - Patrimonio total en custodia (`totalAccountValue = cashBalance + portfolioMarketValue`).
+- **[x] Componente Especializado Liquid Glass (`InvestmentAccountView.tsx`)**:
+  - Panel superior con desglose de liquidez vs inversiones y barra porcentual de distribución.
+  - Accesos directos de acción rápida para *"Nueva Inversión"* e *"Ingresar Fondos (Traspaso)"*.
+  - Pestaña *"Mis Inversiones"*: Lista interactiva de los activos custodiados con acordeón desplegable de todas las aportaciones a ese índice en dicha cuenta y edición directa.
+  - Pestaña *"Traspasos y Movimientos"*: Historial de transferencias de fondos y operaciones con gestos táctiles.
+- **[x] Integración Reactiva en el Carrusel (`HeroBalance.tsx`) y Dashboard (`App.tsx`)**:
+  - Tarjeta de `HeroBalance` adaptada con valor total, métrica de cuánto está dando en verde/rojo y desglose de liquidez.
+  - Al deslizar o seleccionar una cuenta broker, el panel principal conmuta automáticamente a `InvestmentAccountView`.
+- **[x] Suite de Tests Automatizados (`investmentAccount.test.ts`)**:
+  - 6 nuevos tests unitarios validando detección de brokers, cálculo contable de liquidez + cartera, asociación de aportaciones al índice y aislamiento de activos externos.
+- **[x] Estadísticas de Inversión Adaptadas en /stats (`InvestmentAnalyticsView.tsx`)**:
+  - Detección reactiva en `AnalyticsView`: si la cuenta activa es de tipo broker/inversión (`isInvestmentSource`), conmuta automáticamente a la vista de analítica bursátil especializada.
+  - **Hero Card de Cartera**: Muestra Patrimonio Total, Liquidez disponible, Capital Invertido, Aportaciones del Periodo y el indicador clave **"Cuánto está dando"** (€ y %) con glifo y color dinámico.
+  - **Distribución de Activos (Asset Allocation)**: Gráfico de dona (Recharts) interactivo con desglose de clases de activos (ETFs, Fondos, Acciones, Cripto, Renta Fija, Depósitos y Efectivo) con colores oficiales estandarizados (`ASSET_TYPE_CONFIG`).
+  - **Ranking de Posiciones y Ponderación**: Ponderación porcentual en cartera de cada activo, coste de compra, valor de mercado actual, participaciones y rentabilidad neta individual.
+  - **Flujo de Capital Mensual**: Gráfico de barras mensual comparando traspasos entrantes de fondos, compras de activos y retiradas de liquidez.
+  - **Evolución de Cartera**: Gráfico de área temporal comparando la curva de coste invertido vs valoración de mercado.
+  - **Diagnóstico de Eficiencia (Cash Drag)**: Análisis de liquidez ociosa vs capital en rentabilidad.
+  - **Tests Unitarios de Analítica**: 3 nuevos tests en `investmentAccount.test.ts` verificando `computeBrokerAssetAllocation`, `computeBrokerHoldingsRanking` y `computeBrokerMonthlyFlows`.
+- **[x] Gráfico Multi-Línea de Progresión por Activo (`AssetProgressionLineChart.tsx`)**:
+  - Nuevo componente visual Liquid Glass que dibuja las curvas cronológicas individuales para cada ETF, criptomoneda (Bitcoin, Ethereum), acción y fondo indexado.
+  - Integrado en Estadísticas tanto para carteras consolidadas (`AnalyticsView` con nueva pestaña móvil *"Activos"* y vista de escritorio a ancho completo) como para cuentas broker (`InvestmentAnalyticsView` con conmutador en la pestaña *"Evolución"*).
+  - Algoritmo `computeAssetProgressionSeries` con interpolación y reconciliación al céntimo en el mes corriente.
+  - Filtros instantáneos por clase de activo (Todos, ETFs, Cripto / Monedas, Acciones, Fondos) y selector de métrica (Valor de Mercado vs Coste Invertido).
+  - Píldoras interactivas por activo con badge de rentabilidad y botón para aislar líneas (`Eye`).
+  - 4 nuevos tests unitarios en `finance.test.ts` verificando la generación de series y asignación cromática.
+- **[x] Calibración Espacial y Supresión de Truncados en Pestañas Segmentadas**:
+  - Eliminados los iconos vectoriales de los botones de pestañas en Estadísticas para maximizar el ancho disponible del texto.
+  - Erradicadas las clases `truncate` y `min-w-0` en favor de `min-w-max`, garantizando que todos los nombres (*Ahorro, Categorías, Mensual, Patrimonio, Activos, Distribución, Posiciones, Flujos, Evolución*) se lean 100% completos sin puntos suspensivos ("...").
+  - Contenedor vítreo adaptativo con `overflow-x-auto scrollbar-none` que permite scroll táctil natural en móviles muy estrechos y distribución equitativa en móviles estándar.
+
+- **[x] Desacople de Inversiones en Cuentas de Efectivo en Estadísticas**:
+  - En [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx), cuando el usuario selecciona una cuenta de efectivo (`activeSource.type === 'cash'`), se eliminan todos los módulos y pestañas de inversión bursátil (ETFs, criptomonedas, acciones):
+    - Ocultación de la pestaña *"Activos"* en la barra segmentada móvil (<lg).
+    - Exclusión del gráfico inferior a ancho completo `<AssetProgressionLineChart />` en móvil y escritorio (≥lg).
+    - Redirección reactiva (`useEffect`): si la pestaña *"Activos"* estaba seleccionada y el usuario cambia a una cuenta de efectivo, el selector vuelve de inmediato a *"Ahorro"*.
+    - Adaptación semántica de la tarjeta de evolución patrimonial a *"Evolución de Saldo en Efectivo"* (rótulo móvil: *"Saldo"*, tooltip: *"Saldo Efectivo"*, descripción: *"Saldo acumulado disponible en efectivo"*).
+    - Blindaje de `isInvestmentSource` en [`finance.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.ts) descartando explícitamente `type === 'cash'`.
+  - 3 nuevos tests unitarios en [`finance.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/finance.test.ts) validando la discriminación estricta de cuentas de efectivo y brokers.
+
+- **[x] Calibración Óptica de Márgenes de Eje Y en Gráficos Móviles (`formatAxisCurrency`)**:
+  - Erradicado el problema de recorte en el lateral izquierdo en smartphones donde el contenedor con `overflow-hidden` se comía el primer dígito del eje Y (ej. en valores de Bitcoin o carteras >10k€ con `"63,9 mil €"`):
+    - Eliminado el margen negativo `left: -20` en favor de `margin={{ top: 10, right: 10, left: 4, bottom: 0 }}`.
+    - Calibrado de `<YAxis width={48} tickMargin={4} />` proporcionando un margen de seguridad interior de más de 15px.
+    - Introducido el formateador [`formatAxisCurrency`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/currency.ts) que compacta las cifras en estándar financiero europeo (`500€`, `1,2k€`, `64k€`, `1M€`), reduciendo la longitud de caracteres en un 55%.
+    - Homogeneizado en [`AssetProgressionLineChart.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AssetProgressionLineChart.tsx), [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx) y [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx).
+  - 8 nuevos tests unitarios en [`currency.test.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/currency.test.ts) validando `formatAxisCurrency`, `formatPercentage` y `formatCompactCurrency`.
+
+- **[x] Erradicación del Warning en Consola `width(0) and height(0)` en Recharts**:
+  - Resuelto el aviso de consola donde Recharts advertía de dimensiones 0x0 al intentar medir gráficos dentro de contenedores con `display: none` (`hidden lg:flex` y `lg:hidden` simultáneos en el DOM):
+    - Creación del hook reactivo [`useMediaQuery.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/hooks/useMediaQuery.ts) para desacoplar el árbol de componentes entre móvil y escritorio (`!isDesktop ? <MobileCharts /> : <DesktopCharts />`).
+    - Eliminación de la coexistencia de árboles ocultos en el DOM: solo se montan los gráficos activos de la vista actual, reduciendo consumo de CPU/GPU y eliminando por completo la alerta de Recharts.
+    - Asignación universal de `minWidth={0}` a todas las instancias de `<ResponsiveContainer />` en [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx), [`AssetProgressionLineChart.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AssetProgressionLineChart.tsx) e [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx).
+
+- **[x] Ampliación Horizontal de Gráficos en Pantallas Móviles (+30px de Lienzo SVG)**:
+  - Optimización milimétrica del espacio útil en gráficos de estadísticas tanto en [`AssetProgressionLineChart.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AssetProgressionLineChart.tsx), [`InvestmentAnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/InvestmentAnalyticsView.tsx) como en [`AnalyticsView.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/analytics/AnalyticsView.tsx):
+    - Ajuste del padding perimetral de las tarjetas de `p-5` a `px-3.5 sm:px-5 py-4 sm:py-5` (y `px-3 sm:px-5` en progresión multilínea).
+    - Ajuste de márgenes de Recharts de `margin={{ top: 10, right: 10, left: 4, bottom: 0 }}` a `margin={{ top: 10, right: 4, left: 0, bottom: 0 }}`.
+    - Calibración de `<YAxis width={38} tickMargin={2} />` que, complementado con [`formatAxisCurrency`](file:///c:/Users/santi/Documents/UNI/Fluo/src/utils/currency.ts) (requiere solo 24-28px), libera 10px adicionales en el eje Y.
+    - Ganancia total acumulada de más de 30px horizontales en pantallas móviles, logrando trazados más amplios, mayor resolución táctil y cero solapamientos o recortes.
+
+- **[x] Erradicación del Error de Consola 502 (Bad Gateway) en Activos de Renta Fija / Bonos**:
+  - Resuelto el error de red no controlado al consultar cotizaciones para bonos y títulos gubernamentales como `ES0000012K21` (Bonos del Estado español a 3 años):
+    - Corrección en el middleware proxy local en [`vite.config.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/vite.config.ts) y la función serverless [`api/quote.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/api/quote.ts) para responder con código HTTP 200 `{ error: 'Upstream error 404', price: null, symbol }` cuando Yahoo devuelve 404, en lugar de 502, eliminando avisos rojos de red en la consola del navegador.
+    - En [`marketDataService.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/services/marketDataService.ts), se añade resolución nativa en `resolveIsinQuote` para activos de renta fija no cotizados del catálogo curado (`assetType === 'fixed_income'`), devolviendo inmediatamente su precio base benchmark y almacenándolo en caché SWR sin realizar peticiones de red externas innecesarias.
+    - En [`useFinanceStore.ts`](file:///c:/Users/santi/Documents/UNI/Fluo/src/store/useFinanceStore.ts), se excluyen los depósitos bancarios a plazo fijo (`asset.assetType !== 'deposit'`) de los ciclos periódicos de refresco de cotizaciones bursátiles.
+
 ### v0.6.4 (Traspasos Entre Cuentas y Billetera de Efectivo, Interfaz Adaptativa y Doble Apunte Sincronizado)
 - **[x] Conmutación Reactiva de Interfaz en Gasto (`cat-transfer`)**:
   - Al seleccionar la categoría *"Traspaso"* (`cat-transfer`, icono `ArrowLeftRight`) dentro del panel de gasto en [`QuickAddTransactionModal.tsx`](file:///c:/Users/santi/Documents/UNI/Fluo/src/components/forms/QuickAddTransactionModal.tsx), el formulario adapta instantáneamente sus controles:
@@ -1167,7 +1247,7 @@ Control de hitos, módulos completados, en desarrollo y planificados para la apl
   - Añadido espaciado inferior de seguridad (`pb-6 sm:pb-2`) en el formulario para ergonomía táctil en dispositivos móviles.
 
 **Validación de Calidad:**
-- Vitest: 135/135 tests unitarios pasando al 100% (8 suites).
+- Vitest: 159/159 tests unitarios pasando al 100% (10 suites).
 - TypeScript: compilación limpia (`npx tsc -b`, 0 errores).
 - Servidor de Desarrollo: Vite activo en segundo plano en `http://localhost:5173/`.
 - Wiki: Sincronización completa de los 4 documentos en `/docs/wiki/`.

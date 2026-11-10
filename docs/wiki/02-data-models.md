@@ -200,7 +200,7 @@ export interface Transaction {
 Modela los orígenes de dinero independientes (bancos o efectivo) que componen el patrimonio líquido del usuario:
 
 ```typescript
-export type SourceType = 'bank' | 'cash';
+export type SourceType = 'bank' | 'cash' | 'investment';
 
 export interface SourceAccount {
   id: string;
@@ -231,6 +231,39 @@ export interface SourceBalanceInfo {
 // setActiveSourceId: (id: string | null) => void;
 
 > **Regla de Negocio Crítica**: Solo se permite un máximo de **una cuenta en efectivo (`type === 'cash'`)** por usuario. Tanto `addSource` como `updateSource` en `useFinanceStore.ts` y el gestor de fuentes `SourceAccountManager.tsx` validan e impiden la creación o conversión de múltiples cuentas de efectivo, garantizando la unicidad de la billetera física.
+```
+
+
+### Contratos de Cuentas Broker & Inversión (`InvestmentAccountSummary` y `SourceAssetHolding`)
+```typescript
+export interface SourceAssetHolding {
+  asset: InvestmentAsset;
+  shares: number;
+  averageBuyPrice: number;
+  investedCost: number;
+  currentValue: number;
+  pnl: number;
+  pnlPercentage: number;
+  isProfit: boolean;
+  contributions: Transaction[];
+}
+
+export interface InvestmentAccountSummary {
+  source: SourceAccount;
+  cashBalance: number;              // Saldo líquido no invertido disponible en el broker
+  investedCapital: number;          // Coste total desembolsado en las posiciones
+  portfolioMarketValue: number;     // Valor actual de mercado de la cartera en este broker
+  totalAccountValue: number;        // Patrimonio total (Efectivo + Cartera)
+  unrealizedPnL: number;            // Cuánto está dando (plusvalía no realizada en €)
+  unrealizedPnLPercentage: number;  // Rentabilidad no realizada en porcentaje (%)
+  isProfit: boolean;
+  assetsCount: number;              // Número de activos en cartera en este broker
+  holdings: SourceAssetHolding[];   // Desglose de cada activo con sus aportaciones
+  income: number;
+  expense: number;
+  investExpense: number;
+  transactionCount: number;
+}
 ```
 
 ### Correspondencia con la Tabla SQL `public.source_accounts` en Supabase
@@ -591,4 +624,96 @@ export interface InvestmentValidationResult {
 - `isValidMarketPrice(price: unknown): price is number`: Validador de tipo para cotizaciones de mercado en tiempo real.
 - `validateInvestmentEntry(fields: {...}): InvestmentValidationResult`: Validador integral de formulario antes del commit atómico.
 
+---
+
+## 9. Modelos de Analítica y Flujos de Cuentas Broker (`InvestmentAnalyticsView.tsx`)
+
+Para alimentar la sección de estadísticas especializadas de cuentas de inversión y brokers:
+
+```typescript
+export interface AssetAllocationItem {
+  key: string;              // Clave de categoría ('etf', 'index_fund', 'stock', 'cash', etc.)
+  name: string;             // Nombre legible ('ETFs', 'Fondos Indexados', 'Efectivo / Liquidez', etc.)
+  value: number;            // Valoración monetaria actual en euros
+  percentage: number;       // Ponderación relativa sobre el total en custodia (0-100%)
+  color: string;            // Color hex calibrado para gráficos Liquid Glass
+  count: number;            // Número de posiciones en esta clase de activo
+}
+
+export interface BrokerMonthlyFlow {
+  monthKey: string;         // 'YYYY-MM'
+  label: string;            // 'Ene 26', 'Feb 26', etc.
+  inflow: number;           // Fondos transferidos/ingresados desde cuentas bancarias
+  invested: number;         // Capital destinado a compra de activos (DCA)
+  withdrawn: number;        // Retiradas de liquidez hacia cuentas bancarias
+  netInflow: number;        // Inflow - Withdrawn
+}
+
+export interface RankedHoldingItem {
+  id: string;
+  name: string;
+  ticker?: string;
+  isin?: string;
+  assetType: AssetType;
+  shares: number;
+  marketValue: number;
+  cost: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercentage: number;
+  weight: number;           // Porcentaje de la posición sobre el total custodiado (0-100%)
+}
 ```
+
+### Funciones Puras de Cálculo Financiero para Brokers (`finance.ts`)
+- `computeBrokerAssetAllocation(summary: InvestmentAccountSummary): AssetAllocationItem[]`:
+  - Agrupa activos por clase (`ASSET_TYPE_CONFIG`), suma valoraciones de mercado e incluye una cuña proporcional para `Efectivo / Liquidez` si `cashBalance > 0`.
+- `computeBrokerMonthlyFlows(sourceId: string, transactions: Transaction[], monthCount = 6, referenceDate = new Date()): BrokerMonthlyFlow[]`:
+  - Computa cronológicamente los flujos de capital mes a mes separando entradas de liquidez, compras bursátiles y transferencias salientes.
+- `computeBrokerHoldingsRanking(summary: InvestmentAccountSummary): RankedHoldingItem[]`:
+  - Ordena las posiciones de mayor a menor peso patrimonial con cálculo de rentabilidad individual e imputación de ponderación porcentual sobre la cartera.
+
+```
+
+---
+
+## 10. Modelos de Progresión Temporal de Activos (`AssetProgressionLineChart`)
+
+Para representar la trayectoria cronológica del dinero en cada ETF, moneda o posición:
+
+```typescript
+export interface AssetProgressionDataPoint {
+  date: string;             // 'YYYY-MM'
+  label: string;            // 'Ene 26', 'Feb 26', etc.
+  timestamp: number;        // Marca temporal fin de mes
+  totalValue: number;       // Suma de valor de mercado de activos activos en ese mes
+  totalCost: number;        // Suma de coste acumulado invertido
+  [key: string]: number | string; // Dinámico: asset_{id} y asset_{id}_cost
+}
+
+export interface AssetSeriesMeta {
+  id: string;
+  name: string;
+  ticker?: string;
+  isin?: string;
+  assetType: AssetType;
+  color: string;            // Color hex calibrado para la línea (Liquid Glass Palette)
+  currentValue: number;     // Valoración actual viva (shares * currentPrice)
+  investedCost: number;     // Coste base acumulado
+  unrealizedPnL: number;    // Plusvalía/Minusvalía en euros
+  unrealizedPnLPercentage: number; // Rentabilidad %
+  currentPrice: number;     // Cotización unitaria
+  shares: number;           // Títulos/participaciones actuales
+  dataKey: string;          // Clave única para Recharts (ej. 'asset_asset_sp500')
+}
+
+export interface AssetProgressionResult {
+  series: AssetProgressionDataPoint[];
+  assetsMeta: AssetSeriesMeta[];
+}
+```
+
+### Funciones de Generación de Series Multi-Línea (`finance.ts`)
+- `computeAssetProgressionSeries(assets: InvestmentAsset[], transactions: Transaction[], monthCount = 6, referenceDate = new Date()): AssetProgressionResult`:
+  - Agrupa en cubos mensuales cronológicos ascendentes el valor de mercado y el coste de cada activo individual.
+  - Asigna colores vectoriales distintivos (`getAssetProgressionColor`) preservando el dorado para Bitcoin (`#F59E0B`), púrpura para Ethereum (`#8B5CF6`) e índigo para Vanguard/ETFs (`#6366F1`).
+  - Resuelve interpolación de precios históricos ante aportaciones parciales o cotizaciones vivas.

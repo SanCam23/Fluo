@@ -13,7 +13,7 @@ import {
 import { useFinanceStore, useFinancialSummary } from '../../store/useFinanceStore';
 import type { PillarType, Transaction, SourceAccount } from '../../types/finance';
 import { formatCurrency, formatPercentage } from '../../utils/currency';
-import { computeSourceBalance, computeAllSourceBalances } from '../../utils/finance';
+import { computeSourceBalance, computeAllSourceBalances, isInvestmentSource, computeInvestmentAccountSummary } from '../../utils/finance';
 import { SourceAvatar } from '../common/SourceAvatar';
 
 interface HeroBalanceProps {
@@ -329,11 +329,18 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
 
   // ── Source card content (shared between mobile carousel slide & desktop grid card) ──
   const SourceCardContent = ({ source }: { source: SourceAccount }) => {
+    const isInvestAccount = isInvestmentSource(source);
     const balanceInfo = sourceBalancesMap.get(source.id) ?? computeSourceBalance(source, transactions);
-    const formattedSourceBalance = formatCurrency(balanceInfo.netBalance);
+    const investSummary = isInvestAccount
+      ? computeInvestmentAccountSummary(source, transactions, assets)
+      : null;
+
+    const displayBalance = investSummary ? investSummary.totalAccountValue : balanceInfo.netBalance;
+    const formattedSourceBalance = formatCurrency(displayBalance);
     const [sourceInt, sourceDec] = formattedSourceBalance.split(',');
-    const isPositive = balanceInfo.netBalance >= 0;
+    const isPositive = displayBalance >= 0;
     const isBank = source.type === 'bank';
+
     return (
       <>
         {/* Header */}
@@ -345,10 +352,14 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
                 <span className="text-sm font-bold text-white light:text-slate-900 tracking-tight truncate">
                   {source.name}
                 </span>
-                <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                <span
+                  className={`flex h-1.5 w-1.5 rounded-full ${
+                    isInvestAccount ? 'bg-indigo-400' : 'bg-emerald-400'
+                  } animate-pulse flex-shrink-0`}
+                />
               </div>
               <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium truncate">
-                {source.institution || (isBank ? 'Cuenta Bancaria' : 'Efectivo')}
+                {source.institution || (isInvestAccount ? 'Broker & Inversión' : isBank ? 'Cuenta Bancaria' : 'Efectivo')}
               </span>
             </div>
           </div>
@@ -382,28 +393,65 @@ export const HeroBalance: React.FC<HeroBalanceProps> = ({
 
         {/* Bottom sub-metrics */}
         <div className="mt-3 pt-3 border-t border-white/10 light:border-slate-200/80">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
-              <span className="text-[11px] font-medium text-slate-400 truncate">Movimientos</span>
-              <span className="mt-0.5 text-sm font-bold text-white light:text-slate-800 truncate">
-                {balanceInfo.transactionCount}
-              </span>
-              <span className="text-[10px] text-slate-400 mt-0.5 truncate">
-                {isBank ? 'Transacciones banco' : 'Movimientos en efectivo'}
-              </span>
+          {isInvestAccount && investSummary ? (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
+                <span className="text-[11px] font-medium text-slate-400 truncate">Invertido</span>
+                <span className="mt-0.5 text-sm font-bold text-white light:text-slate-800 truncate">
+                  {formatCurrency(investSummary.investedCapital)}
+                </span>
+                <span className="text-[10px] text-emerald-400 light:text-emerald-600 mt-0.5 truncate">
+                  Efectivo: {formatCurrency(investSummary.cashBalance)}
+                </span>
+              </div>
+              <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
+                <span className="text-[11px] font-medium text-slate-400 truncate">Cuánto está dando</span>
+                <span
+                  className={`mt-0.5 text-sm font-bold truncate ${
+                    investSummary.isProfit
+                      ? 'text-emerald-400 light:text-emerald-600'
+                      : 'text-rose-400 light:text-rose-600'
+                  }`}
+                >
+                  {investSummary.isProfit ? '+' : ''}
+                  {formatCurrency(investSummary.unrealizedPnL)}
+                </span>
+                <span
+                  className={`text-[10px] truncate mt-0.5 font-semibold ${
+                    investSummary.isProfit
+                      ? 'text-emerald-400 light:text-emerald-600'
+                      : 'text-rose-400 light:text-rose-600'
+                  }`}
+                >
+                  {investSummary.isProfit ? '+' : ''}
+                  {formatPercentage(investSummary.unrealizedPnLPercentage)} ({investSummary.assetsCount} activos)
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
-              <span className="text-[11px] font-medium text-slate-400 truncate">Balance Inicial</span>
-              <span className="mt-0.5 text-sm font-bold text-slate-200 light:text-slate-800 truncate">
-                {formatCurrency(balanceInfo.initialBalance)}
-              </span>
-              <span className={`text-[10px] truncate mt-0.5 ${isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'}`}>
-                {balanceInfo.income >= (balanceInfo.expense + balanceInfo.investExpense)
-                  ? `+${formatCurrency(balanceInfo.income)} ent.`
-                  : `-${formatCurrency(balanceInfo.expense + balanceInfo.investExpense)} sal.`}
-              </span>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
+                <span className="text-[11px] font-medium text-slate-400 truncate">Movimientos</span>
+                <span className="mt-0.5 text-sm font-bold text-white light:text-slate-800 truncate">
+                  {balanceInfo.transactionCount}
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  {isBank ? 'Transacciones banco' : 'Movimientos en efectivo'}
+                </span>
+              </div>
+              <div className="flex flex-col justify-center rounded-2xl bg-white/[0.04] light:bg-slate-100/90 border border-white/[0.12] light:border-slate-200 shadow-sm px-3 py-2 min-w-0">
+                <span className="text-[11px] font-medium text-slate-400 truncate">Balance Inicial</span>
+                <span className="mt-0.5 text-sm font-bold text-slate-200 light:text-slate-800 truncate">
+                  {formatCurrency(balanceInfo.initialBalance)}
+                </span>
+                <span className={`text-[10px] truncate mt-0.5 ${isPositive ? 'text-emerald-400 light:text-emerald-600' : 'text-rose-400 light:text-rose-600'}`}>
+                  {balanceInfo.income >= (balanceInfo.expense + balanceInfo.investExpense)
+                    ? `+${formatCurrency(balanceInfo.income)} ent.`
+                    : `-${formatCurrency(balanceInfo.expense + balanceInfo.investExpense)} sal.`}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </>
     );

@@ -20,7 +20,7 @@ export interface Brand {
   isPopular?: boolean;
 }
 
-export type SourceType = 'bank' | 'cash';
+export type SourceType = 'bank' | 'cash' | 'investment';
 
 export interface SourceAccount {
   id: string;
@@ -87,6 +87,7 @@ export interface InvestmentAsset {
   currentPrice: number;
   currency: 'EUR' | 'USD';
   platform?: string;
+  sourceId?: string; // Cuenta o broker de custodia
   brandId?: string;
   lastUpdated: string;
   historicalPrices?: HistoricalPricePoint[];
@@ -161,3 +162,81 @@ export type TimeRangeFilter = 'this_month' | 'last_month' | 'last_3_months' | 'l
 
 export type ThemeMode = 'system' | 'dark' | 'light';
 
+
+export interface SourceAssetHolding {
+  asset: InvestmentAsset;
+  shares: number;
+  averageBuyPrice: number;
+  investedCost: number;
+  currentValue: number;
+  pnl: number;
+  pnlPercentage: number;
+  isProfit: boolean;
+  contributions: Transaction[];
+}
+
+export interface InvestmentAccountSummary {
+  source: SourceAccount;
+  cashBalance: number;
+  investedCapital: number;
+  portfolioMarketValue: number;
+  totalAccountValue: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercentage: number;
+  isProfit: boolean;
+  assetsCount: number;
+  holdings: SourceAssetHolding[];
+  income: number;
+  expense: number;
+  investExpense: number;
+  transactionCount: number;
+}
+
+export interface AssetAllocationItem {
+  id: string;
+  name: string;
+  value: number;
+  percentage: number;
+  color: string;
+  count: number;
+}
+
+export interface BrokerMonthlyFlow {
+  label: string;
+  monthKey: string;
+  inflow: number;
+  invested: number;
+  withdrawn: number;
+  netFlow: number;
+  order: number;
+}
+
+export interface AssetProgressionDataPoint {
+  date: string;
+  label: string;
+  timestamp: number;
+  totalValue: number;
+  totalCost: number;
+  [key: string]: number | string;
+}
+
+export interface AssetSeriesMeta {
+  id: string;
+  name: string;
+  ticker?: string;
+  isin?: string;
+  assetType: AssetType;
+  color: string;
+  currentValue: number;
+  investedCost: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercentage: number;
+  currentPrice: number;
+  shares: number;
+  dataKey: string;
+}
+
+export interface AssetProgressionResult {
+  series: AssetProgressionDataPoint[];
+  assetsMeta: AssetSeriesMeta[];
+}
